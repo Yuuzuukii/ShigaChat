@@ -1,0 +1,359 @@
+/* 共通スタイル */
+.category-question-container {
+  font-family: 'Open Sans', sans-serif;
+  width: 100vw;  /* 横幅をビューポート全体に */
+  height: 100vh; /* 高さをビューポート全体に */
+  margin: 0 auto;
+  border-radius: 12px;
+  padding: 30px;
+  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.7s ease-out;
+  border: 1px solid #aad4ff;
+  overflow-y: auto; /* 縦スクロールを許可 */
+}
+
+.category-question-container .header {
+  display: flex;
+  flex-direction: column; /* デフォルトは縦並び */
+  align-items: center;
+  justify-content: center;
+  padding: 15px 20px;
+  background-color: #e0f3ff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto; /* ヘッダーを中央配置 */
+}
+
+.category-question-container .header h1 {
+  flex: 1;
+  text-align: center; /* タイトルを中央に固定 */
+  font-size: 36px;
+  color: #0056b3;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+
+/* 言語選択を左端に */
+.category-question-container .languageSelector {
+  padding: 10px;
+  border: 1px solid #aad4ff;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: #0056b3;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+.category-question-container .user-notification-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* 通知アイコン */
+.category-question-container .notification-container {
+  position: relative;
+}
+
+/* 通知アイコン */
+.notification-button img {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+
+/* 通知ボタン */
+.notification-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 5px;
+}
+
+/* 通知のバッジ（未読件数） */
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 50%;
+}
+
+/* 通知ポップアップ */
+.notification-popup {
+  position: absolute;
+  width: 320px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  margin-top: -50px;
+  right: 0;
+  z-index: 1000;
+}
+
+/* 通知タイトル */
+.notification-popup h3 {
+  padding: 10px 0;
+  text-align: left;
+  font-size: 18px;
+  color: #0056b3;
+  border-bottom: 2px solid #cce7ff;
+}
+
+/* タブボタン */
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  margin: 10px 0;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #e0f3ff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.tabs button:hover {
+  background: #b3d9ff;
+}
+
+.tabs button.active {
+  background: #0056b3;
+  color: white;
+  font-weight: bold;
+}
+
+/* 通知アイテム */
+.notification-item {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* 未読通知 */
+.notification-item.unread {
+  background-color: #ffffff;
+  color: #333;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.unread:hover {
+  background-color: #f0f8ff;
+}
+
+/* 既読通知 */
+.notification-item.read {
+  color: #999;
+  opacity: 0.7;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.read:hover {
+  background-color: #e6e6e6;
+}
+
+/* 通知内の時間表示 */
+.notification-item .time {
+  font-size: 12px;
+  color: gray;
+  margin-top: 5px;
+}
+
+/* 通知が空のとき */
+.no-notifications {
+  text-align: center;
+  color: gray;
+  padding: 15px;
+}
+
+/* モバイル対応 */
+@media screen and (max-width: 768px) {
+  .view-history-container {
+    max-width: 100%;
+    padding: 20px;
+  }
+
+  .notification-popup {
+    width: 280px;
+    right: 10px;
+  }
+
+  .tabs button {
+    font-size: 12px;
+  }
+}
+
+/* 質問リスト */
+.question-list {
+  margin: 0 auto;
+  margin-top: 20px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 900px;
+}
+
+
+.question-list .situmon-header {
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 30px;
+  color: #0056b3;
+}
+
+.question-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out; /* 🔄 滑らかなアニメーション */
+}
+
+.question-item:hover {
+  background-color: #eaf4fc;
+  transform: translateY(-3px); /* 上に少し浮かせる */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+
+.question-text {
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.question-date {
+  font-size: 14px;
+  color: #777;
+  text-align: right;
+}
+
+.answer-section {
+  background-color: #eaf4fc;
+  padding: 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  font-size: 16px;
+  color: #333;
+}
+
+.situmon-header{
+  justify-content: center; /* 水平方向の中央揃え */
+  align-items: center; /* 垂直方向の中央揃え */
+}
+.no-questions {
+  text-align: center;
+  font-size: 16px;
+  color: #777;
+  margin-top: 20px;
+}
+
+/* ボタンのコンテナを中央配置 */
+.category-question-container .button-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}
+
+/* 戻るボタン */
+.back-button {
+  display: block; /* インライン要素をブロック要素に変更 */
+  width: 100%; /* 親要素いっぱいに広げる */
+  max-width: 900px; /* ボタンの最大幅を適切に設定 */
+  background: linear-gradient(135deg, #0056b3, #004494);
+  color: #ffffff;
+  padding: 15px 20px;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin: 20px auto; /* 上下20pxの余白を設定し、中央揃え */
+  text-align: center;
+}
+
+
+.back-button:hover {
+  background: linear-gradient(135deg, #004494, #003366);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.3);
+}
+
+.back-button:active {
+  background: linear-gradient(135deg, #003366, #002244);
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  0% {
+      opacity: 0;
+      transform: translateY(20px);
+  }
+  100% {
+      opacity: 1;
+      transform: translateY(0);
+  }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1024px) {
+  .container {
+      max-width: 100%;
+  }
+}
+
+@media (max-width: 768px) {
+  .container {
+      max-width: 100%;
+      padding: 20px;
+  }
+
+  .header {
+      flex-direction: column;
+      text-align: center;
+  }
+}
+
+.official-badge {
+  background-color: gold;
+  color: black;
+  font-weight: bold;
+  border-radius: 5px;
+  padding: 2px 6px;
+  margin-left: 10px;
+  font-size: 0.9em;
+}

@@ -1,0 +1,624 @@
+.question-history-container {
+  font-family: 'Open Sans', sans-serif;
+  width: 100vw;  /* 横幅をビューポート全体に */
+  height: 100vh; /* 高さをビューポート全体に */
+  margin: 0 auto;
+  border-radius: 12px;
+  padding: 30px;
+  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.7s ease-out;
+  border: 1px solid #aad4ff;
+  overflow-y: auto;
+}
+
+/* ヘッダー部分 */
+.question-history-container .header {
+  display: flex;
+  flex-direction: column; /* デフォルトは縦並び */
+  align-items: center;
+  justify-content: center;
+  padding: 15px 20px;
+  background-color: #e0f3ff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto; /* ヘッダーを中央配置 */
+}
+
+/* タイトルを中央配置 */
+.question-history-container .header h1 {
+  flex: 1;
+  text-align: center; /* タイトルを中央に固定 */
+  font-size: 36px;
+  color: #0056b3;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 言語選択を左端に */
+.question-history-container .languageSelector {
+  padding: 10px;
+  border: 1px solid #aad4ff;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: #0056b3;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+
+.question-history-container .user-notification-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* 通知アイコン */
+.question-history-container .notification-container {
+  position: relative;
+}
+
+/* 通知アイコン */
+.notification-button img {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+
+/* 通知ボタン */
+.notification-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 5px;
+}
+
+/* 通知のバッジ（未読件数） */
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 50%;
+}
+
+/* 通知ポップアップ */
+.notification-popup {
+  position: absolute;
+  width: 320px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  margin-top: -50px;
+  right: 0;
+  z-index: 1000;
+}
+
+/* 通知タイトル */
+.notification-popup h3 {
+  padding: 10px 0;
+  text-align: left;
+  font-size: 18px;
+  color: #0056b3;
+  border-bottom: 2px solid #cce7ff;
+}
+
+/* タブボタン */
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  margin: 10px 0;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #e0f3ff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.tabs button:hover {
+  background: #b3d9ff;
+}
+
+.tabs button.active {
+  background: #0056b3;
+  color: white;
+  font-weight: bold;
+}
+
+/* 通知アイテム */
+.notification-item {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* 未読通知 */
+.notification-item.unread {
+  background-color: #ffffff;
+  color: #333;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.unread:hover {
+  background-color: #f0f8ff;
+}
+
+/* 既読通知 */
+.notification-item.read {
+  color: #999;
+  opacity: 0.7;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.read:hover {
+  background-color: #e6e6e6;
+}
+
+/* 通知内の時間表示 */
+.notification-item .time {
+  font-size: 12px;
+  color: gray;
+  margin-top: 5px;
+}
+
+/* 通知が空のとき */
+.no-notifications {
+  text-align: center;
+  color: gray;
+  padding: 15px;
+}
+
+/* モバイル対応 */
+@media screen and (max-width: 768px) {
+  .view-history-container {
+    max-width: 100%;
+    padding: 20px;
+  }
+
+  .notification-popup {
+    width: 280px;
+    right: 10px;
+  }
+
+  .tabs button {
+    font-size: 12px;
+  }
+}
+
+.question-history-container h2.keyword-k {
+  text-align: center;
+  font-size: 24px;
+  color: #0056b3;
+  margin-top: 30px;
+}
+
+.question-history-container .history-list {
+  margin: 0 auto;
+  margin-top: 20px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  max-width: 900px;
+}
+
+.question-history-container .history-item {
+  margin-bottom: 20px;
+  padding: 15px;
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out; /* 🔄 滑らかなアニメーション */
+}
+
+
+.question-history-container .history-item:hover {
+  background-color: #eaf4fc;
+  transform: translateY(-3px); /* 上に少し浮かせる */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+}
+
+.question-history-container .history-date {
+  font-size: 14px;
+  color: #999;
+  margin-bottom: 8px;
+}
+
+.question-history-container .history-question{
+  font-size: 18px;
+  font-weight: bold;
+  color: #333;
+}
+
+.question-history-container .error-message {
+  color: red;
+  font-size: 14px;
+  text-align: center;
+  margin-top: 20px;
+}
+
+.question-history-container .no-history {
+  margin-top: 20px;
+  padding: 20px;
+  background-color: #f4faff;
+  /* 薄い青背景 */
+  border: 1px solid #aad4ff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/*現在のカテゴリ */
+.question-history-container .category-current {
+  font-size: 14px;
+  color: #777;
+  margin-top: 5px;
+}
+
+/* 回答セクション */
+.answer-section {
+  background-color: #eaf4fc;
+  padding: 10px;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* トグルスイッチのコンテナ */
+.toggle-wrapper {
+  display: flex; /* ✅ ラベルとスイッチを横並びに */
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 10px;
+  gap: 10px;
+  position: relative;
+  z-index: 999; /* ✅ メニューオーバーレイの下にする */
+}
+
+/* 公開/非公開のラベル */
+.toggle-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #0056b3;
+  white-space: nowrap;
+  position: relative;
+  z-index: 2; /* ✅ スイッチの下に隠れないようにする */
+}
+
+/* トグルスイッチ */
+.toggle-switch {
+  width: 50px;
+  height: 25px;
+  background-color: #ccc;
+  border-radius: 25px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  z-index: 1; /* ✅ ラベルの下にならないようにする */
+}
+
+/* アクティブ (ON) の時の背景色 */
+.toggle-switch.active {
+  background-color: #4caf50;
+  justify-content: flex-end;
+}
+
+/* 白い丸のスイッチ部分 */
+.toggle-circle {
+  width: 21px;
+  height: 21px;
+  background-color: white;
+  border-radius: 50%;
+  position: absolute;
+  left: 2px;
+  transition: transform 0.3s ease-in-out;
+}
+
+/* ON の時のスイッチ位置 */
+.toggle-switch.active .toggle-circle {
+  width: 21px;
+  height: 21px;
+  background-color: white;
+  border-radius: 50%;
+  position: absolute;
+  left: 2px;
+  transition: transform 0.3s ease-in-out;
+}
+
+.delete-button {
+  justify-content: flex-end;
+  width: 60px;
+  margin-left: auto;
+  background-color: #ff4d4d;
+  color: white;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.3s;
+}
+
+/* ✅ モーダルの背景 */
+.category-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+}
+
+/* ✅ モーダルのコンテンツ */
+.category-modal-content {
+  background: white;
+  padding: 20px;
+  border-radius: 10px;
+  text-align: center;
+  width: 400px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* ✅ 3列のカテゴリ選択ボタンレイアウト */
+.category-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  /* 3列レイアウト */
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* ✅ カテゴリ選択ボタン */
+.category-option-button {
+  padding: 15px;
+  border: none;
+  font-size: 12px;
+  font-weight: bold;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+/* ✅ 無効化されたボタン（現在のカテゴリ） */
+.category-option-button:disabled {
+  background: #ddd !important;
+  color: #777 !important;
+  cursor: not-allowed;
+}
+
+
+/* ✅ 各カテゴリの背景色（通常時、ホバー時、選択時） */
+.category-option-button:nth-child(1) {
+  background-color: #ffe599;
+}
+
+.category-option-button:nth-child(1):hover,
+.category-option-button:nth-child(1).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #ffd966;
+}
+
+
+.category-option-button:nth-child(2) {
+  background-color: #d9ead3;
+}
+
+.category-option-button:nth-child(2):hover,
+.category-option-button:nth-child(2).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #b6d7a8;
+}
+
+.category-option-button:nth-child(3) {
+  background-color: #f9cb9c;
+}
+
+.category-option-button:nth-child(3):hover,
+.category-option-button:nth-child(3).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #f6b26b;
+}
+
+.category-option-button:nth-child(4) {
+  background-color: #c9daf8;
+}
+
+.category-option-button:nth-child(4):hover,
+.category-option-button:nth-child(4).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #6d9eeb;
+}
+
+.category-option-button:nth-child(5) {
+  background-color: #f6d7b0;
+}
+
+.category-option-button:nth-child(5):hover,
+.category-option-button:nth-child(5).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #f4b183;
+}
+
+.category-option-button:nth-child(6) {
+  background-color: #e06666;
+}
+
+.category-option-button:nth-child(6):hover,
+.category-option-button:nth-child(6).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #cc0000;
+}
+
+.category-option-button:nth-child(7) {
+  background-color: #a4c2f4;
+}
+
+.category-option-button:nth-child(7):hover,
+.category-option-button:nth-child(7).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #6fa8dc;
+}
+
+.category-option-button:nth-child(8) {
+  background-color: #d9d2e9;
+}
+
+.category-option-button:nth-child(8):hover,
+.category-option-button:nth-child(8).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #b4a7d6;
+}
+
+.category-option-button:nth-child(9) {
+  background-color: #b6d7a8;
+}
+
+.category-option-button:nth-child(9):hover,
+.category-option-button:nth-child(9).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #93c47d;
+}
+
+.category-option-button:nth-child(10) {
+  background-color: #cfe2f3;
+}
+
+.category-option-button:nth-child(10):hover,
+.category-option-button:nth-child(10).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #76a5af;
+}
+
+.category-option-button:nth-child(11) {
+  background-color: #f6e0b5;
+}
+
+.category-option-button:nth-child(11):hover,
+.category-option-button:nth-child(11).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #e69138;
+}
+
+.category-option-button:nth-child(12) {
+  background-color: #ea9999;
+}
+
+.category-option-button:nth-child(12):hover,
+.category-option-button:nth-child(12).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #cc0000;
+}
+
+
+.category-option-button:nth-child(13) {
+  background-color: #b4a7d6;
+}
+
+.category-option-button:nth-child(13):hover,
+.category-option-button:nth-child(13).selected {
+  transform: scale(1.05);
+  /* 少し拡大 */
+  background-color: #674ea7;
+}
+
+/* ✅ カテゴリ変更ボタン */
+.change-category-button {
+  background-color: #007BFF;
+  /* 青 */
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  font-size: 14px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: 0.3s;
+}
+
+.change-category-button:hover {
+  background-color: #0056b3;
+  transform: scale(1.05);
+}
+
+/* ✅ キャンセルボタン */
+.modal-close-button {
+  background: #ccc;
+  color: black;
+  padding: 10px;
+  border: none;
+  width: 100%;
+  margin-top: 15px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.modal-close-button:hover {
+  background: #999;
+}
+
+/* メディアクエリ */
+@media (max-width: 1024px) {
+  .question-history-container {
+    max-width: 700px;
+  }
+}
+
+@media (max-width: 768px) {
+  .question-history-container {
+    max-width: 100%;
+    padding: 20px;
+  }
+}
+
+/* アニメーション */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

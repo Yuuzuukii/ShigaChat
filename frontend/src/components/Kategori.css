@@ -1,0 +1,383 @@
+/* メインコンテナ */
+.container-kategori {
+  font-family: 'Open Sans', sans-serif;
+  width: 100vw;  /* 横幅をビューポート全体に */
+  height: 100vh; /* 高さをビューポート全体に */
+  margin: 0 auto;
+  border-radius: 12px;
+  padding: 30px;
+  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+  animation: fadeIn 0.7s ease-out;
+  border: 1px solid #aad4ff;
+  overflow-y: auto;
+}
+
+/* ヘッダー部分 */
+.container-kategori .header {
+  display: flex;
+  flex-direction: column; /* デフォルトは縦並び */
+  align-items: center;
+  justify-content: center;
+  padding: 15px 20px;
+  background-color: #e0f3ff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  max-width: 900px;
+  margin: 0 auto; /* ヘッダーを中央配置 */
+}
+
+
+/* タイトルを中央配置 */
+.container-kategori .header h1 {
+  flex: 1;
+  text-align: center; /* タイトルを中央に固定 */
+  font-size: 36px;
+  color: #0056b3;
+  font-weight: bold;
+  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* 言語選択を左端に */
+.container-kategori .languageSelector {
+  padding: 10px;
+  border: 1px solid #aad4ff;
+  border-radius: 6px;
+  font-size: 14px;
+  background-color: #ffffff;
+  color: #0056b3;
+  margin-top: 10px;
+  margin-bottom: 15px;
+}
+
+.container-kategori .user-notification-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+}
+
+/* 通知アイコン */
+.container-kategori .notification-container {
+  position: relative;
+}
+
+/* 通知アイコン */
+.notification-button img {
+  width: 28px;
+  height: 28px;
+  vertical-align: middle;
+}
+
+/* 通知ボタン */
+.notification-button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  padding: 5px;
+}
+
+/* 通知のバッジ（未読件数） */
+.badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: red;
+  color: white;
+  font-size: 12px;
+  padding: 3px 7px;
+  border-radius: 50%;
+}
+
+/* 通知ポップアップ */
+.notification-popup {
+  position: absolute;
+  width: 320px;
+  background: white;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  padding: 15px;
+  margin-top: -50px;
+  right: 0;
+  z-index: 1000;
+}
+
+/* 通知タイトル */
+.notification-popup h3 {
+  padding: 10px 0;
+  text-align: left;
+  font-size: 18px;
+  color: #0056b3;
+  border-bottom: 2px solid #cce7ff;
+}
+
+/* タブボタン */
+.tabs {
+  display: flex;
+  justify-content: space-around;
+  margin: 10px 0;
+}
+
+.tabs button {
+  flex: 1;
+  padding: 10px;
+  border: none;
+  background: #e0f3ff;
+  cursor: pointer;
+  font-size: 14px;
+  transition: 0.3s;
+}
+
+.tabs button:hover {
+  background: #b3d9ff;
+}
+
+.tabs button.active {
+  background: #0056b3;
+  color: white;
+  font-weight: bold;
+}
+
+/* 通知アイテム */
+.notification-item {
+  padding: 12px;
+  border-bottom: 1px solid #ddd;
+  cursor: pointer;
+  transition: background 0.2s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+/* 未読通知 */
+.notification-item.unread {
+  background-color: #ffffff;
+  color: #333;
+  font-weight: bold;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.unread:hover {
+  background-color: #f0f8ff;
+}
+
+/* 既読通知 */
+.notification-item.read {
+  color: #999;
+  opacity: 0.7;
+  font-size: 14px;
+  text-align: left;
+}
+
+.notification-item.read:hover {
+  background-color: #e6e6e6;
+}
+
+/* 通知内の時間表示 */
+.notification-item .time {
+  font-size: 12px;
+  color: gray;
+  margin-top: 5px;
+}
+
+/* 通知が空のとき */
+.no-notifications {
+  text-align: center;
+  color: gray;
+  padding: 15px;
+}
+
+/* モバイル対応 */
+@media screen and (max-width: 768px) {
+  .view-history-container {
+    max-width: 100%;
+    padding: 20px;
+  }
+
+  .notification-popup {
+    width: 280px;
+    right: 10px;
+  }
+
+  .tabs button {
+    font-size: 12px;
+  }
+}
+
+.container-kategori .body{
+  margin: 0 auto;
+  max-width: 900px;
+  background: rgba(255, 255, 255, 0.9); /* 白に少し透明感を追加 */
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1); /* ログインボックスの立体感 */
+  text-align: center;
+  margin-top: 20px;
+}
+
+/* ページタイトル */
+.container-kategori .category-header {
+  text-align: center;
+  font-size: 24px;
+  font-weight: bold;
+  margin-bottom: 20px;
+  color: #0056b3;
+}
+
+.container-kategori .kotoba{
+  text-align: center;
+  font-size: 20px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  color: #0056b3;
+}
+
+/* カテゴリボタンのグリッド */
+.container-kategori .category-container {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  justify-content: center;
+  align-items: center;
+  padding: 20px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+/* カテゴリボタンのスタイル */
+.container-kategori .category-button {
+  padding: 15px;
+  border: none;
+  border-radius: 10px;
+  font-size: 20px;
+  height: 80px;
+  font-weight: bold;
+  text-align: center;
+  color: #333;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+  background-color: #f4f4f4;
+}
+
+.container-kategori .category-button:hover,
+.container-kategori .category-button:focus {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  font-size: 18px; /* フォーカス時文字を少し大きく */
+}
+
+/* 各カテゴリごとの背景色 */
+/* 各カテゴリごとの背景色 */
+.container-kategori .category-zairyu { background-color: #ffe599; }
+.container-kategori .category-zairyu:hover, .category-zairyu.selected {
+  background-color: #ffd966; /* 選択時に色を濃く */
+}
+
+.container-kategori .category-seikatsu { background-color: #d9ead3; }
+.container-kategori .category-seikatsu:hover, .category-seikatsu.selected {
+  background-color: #b6d7a8;
+}
+
+.container-kategori .category-iryo { background-color: #f9cb9c; }
+.container-kategori .category-iryo:hover, .category-iryo.selected {
+  background-color: #f6b26b;
+}
+
+.container-kategori .category-nenkin { background-color: #c9daf8; }
+.container-kategori .category-nenkin:hover, .category-nenkin.selected {
+  background-color: #6d9eeb;
+}
+
+.container-kategori .category-roudou { background-color: #f6d7b0; }
+.container-kategori .category-roudou:hover, .category-roudou.selected {
+  background-color: #f4b183;
+}
+
+.container-kategori .category-kyouiku { background-color: #e06666; }
+.container-kategori .category-kyouiku:hover, .category-kyouiku.selected {
+  background-color: #cc0000;
+}
+
+.container-kategori .category-kekkon { background-color: #a4c2f4; }
+.container-kategori .category-kekkon:hover, .category-kekkon.selected {
+  background-color: #6fa8dc;
+}
+
+.container-kategori .category-shussan { background-color: #d9d2e9; }
+.container-kategori .category-shussan:hover, .category-shussan.selected {
+  background-color: #b4a7d6;
+}
+
+.container-kategori .category-jutaku { background-color: #b6d7a8; }
+.container-kategori .category-jutaku:hover, .category-jutaku.selected {
+  background-color: #93c47d;
+}
+
+.container-kategori .category-zeikin { background-color: #cfe2f3; }
+.container-kategori .category-zeikin:hover, .category-zeikin.selected {
+  background-color: #76a5af;
+}
+
+.container-kategori .category-fukushi { background-color: #f6e0b5; }
+.container-kategori .category-fukushi:hover, .category-fukushi.selected {
+  background-color: #e69138;
+}
+
+.container-kategori .category-jiken { background-color: #ea9999; }
+.container-kategori .category-jiken:hover, .category-jiken.selected {
+  background-color: #cc0000;
+}
+
+.container-kategori .category-saigai { background-color: #b4a7d6; }
+.container-kategori .category-saigai:hover, .category-saigai.selected {
+  background-color: #674ea7;
+}
+
+.container-kategori .category-sonota { background-color: #f3cda8; }
+.container-kategori .category-sonota:hover, .category-sonota.selected {
+  background-color: #e69138;
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 1024px) {
+  .container-kategori {
+    max-width: 100%;
+    padding: 22px;
+  }
+
+  .container-kategori .category-button {
+    font-size: 14px;
+    padding: 10px;
+    max-width: 220px;
+  }
+
+  
+}
+
+@media (max-width: 768px) {
+  .container-kategori {
+    max-width: 100%;
+    padding: 20px;
+  }
+
+  .container-kategori .category-button {
+    font-size: 14px;
+    padding: 8px;
+    max-width: 180px;
+  }
+}
+
+/* フェードインアニメーション */
+@keyframes fadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

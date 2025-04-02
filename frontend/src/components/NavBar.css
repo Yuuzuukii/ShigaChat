@@ -1,0 +1,328 @@
+/* ナビゲーションバー */
+.navbar {
+  position: fixed;
+  margin: auto;
+  max-width: 1200px;
+  background-color: #ffffff; /* ✅ 白を基調に */
+  z-index: 1100;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+/* メニューアイコン */
+.navbar .menu-toggle {
+  position: fixed;
+  top: 40px;
+  left: 15px;
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.9); /* ✅ 半透明で軽やかに */
+  border-radius: 50%; /* ✅ 丸いボタンにする */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15); /* ✅ フロート感を出す影 */
+  cursor: pointer;
+  border: none;
+  transition: background-color 0.3s ease, box-shadow 0.3s ease, transform 0.2s ease;
+  backdrop-filter: blur(8px); /* ✅ 背景をぼかして奥行きを演出 */
+}
+/* ハンバーガーアイコン（三本線） */
+.navbar .menu-icon {
+  font-size: 26px;
+  color: #333;
+  transition: color 0.3s ease;
+}
+/* ホバー時（青っぽく光らせる） */
+.menu-toggle:hover {
+  background: rgba(0, 123, 255, 0.2); /* ✅ 青っぽい光 */
+  box-shadow: 0 6px 12px rgba(0, 0, 255, 0.3); /* ✅ 影を強調 */
+  transform: scale(1.1); /* ✅ ふわっと拡大 */
+}
+
+/* メニューが開いたときのアニメーション */
+.menu-toggle.open {
+  background: rgba(0, 123, 255, 0.3); /* ✅ 開いたときの色 */
+  box-shadow: 0 6px 12px rgba(0, 0, 255, 0.4);
+}
+
+/* オーバーレイ */
+.overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.4);
+  z-index: 999;
+  transition: opacity 0.3s ease;
+}
+
+/* スライドメニュー（フローティング） */
+.menu {
+  position: fixed;
+  top: 10%;
+  left: -300px; /* 初期状態で隠す */
+  width: 260px;
+  height: auto;
+  max-height: 80%;
+  background-color: rgba(255, 255, 255, 0.95); /* ✅ 少し透過させる */
+  display: flex;
+  flex-direction: column;
+  justify-content: start;
+  align-items: flex-start;
+  padding: 20px;
+  border-radius: 12px; /* ✅ 角を丸くして浮いた印象に */
+  transition: left 0.3s ease, transform 0.3s ease;
+  z-index: 1000;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2); /* ✅ 浮いている影 */
+  backdrop-filter: blur(8px); /* ✅ 背景ぼかしでフロート感を強調 */
+}
+
+/* メニューを開いたとき */
+.menu.open {
+  left: 30px;
+}
+
+/* 閉じるボタン */
+.menu .close-button {
+  background: none;
+  color: black;
+  font-size: 32px;
+  border: none;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+  transition: color 0.3s ease;
+}
+
+.menu .close-button:hover {
+  color: #0056b3; /* ✅ 青っぽく変化 */
+  transform: scale(1.1); /* ✅ ふわっと拡大 */
+}
+
+/* メニュー項目 */
+.menu li {
+  width: 100%;
+  padding: 12px 20px;
+  list-style: none;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.1); /* ✅ 薄い線で区切る */
+  text-align: left; /* ✅ 左寄せ */
+}
+
+.menu li:last-child {
+  border-bottom: none; /* 最後のメニューにはボーダーなし */
+}
+
+/* メニューリンク */
+.menu li a,
+.menu li button {
+  width: 100%;
+  display: block;
+  color: #333;
+  font-size: 18px;
+  text-decoration: none;
+  padding: 10px 0;
+  transition: background-color 0.3s ease, color 0.3s ease;
+  text-align: left;
+  font-weight: bold;
+  transition: all 0.2s ease-in-out; /* 🔄 滑らかなアニメーション */
+}
+
+.menu li a:hover,
+.menu li button:hover {
+  color: #007bff; /* ✅ ホバー時に青く */
+  transform: scale(1.1); /* ✅ ふわっと拡大 */
+}
+
+/* ログアウトボタン */
+.logout-button {
+  background: none;
+  border: none;
+  color: #333;
+  font-size: 18px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+}
+
+.logout-button:hover {
+  background-color: rgba(0, 123, 255, 0.1);
+  color: #007bff;
+}
+
+/* ナビゲーションバーのレスポンシブ対応 */
+@media (max-width: 768px) {
+  .navbar {
+    width: 100%;
+    max-width: none;
+    padding: 0 15px;
+  }
+  
+  .navbar .menu-toggle {
+    top: 20px;
+    left: 10px;
+    width: 40px;
+    height: 40px;
+  }
+  
+  .navbar .menu-icon {
+    font-size: 22px;
+  }
+  
+  .menu {
+    top: 15%;
+    left: -100%; /* 画面外に隠す */
+    width: 80%;
+    max-width: 250px;
+    padding: 15px;
+    max-height: 80vh; /* 画面の高さの80%まで */
+    overflow-y: auto; /* スクロール可能にする */
+  }
+  
+  .menu.open {
+    left: 10px;
+  }
+  
+  .menu .close-button {
+    top: 15px;
+    right: 15px;
+    font-size: 28px;
+  }
+  
+  .menu li {
+    padding: 10px 15px;
+  }
+  
+  .menu li a,
+  .menu li button {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar .menu-toggle {
+    top: 15px;
+    left: 5px;
+    width: 35px;
+    height: 35px;
+  }
+  
+  .navbar .menu-icon {
+    font-size: 20px;
+  }
+  
+  .menu {
+    top: 10%;
+    width: 90%;
+    max-width: 220px;
+    padding: 10px;
+    max-height: 80vh; /* 画面の高さの80%まで */
+    overflow-y: auto; /* スクロール可能にする */
+  }
+  
+  .menu.open {
+    left: 5px;
+  }
+  
+  .menu .close-button {
+    top: 10px;
+    right: 10px;
+    font-size: 26px;
+  }
+  
+  .menu li {
+    padding: 8px 12px;
+  }
+  
+  .menu li a,
+  .menu li button {
+    font-size: 14px;
+  }
+}
+
+/*もう一個候補のメニューバー*/
+
+/* ベーススタイル
+.navbar {
+  position: relative;
+  background-color: #f8f8f8;
+  padding: 10px;
+  border-bottom: 1px solid #ccc;
+}
+
+.menu-toggle {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 18px;
+}
+
+.menu-icon {
+  margin-right: 8px;
+}
+
+/* メニューオーバーレイ */
+/* .menu-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.8);
+  display: none;
+  z-index: 999;
+}
+
+.menu-backdrop.open {
+  display: block;
+}
+
+.menu {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 300px;
+  height: 100%;
+  background-color: #333;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transform: translateX(100%);
+  transition: transform 0.3s ease-in-out;
+  z-index: 1000;
+}
+
+.menu.open {
+  transform: translateX(0);
+}
+
+.close-button {
+  background: none;
+  color: white;
+  font-size: 32px;
+  border: none;
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  cursor: pointer;
+}
+
+.menu li {
+  margin: 15px 0;
+}
+
+.menu li a {
+  color: #fff;
+  font-size: 24px;
+  text-decoration: none;
+  padding: 10px 20px;
+  border-radius: 8px;
+  transition: background-color 0.3s ease;
+}
+
+.menu li a:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+ */ 

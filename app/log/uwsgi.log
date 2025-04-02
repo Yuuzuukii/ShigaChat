@@ -1,0 +1,279 @@
+*** Starting uWSGI 2.0.20 (64bit) on [Sat Jan 11 13:07:57 2025] ***
+compiled with version: 10.2.1 20210110 on 11 January 2025 03:43:42
+os: Linux-6.10.14-linuxkit #1 SMP Fri Nov 29 17:22:03 UTC 2024
+nodename: bc47b9ff16d7
+machine: aarch64
+clock source: unix
+pcre jit disabled
+detected number of CPU cores: 10
+current working directory: /var/www
+detected binary path: /usr/local/bin/uwsgi
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uwsgi socket 0 bound to TCP address :3031 fd 3
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+Python version: 3.6.15 (default, Dec 21 2021, 08:03:21)  [GCC 10.2.1 20210110]
+Python main interpreter initialized at 0xaaaae3f51bd0
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 145840 bytes (142 KB) for 1 cores
+*** Operational MODE: single process ***
+Traceback (most recent call last):
+  File "main.py", line 11, in <module>
+    from fastapi import APIRouter, HTTPException, Depends, status
+ModuleNotFoundError: No module named 'fastapi'
+unable to load app 0 (mountpoint='') (callable not found or import error)
+*** no app loaded. going in full dynamic mode ***
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 1)
+spawned uWSGI worker 1 (pid: 7, cores: 1)
+Python auto-reloader enabled
+--- no python application found, check your startup logs for errors ---
+[pid: 7|app: -1|req: -1/1] 172.18.0.1 () {48 vars in 739 bytes} [Sat Jan 11 13:11:06 2025] GET / => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+--- no python application found, check your startup logs for errors ---
+[pid: 7|app: -1|req: -1/2] 172.18.0.1 () {48 vars in 707 bytes} [Sat Jan 11 13:11:06 2025] GET /favicon.ico => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+invalid request block size: 21573 (max 4096)...skip
+invalid request block size: 21573 (max 4096)...skip
+invalid request block size: 21573 (max 4096)...skip
+invalid request block size: 21573 (max 4096)...skip
+invalid request block size: 21573 (max 4096)...skip
+invalid request block size: 21573 (max 4096)...skip
+SIGINT/SIGTERM received...killing workers...
+worker 1 buried after 1 seconds
+goodbye to uWSGI.
+*** Starting uWSGI 2.0.20 (64bit) on [Sat Jan 11 13:18:15 2025] ***
+compiled with version: 10.2.1 20210110 on 11 January 2025 04:17:41
+os: Linux-6.10.14-linuxkit #1 SMP Fri Nov 29 17:22:03 UTC 2024
+nodename: 150df9f8342f
+machine: aarch64
+clock source: unix
+pcre jit disabled
+detected number of CPU cores: 10
+current working directory: /var/www
+detected binary path: /usr/local/bin/uwsgi
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 0.0.0.0:3031  # HTTPでリクエストをリッスン fd 4
+uwsgi socket 0 bound to TCP address 127.0.0.1:35013 (port auto-assigned) fd 3
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+Python version: 3.6.15 (default, Dec 21 2021, 08:03:21)  [GCC 10.2.1 20210110]
+Python main interpreter initialized at 0xaaab081ecae0
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 145840 bytes (142 KB) for 1 cores
+*** Operational MODE: single process ***
+DEBUG:passlib.registry:registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+ERROR:fastapi:Form data requires "python-multipart" to be installed. 
+You can install "python-multipart" with: 
+
+pip install python-multipart
+
+Traceback (most recent call last):
+  File "/usr/local/lib/python3.6/site-packages/fastapi/dependencies/utils.py", line 97, in check_file_field
+    from multipart import __version__  # type: ignore
+ModuleNotFoundError: No module named 'multipart'
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "main.py", line 169, in <module>
+    language: Optional[str] = None  # クライアントから現在の言語を受け取る
+  File "/usr/local/lib/python3.6/site-packages/fastapi/routing.py", line 651, in decorator
+    generate_unique_id_function=generate_unique_id_function,
+  File "/usr/local/lib/python3.6/site-packages/fastapi/routing.py", line 591, in add_api_route
+    generate_unique_id_function=current_generate_unique_id,
+  File "/usr/local/lib/python3.6/site-packages/fastapi/routing.py", line 440, in __init__
+    self.body_field = get_body_field(dependant=self.dependant, name=self.unique_id)
+  File "/usr/local/lib/python3.6/site-packages/fastapi/dependencies/utils.py", line 755, in get_body_field
+    check_file_field(final_field)
+  File "/usr/local/lib/python3.6/site-packages/fastapi/dependencies/utils.py", line 110, in check_file_field
+    raise RuntimeError(multipart_not_installed_error)
+RuntimeError: Form data requires "python-multipart" to be installed. 
+You can install "python-multipart" with: 
+
+pip install python-multipart
+
+unable to load app 0 (mountpoint='') (callable not found or import error)
+*** no app loaded. going in full dynamic mode ***
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 1)
+spawned uWSGI worker 1 (pid: 25, cores: 1)
+spawned uWSGI http 1 (pid: 27)
+Python auto-reloader enabled
+--- no python application found, check your startup logs for errors ---
+[pid: 25|app: -1|req: -1/1] 172.18.0.1 () {44 vars in 741 bytes} [Sat Jan 11 13:18:27 2025] GET / => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+--- no python application found, check your startup logs for errors ---
+[pid: 25|app: -1|req: -1/2] 172.18.0.1 () {44 vars in 709 bytes} [Sat Jan 11 13:18:27 2025] GET /favicon.ico => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+--- no python application found, check your startup logs for errors ---
+[pid: 25|app: -1|req: -1/3] 127.0.0.1 () {28 vars in 335 bytes} [Sat Jan 11 13:20:58 2025] GET / => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+--- no python application found, check your startup logs for errors ---
+[pid: 25|app: -1|req: -1/4] 127.0.0.1 () {28 vars in 335 bytes} [Sat Jan 11 13:21:59 2025] GET / => generated 21 bytes in 0 msecs (HTTP/1.1 500) 2 headers in 83 bytes (0 switches on core 0)
+SIGINT/SIGTERM received...killing workers...
+gateway "uWSGI http 1" has been buried (pid: 27)
+worker 1 buried after 1 seconds
+goodbye to uWSGI.
+*** Starting uWSGI 2.0.20 (64bit) on [Sat Jan 11 13:23:41 2025] ***
+compiled with version: 10.2.1 20210110 on 11 January 2025 04:23:33
+os: Linux-6.10.14-linuxkit #1 SMP Fri Nov 29 17:22:03 UTC 2024
+nodename: 0e0b1ef76a41
+machine: aarch64
+clock source: unix
+pcre jit disabled
+detected number of CPU cores: 10
+current working directory: /var/www
+detected binary path: /usr/local/bin/uwsgi
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 0.0.0.0:3031  # HTTPでリクエストをリッスン fd 4
+uwsgi socket 0 bound to TCP address 127.0.0.1:41487 (port auto-assigned) fd 3
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+Python version: 3.6.15 (default, Dec 21 2021, 08:03:21)  [GCC 10.2.1 20210110]
+Python main interpreter initialized at 0xaaaaf8f5dae0
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 145840 bytes (142 KB) for 1 cores
+*** Operational MODE: single process ***
+DEBUG:passlib.registry:registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+WSGI app 0 (mountpoint='') ready in 1 seconds on interpreter 0xaaaaf8f5dae0 pid: 1 (default app)
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 1)
+spawned uWSGI worker 1 (pid: 26, cores: 1)
+spawned uWSGI http 1 (pid: 28)
+Python auto-reloader enabled
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 1/1] 172.18.0.1 () {44 vars in 741 bytes} [Sat Jan 11 13:23:52 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 2/2] 172.18.0.1 () {44 vars in 741 bytes} [Sat Jan 11 13:23:53 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 3/3] 172.18.0.1 () {44 vars in 741 bytes} [Sat Jan 11 13:23:53 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 4/4] 172.18.0.1 () {44 vars in 741 bytes} [Sat Jan 11 13:23:53 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 5/5] 172.18.0.1 () {28 vars in 335 bytes} [Sat Jan 11 13:25:09 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+SIGINT/SIGTERM received...killing workers...
+gateway "uWSGI http 1" has been buried (pid: 28)
+worker 1 buried after 1 seconds
+goodbye to uWSGI.
+*** Starting uWSGI 2.0.20 (64bit) on [Sat Jan 11 13:26:23 2025] ***
+compiled with version: 10.2.1 20210110 on 11 January 2025 04:23:33
+os: Linux-6.10.14-linuxkit #1 SMP Fri Nov 29 17:22:03 UTC 2024
+nodename: abd54da603ea
+machine: aarch64
+clock source: unix
+pcre jit disabled
+detected number of CPU cores: 10
+current working directory: /var/www
+detected binary path: /usr/local/bin/uwsgi
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 0.0.0.0:3031  # HTTPでリクエストをリッスン fd 4
+uwsgi socket 0 bound to TCP address 127.0.0.1:39619 (port auto-assigned) fd 3
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+Python version: 3.6.15 (default, Dec 21 2021, 08:03:21)  [GCC 10.2.1 20210110]
+Python main interpreter initialized at 0xaaaafd3b1ae0
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+python threads support enabled
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 145840 bytes (142 KB) for 1 cores
+*** Operational MODE: single process ***
+DEBUG:passlib.registry:registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+WSGI app 0 (mountpoint='') ready in 0 seconds on interpreter 0xaaaafd3b1ae0 pid: 1 (default app)
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 1)
+spawned uWSGI worker 1 (pid: 26, cores: 1)
+spawned uWSGI http 1 (pid: 28)
+Python auto-reloader enabled
+SIGINT/SIGTERM received...killing workers...
+gateway "uWSGI http 1" has been buried (pid: 28)
+worker 1 buried after 1 seconds
+goodbye to uWSGI.
+*** Starting uWSGI 2.0.20 (64bit) on [Sat Jan 11 13:27:04 2025] ***
+compiled with version: 10.2.1 20210110 on 11 January 2025 04:23:33
+os: Linux-6.10.14-linuxkit #1 SMP Fri Nov 29 17:22:03 UTC 2024
+nodename: 9a677615a9b1
+machine: aarch64
+clock source: unix
+pcre jit disabled
+detected number of CPU cores: 10
+current working directory: /var/www
+detected binary path: /usr/local/bin/uwsgi
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your memory page size is 4096 bytes
+detected max file descriptor number: 1048576
+lock engine: pthread robust mutexes
+thunder lock: disabled (you can enable it with --thunder-lock)
+uWSGI http bound on 0.0.0.0:3031 fd 4
+uwsgi socket 0 bound to TCP address 127.0.0.1:41859 (port auto-assigned) fd 3
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+Python version: 3.6.15 (default, Dec 21 2021, 08:03:21)  [GCC 10.2.1 20210110]
+*** Python threads support is disabled. You can enable it with --enable-threads ***
+Python main interpreter initialized at 0xaaab1d9058d0
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+your server socket listen backlog is limited to 100 connections
+your mercy for graceful operations on workers is 60 seconds
+mapped 145840 bytes (142 KB) for 1 cores
+*** Operational MODE: single process ***
+DEBUG:passlib.registry:registered 'bcrypt' handler: <class 'passlib.handlers.bcrypt.bcrypt'>
+WSGI app 0 (mountpoint='') ready in 0 seconds on interpreter 0xaaab1d9058d0 pid: 1 (default app)
+uWSGI running as root, you can use --uid/--gid/--chroot options
+*** WARNING: you are running uWSGI as root !!! (use the --uid flag) *** 
+*** uWSGI is running in multiple interpreter mode ***
+spawned uWSGI master process (pid: 1)
+spawned uWSGI worker 1 (pid: 26, cores: 1)
+spawned uWSGI http 1 (pid: 27)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 1/1] 172.18.0.1 () {44 vars in 700 bytes} [Sat Jan 11 13:27:21 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 2/2] 172.18.0.1 () {44 vars in 700 bytes} [Sat Jan 11 13:27:21 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 3/3] 172.18.0.1 () {44 vars in 700 bytes} [Sat Jan 11 13:27:21 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 4/4] 172.18.0.1 () {44 vars in 700 bytes} [Sat Jan 11 13:27:21 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+TypeError: __call__() missing 1 required positional argument: 'send'
+[pid: 26|app: 0|req: 5/5] 172.18.0.1 () {28 vars in 293 bytes} [Sat Jan 11 13:27:47 2025] GET / => generated 0 bytes in 0 msecs (HTTP/1.1 500) 0 headers in 0 bytes (0 switches on core 0)
+SIGINT/SIGTERM received...killing workers...
+gateway "uWSGI http 1" has been buried (pid: 27)
+worker 1 buried after 1 seconds
+goodbye to uWSGI.
