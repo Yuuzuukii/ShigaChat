@@ -7,8 +7,10 @@ ShigaChat公開用
 
 .envファイルを作成し、以下の記述を行なってください。（実際のキーを入力してください。）
 
+```.env
 OPENAI_API_KEY=your_openai_api_key_here
 
 SECRET_KEY=your_secret_key_here
 
 DATABASE=your_database_file_here
+```
