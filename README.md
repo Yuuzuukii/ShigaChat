@@ -1,5 +1,6 @@
 # ShigaChat
 ShigaChat公開用
+URL: https://si-lab.org/shigachat/
 
 ## システムの説明
 本システム「Shiga Chat」は、滋賀県に住む在日外国人の方々を対象とした多言語対応のQ&Aサービスである。
