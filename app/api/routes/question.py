@@ -13,9 +13,10 @@ from langchain.chains import RetrievalQA
 from config import DATABASE, OPENAI_API_KEY, language_mapping
 from api.routes.user import current_user_info
 from api.routes.category import categorize_question
-from models.schemas import SimpleQuestion, QuestionRequest
+from models.schemas import SimpleQuestion, QuestionRequest, Question, AnswerRequest
 from api.utils.security import detect_privacy_info
 from api.utils.translator import question_translate, answer_translate
+from RAG import RAG
 
 
 router = APIRouter()
@@ -172,50 +173,116 @@ def load_data_from_database():
     
     return questions_and_answers
 
-def split_data_into_chunks(data):
-    if not data:
-        raise ValueError("No data provided for splitting.")
-    print(f"分割前のデータ数: {len(data)}", flush=True)
-    text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-    documents = [Document(page_content=item[1], metadata={"question_id": item[0]}) for item in data]
-    split_docs = text_splitter.split_documents(documents)
-    print(f"分割後のチャンク数: {len(split_docs)}", flush=True)
-    return split_docs
-
-# FAISSインデックスの構築
-def build_faiss_index(docs):
-    embeddings = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)  # ここにAPIキーを直接指定
-    vector_store = FAISS.from_documents(docs, embeddings)
-    print(f"FAISS に登録する文書数: {len(docs)}", flush=True)
-    return vector_store
-
-# RAGチェーンのセットアップ
-def setup_rag_chain(vector_store):
-    retriever = vector_store.as_retriever(search_kwargs={"k": 5})
-    llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0, openai_api_key=OPENAI_API_KEY)  # ここにAPIキーを直接指定
-    chain = RetrievalQA.from_chain_type(
-        llm=llm, 
-        retriever=retriever, 
-        return_source_documents=True  # ソースドキュメントを取得
-    )
-    return chain
-
 @router.post("/get_answer")
-async def get_answer(request: QuestionRequest, current_user: dict = Depends(current_user_info)):
-    question_id = request.question_id
-    spoken_language = current_user["spoken_language"]
-    language_id = language_mapping.get(spoken_language)
+async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
+    question_text = request.text
+    thread_id = request.thread_id
+    user_id = current_user["user_id"]
+
+    try:
+        # スレッドが存在しなければ作成
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT thread_id FROM threads WHERE thread_id = ?", (thread_id,))
+            if not cursor.fetchone():
+                cursor.execute(
+                    "INSERT INTO threads (thread_id, user_id, last_updated) VALUES (?, ?, ?)",
+                    (thread_id, user_id, datetime.now())
+                )
+                conn.commit()
+
+        # 🔹 RAGで取得した関連QA
+        rag_result = RAG(question_text)
+        if not rag_result:
+            raise HTTPException(status_code=500, detail="RAGが空を返しました")
+        rag_qa = dict(list(rag_result.items()))  # 念のため5件制限
+
+        # 🔹 thread_qaから直近5件の対話履歴を取得
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT question, answer FROM thread_qa
+                WHERE thread_id = ?
+                ORDER BY created_at DESC
+                LIMIT 5
+            """, (thread_id,))
+            past_qa_rows = cursor.fetchall()
+        history_qa = list(reversed(past_qa_rows))  # 時系列順に並び替え
+
+        # 🔹 LLMで回答生成
+        generated_answer = generate_answer_with_llm(
+            question_text=question_text,
+            rag_qa=rag_qa,
+            history_qa=history_qa
+        )
+
+        # 🔹 新しいQAペアを保存
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO thread_qa (thread_id, question, answer)
+                VALUES (?, ?, ?)
+            """, (thread_id, question_text, generated_answer))
+            cursor.execute("""
+                UPDATE threads SET last_updated = ? WHERE thread_id = ?
+            """, (datetime.now(), thread_id))
+            conn.commit()
+
+        return {
+            "thread_id": thread_id,
+            "question": question_text,
+            "answer": generated_answer
+        }
+
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
+    
+def generate_answer_with_llm(question_text: str, rag_qa: dict, history_qa: list) -> str:
+    prompt = "あなたは滋賀県に住む外国人に情報を提供する専門家です。\n"
+    prompt += "以下は参考情報です:\n\n"
+
+    # 🔹 RAGからの関連QA
+    prompt += "【RAGから抽出されたQA】\n"
+    for i, (_, qa_list) in enumerate(rag_qa.items(), 1):
+        q, a, t = qa_list
+        prompt += f"Q{i}: {q}\nA{i}: {a}\n"
+
+    # 🔹 過去の対話履歴
+    prompt += "\n【これまでの会話履歴】\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"User{i}: {q}\nBot{i}: {a}\n"
+
+    # 🔹 新しい質問
+    prompt += f"\n【現在の質問】\n{question_text}\n"
+    prompt += "\nこの質問に対して、参考情報と会話履歴を踏まえて適切に回答してください。"
+
+    # 🔹 ChatOpenAI呼び出し
+    client = ChatOpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    return response.choices[0].message.content.strip()
+
+
+"""
+@router.post("/get_answer")
+async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
+    question_text = request.text
 
     try:
         # 🔹 質問情報を取得
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute("
                 SELECT q.content, c.description AS category_name, q.title, q.time
                 FROM question q
                 LEFT JOIN category c ON q.category_id = c.id
                 WHERE q.question_id = ? 
-            """, (question_id,))
+            ", (question_id,))
             question_data = cursor.fetchone()
 
         if not question_data:
@@ -259,7 +326,7 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
             context = "\n".join([doc.page_content for doc in source_documents])
 
             # LLM を使用して回答を生成
-            prompt = f"""
+            prompt = f"
             あなたは滋賀県に住む外国人向けの専門家です。
             以下の参考情報を元に、ユーザーの質問に適切に回答してください。
 
@@ -270,7 +337,7 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
             {question_content}
 
             【回答】
-            """
+            "
 
             llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0, openai_api_key=OPENAI_API_KEY)
             response = llm.invoke(prompt)
@@ -299,9 +366,9 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
 
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute("
                 SELECT language_id FROM answer_translation WHERE answer_id = ?
-            """, (answer_id,))
+            ", (answer_id,))
             existing_languages = {row[0] for row in cursor.fetchall()}
 
         missing_languages = set(required_languages) - existing_languages
@@ -316,9 +383,9 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
 
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("""
+            cursor.execute("
                 SELECT language_id, texts FROM answer_translation WHERE answer_id = ?
-            """, (answer_id,))
+            ", (answer_id,))
             for row in cursor.fetchall():
                 all_translations[row[0]] = row[1]  # {language_id: translation}
         answer = all_translations.get(language_id, "回答が見つかりません")
@@ -330,14 +397,14 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
 
             with sqlite3.connect(DATABASE) as conn:
                 cursor = conn.cursor()
-                cursor.execute("""
+                cursor.execute("
                     SELECT q.content, c.description AS category_name, q.title, q.time, qa.answer_id, at.texts
                     FROM question q
                     LEFT JOIN category c ON q.category_id = c.id
                     LEFT JOIN QA qa ON q.question_id = qa.question_id
                     LEFT JOIN answer_translation at ON qa.answer_id = at.answer_id AND at.language_id = ?
                     WHERE q.question_id = ?
-                """, (language_id, doc_question_id))
+                ", (language_id, doc_question_id))
                 doc_data = cursor.fetchone()
 
             if doc_data:
@@ -372,6 +439,7 @@ async def get_answer(request: QuestionRequest, current_user: dict = Depends(curr
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
+"""
 
 @router.get("/get_translated_answer")
 def get_translated_answer(

@@ -35,6 +35,10 @@ class AnswerRequest(BaseModel):
 class QuestionRequest(BaseModel):
     question_id: int
 
+class Question(BaseModel):
+    thread_id: int
+    text: str
+
 class AnswerEditRequest(BaseModel):
     answer_id: int
     new_text: str
