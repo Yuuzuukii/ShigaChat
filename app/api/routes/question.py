@@ -1,17 +1,23 @@
+# データベースの中身を見たい時、uwsgiコンテナの中（exec）で以下を実行
+"""
+apt-get update
+apt-get install -y sqlite3
+sqlite3 ShigaChat.db
+"""
+
 import os
 import sqlite3
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
-from langchain.chat_models import ChatOpenAI
 from config import DATABASE, OPENAI_API_KEY, language_mapping
 from api.routes.user import current_user_info
 from api.routes.category import categorize_question
 from models.schemas import SimpleQuestion, QuestionRequest, Question, AnswerRequest
 from api.utils.security import detect_privacy_info
 from api.utils.translator import question_translate, answer_translate
-from api.utils.RAG import rag
+from api.utils.RAG import rag, generate_answer_with_llm
 
 
 router = APIRouter()
@@ -172,7 +178,7 @@ def load_data_from_database():
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
     question_text = request.text
     thread_id = request.thread_id
-    user_id = current_user["user_id"]
+    user_id = current_user[""]
 
     try:
         # スレッドが存在しなければ作成
@@ -186,11 +192,20 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 )
                 conn.commit()
 
-        # 🔹 RAGで取得した関連QA
-        rag_result = RAG(question_text)
-        if not rag_result:
-            raise HTTPException(status_code=500, detail="RAGが空を返しました")
-        rag_qa = dict(list(rag_result.items()))  # 念のため5件制限
+        # rag_result = {1: [answer, question, time, distance], ...}
+        rag_result = rag(question_text)
+
+        rag_qa = []
+        for rank in sorted(rag_result.keys()):
+            answer, question, retrieved_at, distance = rag_result[rank]
+            score = round(1 / (1 + distance), 4)  # スコア化
+            rag_qa.append({
+                "question": question,
+                "answer": answer,
+                "retrieved_at": retrieved_at,
+                "score": score
+            })
+
 
         # 🔹 thread_qaから直近5件の対話履歴を取得
         with sqlite3.connect(DATABASE) as conn:
@@ -224,43 +239,15 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             conn.commit()
 
         return {
-            "thread_id": thread_id,
-            "question": question_text,
-            "answer": generated_answer
+            "answer": generated_answer,
+            "rag_qa": rag_qa
         }
 
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
-    
-def generate_answer_with_llm(question_text: str, rag_qa: dict, history_qa: list) -> str:
-    prompt = "あなたは滋賀県に住む外国人に情報を提供する専門家です。\n"
-    prompt += "以下は参考情報です:\n\n"
 
-    # 🔹 RAGからの関連QA
-    prompt += "【RAGから抽出されたQA】\n"
-    for i, (_, qa_list) in enumerate(rag_qa.items(), 1):
-        q, a, t = qa_list
-        prompt += f"Q{i}: {q}\nA{i}: {a}\n"
-
-    # 🔹 過去の対話履歴
-    prompt += "\n【これまでの会話履歴】\n"
-    for i, (q, a) in enumerate(history_qa, 1):
-        prompt += f"User{i}: {q}\nBot{i}: {a}\n"
-
-    # 🔹 新しい質問
-    prompt += f"\n【現在の質問】\n{question_text}\n"
-    prompt += "\nこの質問に対して、参考情報と会話履歴を踏まえて適切に回答してください。"
-
-    # 🔹 ChatOpenAI呼び出し
-    client = ChatOpenAI(api_key=OPENAI_API_KEY)
-    response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[{"role": "user", "content": prompt}],
-        temperature=0.3,
-    )
-    return response.choices[0].message.content.strip()
 
 
 """

@@ -8,6 +8,7 @@ from collections import defaultdict
 import dotenv
 import os
 from tqdm import tqdm
+from langchain.chat_models import ChatOpenAI
 dotenv.load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
 client = OpenAI(api_key=api_key)
@@ -91,3 +92,32 @@ def rag(question):
         question_text, answer_text, time_val = texts[idx]
         results[rank + 1] = [answer_text, question_text, time_val]
     return results
+
+# LLMによる回答生成
+def generate_answer_with_llm(question_text: str, rag_qa: dict, history_qa: list) -> str:
+    prompt = "あなたは滋賀県に住む外国人に情報を提供する専門家です。\n"
+    prompt += "以下は参考情報です:\n\n"
+
+    # 🔹 RAGからの関連QA
+    prompt += "【RAGから抽出されたQA】\n"
+    for i, (_, qa_list) in enumerate(rag_qa.items(), 1):
+        q, a, t = qa_list
+        prompt += f"Q{i}: {q}\nA{i}: {a}\n"
+
+    # 🔹 過去の対話履歴
+    prompt += "\n【これまでの会話履歴】\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"User{i}: {q}\nBot{i}: {a}\n"
+
+    # 🔹 新しい質問
+    prompt += f"\n【現在の質問】\n{question_text}\n"
+    prompt += "\nこの質問に対して、参考情報と会話履歴を踏まえて適切に回答してください。"
+
+    # 🔹 ChatOpenAI呼び出し
+    client = ChatOpenAI(api_key=OPENAI_API_KEY)
+    response = client.chat.completions.create(
+        model="gpt-3.5-turbo",
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    return response.choices[0].message.content.strip()
