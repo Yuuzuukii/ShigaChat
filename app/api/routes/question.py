@@ -178,36 +178,38 @@ def load_data_from_database():
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
     question_text = request.text
     thread_id = request.thread_id
-    user_id = current_user[""]
+    user_id = current_user["id"]
 
     try:
         # スレッドが存在しなければ作成
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT thread_id FROM threads WHERE thread_id = ?", (thread_id,))
+            cursor.execute("SELECT id FROM threads WHERE id = ?", (thread_id,))
             if not cursor.fetchone():
                 cursor.execute(
-                    "INSERT INTO threads (thread_id, user_id, last_updated) VALUES (?, ?, ?)",
+                    "INSERT INTO threads (id, user_id, last_updated) VALUES (?, ?, ?)",
                     (thread_id, user_id, datetime.now())
                 )
                 conn.commit()
 
-        # rag_result = {1: [answer, question, time, distance], ...}
+        # 🔹 RAG結果取得と整形
         rag_result = rag(question_text)
 
-        rag_qa = []
-        for rank in sorted(rag_result.keys()):
+        raw_rag_qa = []
+        for rank in rag_result:
             answer, question, retrieved_at, distance = rag_result[rank]
-            score = round(1 / (1 + distance), 4)  # スコア化
-            rag_qa.append({
+            score = round(1 / (1 + distance), 4)  # スコア化（高いほど関連度高）
+            raw_rag_qa.append({
                 "question": question,
                 "answer": answer,
                 "retrieved_at": retrieved_at,
                 "score": score
             })
 
+        # 🔹 関連度が高い順（スコア降順）に並び替え
+        rag_qa = sorted(raw_rag_qa, key=lambda x: x["score"], reverse=True)
 
-        # 🔹 thread_qaから直近5件の対話履歴を取得
+        # 🔹 過去履歴の取得（最新5件を時系列順に）
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
             cursor.execute("""
@@ -217,9 +219,9 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 LIMIT 5
             """, (thread_id,))
             past_qa_rows = cursor.fetchall()
-        history_qa = list(reversed(past_qa_rows))  # 時系列順に並び替え
+        history_qa = list(reversed(past_qa_rows))  # 時系列順に並べ替え
 
-        # 🔹 LLMで回答生成
+        # 🔹 回答生成
         generated_answer = generate_answer_with_llm(
             question_text=question_text,
             rag_qa=rag_qa,
@@ -234,11 +236,13 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 VALUES (?, ?, ?)
             """, (thread_id, question_text, generated_answer))
             cursor.execute("""
-                UPDATE threads SET last_updated = ? WHERE thread_id = ?
+                UPDATE threads SET last_updated = ? WHERE id = ?
             """, (datetime.now(), thread_id))
             conn.commit()
 
         return {
+            "thread_id": thread_id,
+            "question": question_text,
             "answer": generated_answer,
             "rag_qa": rag_qa
         }
@@ -247,8 +251,6 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
-
-
 
 """
 @router.post("/get_answer")
