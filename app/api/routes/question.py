@@ -4,19 +4,14 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
 from langdetect import detect
 from langdetect.lang_detect_exception import LangDetectException
-from langchain.text_splitter import CharacterTextSplitter
-from langchain.schema import Document
-from langchain.embeddings.openai import OpenAIEmbeddings
-from langchain_community.vectorstores import FAISS
 from langchain.chat_models import ChatOpenAI
-from langchain.chains import RetrievalQA
 from config import DATABASE, OPENAI_API_KEY, language_mapping
 from api.routes.user import current_user_info
 from api.routes.category import categorize_question
 from models.schemas import SimpleQuestion, QuestionRequest, Question, AnswerRequest
 from api.utils.security import detect_privacy_info
 from api.utils.translator import question_translate, answer_translate
-from RAG import RAG
+from api.utils.RAG import rag
 
 
 router = APIRouter()

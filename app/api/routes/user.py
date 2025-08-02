@@ -3,7 +3,7 @@ from datetime import datetime
 from jose import jwt, JWTError
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from api.utils.security import ALGORITHM, hash_password, verify_password, create_access_token
+from api.utils.security import ALGORITHM, hash_password, verify_password, create_access_token, oauth2_scheme
 from models.schemas import User, UserLogin
 from config import DATABASE, SECRET_KEY
 
@@ -33,7 +33,7 @@ def register_user(user: User):
 
     return {"message": "登録が完了しました"}
 
-def get_current_user(token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("id")
@@ -82,6 +82,8 @@ def login_for_access_token(
         raise HTTPException(status_code=404, detail="User not found")
 
     user_id, stored_password, spoken_language, is_admin = db_user
+    
+    print(f"User ID: {user_id}, Spoken Language: {spoken_language}, Is Admin: {is_admin}")
 
     if not verify_password(form_data.password, stored_password):
         raise HTTPException(status_code=401, detail="Incorrect password")
@@ -125,7 +127,7 @@ def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
     return {"message": "ユーザー情報が削除されました"}
 
 @router.post("/change_language")
-def change_language(language: str, token: str = Depends(OAuth2PasswordBearer(tokenUrl="token"))):
+def change_language(language: str, token: str = Depends(oauth2_scheme)):
     try:
         # トークンをデコードしてユーザー情報を取得
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

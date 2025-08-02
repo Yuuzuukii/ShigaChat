@@ -6,7 +6,7 @@ uvicorn==0.34.0
 uwsgi==2.0.20
 passlib==1.7.4
 langdetect==1.0.9
-openai==0.28.0
+openai==1.98.0
 httpx==0.28.1
 scikit-learn==1.6.0
 deep-translator==1.11.4
