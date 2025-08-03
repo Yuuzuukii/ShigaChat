@@ -11,7 +11,7 @@ from tqdm import tqdm
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 from pathlib import Path
-from app.config import DATABASE #パスを修正
+from config import DATABASE #パスを修正
 
 
 dotenv.load_dotenv()
