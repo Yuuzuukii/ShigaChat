@@ -11,7 +11,8 @@ from tqdm import tqdm
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 from pathlib import Path
-from config import DATABASE  # ✅ config.py から正しいDBパスを取得
+from app.config import DATABASE #パスを修正
+
 
 dotenv.load_dotenv()
 api_key = os.getenv("OPENAI_API_KEY")
