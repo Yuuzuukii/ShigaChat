@@ -11,7 +11,12 @@ from tqdm import tqdm
 from langchain.chat_models import ChatOpenAI
 from langchain.schema import HumanMessage
 from pathlib import Path
-from config import DATABASE #パスを修正
+
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../..")))
+
+from app.config import DATABASE #パスを修正
 
 
 dotenv.load_dotenv()
