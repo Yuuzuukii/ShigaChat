@@ -71,7 +71,7 @@ const Shinki = () => {
             <label className="name">{t.nickname}:</label>
             <input
               type="text"
-              value={nickname}
+              value={name}
               onChange={(e) => setNickname(e.target.value)}
               placeholder={t.nickname + "を入力して下さい"}
             />
