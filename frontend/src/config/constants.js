@@ -74,7 +74,7 @@ export const translations = {
     officialize: "公式マークを付与しますか？",
     categorychanged: "カテゴリが変更されました！",
     failtochangecategory: "カテゴリの変更に失敗しました。",
-    name: "名前",
+    nickname: "名前",
     password: "パスワード",
     login: "ログイン",
     registerPrompt: "↓↓↓↓ 新規登録はこちら ↓↓↓↓",
