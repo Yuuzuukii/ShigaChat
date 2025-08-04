@@ -68,12 +68,12 @@ const Shinki = () => {
         <h1 className="kotoba">{t.signUp}</h1>
         <form onSubmit={handleRegister}>
           <div>
-            <label className="name">{t.nickname}:</label>
+            <label className="name">{t.name}:</label>
             <input
               type="text"
               value={name}
-              onChange={(e) => setNickname(e.target.value)}
-              placeholder={t.nickname + "を入力して下さい"}
+              onChange={(e) => setName(e.target.value)}
+              placeholder={t.name + "を入力して下さい"}
             />
           </div>
 
