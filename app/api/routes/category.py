@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 import sqlite3
-from openai import OpenAI
+import openai  as oepnai
 import numpy as np
 from typing import Tuple
 from sklearn.metrics.pairwise import cosine_similarity
@@ -225,7 +225,7 @@ def categorize_question(question: str, language_id: int) -> Tuple[int, str]:
     try:
         # OpenAI API に送るテキスト
         input_texts = [question] + category_descriptions + question_texts
-        response = OpenAI.Embedding.create(input=input_texts, model="text-embedding-ada-002")
+        response = oepnai.embeddings.create(input=input_texts, model="text-embedding-3-small")
         embeddings = response["data"]
         
         # ✅ 質問の埋め込み

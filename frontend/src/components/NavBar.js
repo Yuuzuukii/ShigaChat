@@ -154,11 +154,9 @@ const NavBar = () => {
               <li>
                 <Link to="/Etsurannrireki" onClick={closeMenu}>{t.viewingHistory}</Link>
               </li>
-              {user.isAdmin && (
-                <li>
+              <li>
                   <Link to="/Admin/QuestionAdmin" onClick={closeMenu}>{t.questionAdmin}</Link>
-                </li>
-              )}
+              </li>         
               <li>
                 <a href="https://www.s-i-a.or.jp" className="important-link" target="_blank" rel="noopener noreferrer">
                   {t.officialWebsite}
