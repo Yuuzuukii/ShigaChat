@@ -10,12 +10,10 @@ import {
 import './Shinki.css';
 
 const Shinki = () => {
-  const [nickname, setNickname] = useState('');
+  const [name, setName] = useState('');
   const [password, setPassword] = useState('');
   const [language, setLanguage] = useState('en');
   const [showPassword, setShowPassword] = useState(false);
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
   const [spokenLanguage, setSpokenLanguage] = useState('');
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -31,18 +29,16 @@ const Shinki = () => {
   const handleRegister = (e) => {
     e.preventDefault();
 
-    if (!nickname || !password || !age || !gender || !spokenLanguage) {
+  if (!name || !password || !spokenLanguage) {
       setError(t.errorAllFields);
       return;
-    }
+  }
 
     axios
       .post(`${API_BASE_URL}/user/register`, {
-        nickname,
+        name,
         password,
         spoken_language: spokenLanguage,
-        gender,
-        age: parseInt(age, 10),
       })
       .then(() => {
         setSuccess(t.successRegistration);
@@ -100,27 +96,6 @@ const Shinki = () => {
               </button>
             </div>
 
-          </div>
-
-          <div>
-            <label className="name">{t.age}:</label>
-            <input
-              type="number"
-              value={age}
-              onChange={(e) => setAge(e.target.value)}
-              placeholder={t.age + "を入力して下さい"}
-              min="0"
-            />
-          </div>
-
-          <div>
-            <label className="name">{t.gender}:</label>
-            <select id="gender" value={gender} onChange={(e) => setGender(e.target.value)}>
-              <option value="" disabled>{t.gender + "を選択してください"}</option> // 追加
-              <option value="男性">{t.male}</option>
-              <option value="女性">{t.female}</option>
-              <option value="その他">{t.other}</option>
-            </select>
           </div>
 
           <div>
