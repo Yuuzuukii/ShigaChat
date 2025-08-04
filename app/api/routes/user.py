@@ -15,20 +15,20 @@ def register_user(user: User):
     # ニックネームの重複を確認
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id FROM user WHERE nickname = ?", (user.nickname,))
+        cursor.execute("SELECT id FROM user WHERE name = ?", (user.name,))
         existing_user = cursor.fetchone()
 
     if existing_user:
-        raise HTTPException(status_code=400, detail="このニックネームは既に使用されています")
+        raise HTTPException(status_code=400, detail="この名前は既に使用されています")
     
     # パスワードをハッシュ化して保存
     hashed_password = hash_password(user.password)
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
         cursor.execute("""
-        INSERT INTO user (nickname, password, spoken_language, gender, age)
-        VALUES (?, ?, ?, ?, ?)
-        """, (user.nickname, hashed_password, user.spoken_language, user.gender, user.age))
+        INSERT INTO user (name, password, spoken_language)
+        VALUES (?, ?, ?)
+        """, (user.name, hashed_password, user.spoken_language))
         conn.commit()
 
     return {"message": "登録が完了しました"}
@@ -62,11 +62,8 @@ def current_user_info(current_user: dict = Depends(get_current_user)):
 
     return {
         "id": user[0],
-        "nickname": user[1],
+        "name": user[1],
         "spoken_language": user[3],
-        "gender": user[4],
-        "age": user[5],
-        "isAdmin": user[6],  # is_admin を追加
     }
 
 @router.post("/token")
@@ -75,35 +72,34 @@ def login_for_access_token(
 ):
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT id, password, spoken_language, is_admin FROM user WHERE nickname = ?", (form_data.username,))
+        cursor.execute("SELECT id, password, spoken_language FROM user WHERE name = ?", (form_data.username,))
         db_user = cursor.fetchone()
 
     if db_user is None:
         raise HTTPException(status_code=404, detail="User not found")
 
-    user_id, stored_password, spoken_language, is_admin = db_user
-    
-    print(f"User ID: {user_id}, Spoken Language: {spoken_language}, Is Admin: {is_admin}")
+    user_id, stored_password, spoken_language = db_user
 
     if not verify_password(form_data.password, stored_password):
         raise HTTPException(status_code=401, detail="Incorrect password")
 
-    # JWT に isAdmin を含める
+    # JWT に必要な情報のみ含める
     access_token = create_access_token(
-        data={"id": user_id, "spoken_language": spoken_language, "isAdmin": is_admin}
+        data={"id": user_id, "spoken_language": spoken_language}
     )
 
     return {"access_token": access_token, "token_type": "bearer"}
 
+
 # /user_delete エンドポイントを追加
 @router.delete("/user_delete")
 def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
-    if current_user != user.nickname:
+    if current_user != user.name:
         raise HTTPException(status_code=403, detail="Permission denied")
 
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        cursor.execute("SELECT password FROM user WHERE nickname = ?", (user.nickname,))
+        cursor.execute("SELECT password FROM user WHERE name = ?", (user.name,))
         db_user = cursor.fetchone()
 
     if db_user is None:
@@ -119,7 +115,7 @@ def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
     try:
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM user WHERE nickname = ?", (user.nickname,))
+            cursor.execute("DELETE FROM user WHERE name = ?", (user.name,))
             conn.commit()
     except sqlite3.Error:
         raise HTTPException(status_code=500, detail="データベースエラーが発生しました")

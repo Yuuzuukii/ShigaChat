@@ -4,14 +4,13 @@ from datetime import datetime
 
 # User モデルの定義
 class User(BaseModel):
-    nickname: str
+    name: str
     password: str
     spoken_language: str
-    gender: Optional[str] = "不明"  # デフォルトは "不明"
-    age: int
+
     
 class UserLogin(BaseModel):
-    nickname: str
+    name: str
     password: str
 
 class SimpleQuestion(BaseModel):

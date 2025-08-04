@@ -1521,3 +1521,5 @@
 2025/04/02 21:35:05 [error] 29#29: *4 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
 2025/04/02 21:37:35 [error] 28#28: *7 open() "/usr/share/nginx/html/apple-touch-icon-precomposed.png" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /apple-touch-icon-precomposed.png HTTP/1.1", host: "localhost"
 2025/04/02 21:37:35 [error] 28#28: *8 open() "/usr/share/nginx/html/apple-touch-icon.png" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /apple-touch-icon.png HTTP/1.1", host: "localhost"
+2025/08/03 22:33:47 [error] 22#22: *145 open() "/usr/share/nginx/html/home" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /home HTTP/1.1", host: "localhost"
+2025/08/03 22:33:50 [error] 22#22: *145 open() "/usr/share/nginx/html/home" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /home HTTP/1.1", host: "localhost"
