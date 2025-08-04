@@ -1545,3 +1545,4 @@
 2025/08/04 12:04:12 [error] 29#29: *14 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
 2025/08/04 12:13:46 [error] 29#29: *23 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
 2025/08/04 12:14:16 [error] 29#29: *24 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
+2025/08/04 12:37:11 [error] 29#29: *12 open() "/usr/share/nginx/html/shinki" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /shinki HTTP/1.1", host: "localhost"
