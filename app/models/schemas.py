@@ -55,10 +55,9 @@ class moveCategoryRequest(BaseModel):
 
 class RegisterQuestionRequest(BaseModel):
     category_id: int
-    title: str
     content: str
-    public: bool
     answer_text: str
+    public: bool = True
     
 class NotificationRequest(BaseModel):
     id: int

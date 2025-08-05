@@ -1558,3 +1558,7 @@
 2025/08/04 16:16:38 [error] 29#29: *10 open() "/usr/share/nginx/html/static/js/main.042dfba8.js" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /static/js/main.042dfba8.js HTTP/1.1", host: "localhost", referrer: "http://localhost/"
 2025/08/04 16:17:36 [error] 29#29: *14 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
 2025/08/04 16:22:25 [error] 29#29: *2 open() "/usr/share/nginx/html/static/js/main.e10bfd30.js" failed (2: No such file or directory), client: 192.168.65.1, server: , request: "GET /static/js/main.e10bfd30.js HTTP/1.1", host: "localhost", referrer: "http://localhost/"
+2025/08/04 17:11:10 [error] 29#29: *88 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
+2025/08/04 23:37:27 [error] 29#29: *32 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
+2025/08/04 23:37:58 [error] 29#29: *33 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"
+2025/08/05 19:44:38 [error] 22#22: *99 directory index of "/usr/share/nginx/html/" is forbidden, client: 127.0.0.1, server: , request: "GET / HTTP/1.1", host: "localhost"

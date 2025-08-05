@@ -1,5 +1,5 @@
 import sqlite3
-from datetime import datetime
+from datetime import datetime,timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from api.routes.user import current_user_info
 from api.utils.translator import question_translate, answer_translate
@@ -445,15 +445,16 @@ async def register_question(
     
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
-        
+        japan_time = datetime.utcnow() + timedelta(hours=9)
         # 質問を登録
         cursor.execute(
             """
             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
             VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            (request.category_id, datetime.utcnow(), language_id, user_id, request.title, request.content, request.public)
+            (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
         )
+
         question_id = cursor.lastrowid
 
         # 元言語の質問を question_translation に格納
