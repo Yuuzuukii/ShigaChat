@@ -6,10 +6,10 @@
   width: 100vw;
   height: 100vh;
   padding: 30px;
-  background: linear-gradient(135deg, #ffe6e6, #ffcccc);
+  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.7s ease-out;
-  border: 1px solid #ff9999;
+  border: 1px solid #e6f7ff;
   overflow-y: auto;
 }
 
@@ -20,7 +20,7 @@
   align-items: center;
   justify-content: center;
   padding: 15px 20px;
-  background-color: #ffdddd;
+  background-color: #e0f3ff;
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 100%;
@@ -34,7 +34,7 @@
   flex: 1;
   text-align: center; /* タイトルを中央に固定 */
   font-size: 36px;
-  color: #b30000;
+  color: #0056b3;
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
   margin-top: 20px;
@@ -45,8 +45,8 @@
   border: 1px solid #ff9999;
   border-radius: 6px;
   font-size: 14px;
-  background-color: #ffffff;
-  color: #b30000;
+  background-color: #c9daf8;
+  color: #0056b3;
   margin-top: 10px;
   margin-bottom: 15px;
 }
@@ -154,7 +154,7 @@
 
 .admin-container-kategori .question-admin{
   font-size: 24px;
-  color: #b30000;
+  color: #0056b3;
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
   margin-bottom: 10px;
@@ -162,18 +162,18 @@
 
 .admin-container-kategori .admin-title {
   font-size: 40px;
-  color: #b30000;
+  color: #0056b3;
   font-weight: bold;
   text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .admin-container-kategori .admin-languageSelector {
   padding: 10px;
-  border: 1px solid #ffdddd;
+  border: 1px solid #e6f7ff;
   border-radius: 6px;
   font-size: 14px;
-  background-color: #ffffff;
-  color: #b30000;
+  background-color: #e6f7ff;
+  color: #0056b3;
 }
 
 /* ページタイトル */
@@ -182,7 +182,7 @@
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 20px;
-  color: #b30000;
+  color: #0056b3;
 }
 
 .admin-container-kategori .admin-kotoba {
@@ -190,7 +190,7 @@
   font-size: 24px;
   font-weight: bold;
   margin-bottom: 20px;
-  color: #b30000;
+  color: #0056b3;
 }
 
 /* カテゴリボタンのグリッド */
@@ -276,7 +276,7 @@
   width: 100%; /* 親要素いっぱいに広げる */
   max-width: 900px; /* 幅を最大に設定 */
   padding: 15px 20px; /* パディングを少し広めに */
-  background-color: #8B0000; /* 濃い赤色 (ダークレッド) */
+  background-color: #0056b3; /* 濃い赤色 (ダークレッド) */
   text-align: center;
   color: white; /* 文字色を白に */
   border: none; /* ボーダーなし */
@@ -293,13 +293,13 @@
 }
 
 .admin-container-kategori .reg:hover {
-  background-color: #660000; /* さらに濃い赤に変更（ホバー時） */
+  background-color: #0056b3; /* さらに濃い赤に変更（ホバー時） */
   transform: translateY(-3px); /* ホバー時に少し浮き上がる */
   box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3); /* ホバー時の影を強調 */
 }
 
 .admin-container-kategori .reg:active {
-  background-color: #4B0000; /* クリック時はさらに濃い色に */
+  background-color: #0056b3; /* クリック時はさらに濃い色に */
   transform: translateY(0); /* クリック時に元の位置に戻す */
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); /* 影を少し弱める */
 }
@@ -382,7 +382,7 @@
   width: 90%; /* 幅を90%に設定 */
   margin: 20px auto;
   padding: 20px;
-  background: #ffdddd;
+  background: #ffffff;
   border-radius: 12px;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
   animation: fadeIn 0.8s ease-out;
@@ -608,7 +608,7 @@
 }/* タイトルボタン */
 
 .register-container .register{
-  background: linear-gradient(135deg, #b30000, #940000);
+  background: linear-gradient(135deg, #007BFF, #007BFF);
   color: #ffffff;
   padding: 15px 20px;
   border: none;
@@ -622,7 +622,7 @@
   text-align: center;
 }
 .register-container .register:hover{
-  background: linear-gradient(135deg, #7a0000, #920101);
+  background: linear-gradient(135deg,#0056b3, #0056b3);
   transition: background-color 0.3s ease;
   transform: translateY(-3px); /* ホバー時に少し浮き上がる */
 }
