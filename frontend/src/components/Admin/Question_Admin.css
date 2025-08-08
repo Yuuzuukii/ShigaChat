@@ -1,642 +1,643 @@
 /* メインコンテナ */
 .admin-container-kategori {
-  font-family: 'Open Sans', sans-serif;
-  margin: 0 auto;
-  border-radius: 12px;
-  width: 100vw;
-  height: 100vh;
-  padding: 30px;
-  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
-  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
-  animation: fadeIn 0.7s ease-out;
-  border: 1px solid #e6f7ff;
-  overflow-y: auto;
-}
-
-
-.admin-container-kategori .header {
-  display: flex;
-  flex-direction: column; /* デフォルトは縦並び */
-  align-items: center;
-  justify-content: center;
-  padding: 15px 20px;
-  background-color: #e0f3ff;
-  border-radius: 12px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  width: 100%;
-  max-width: 900px;
-  margin: 0 auto; /* ヘッダーを中央配置 */
-}
-
-
-/* タイトルを中央配置 */
-.admin-container-kategori .header h1 {
-  flex: 1;
-  text-align: center; /* タイトルを中央に固定 */
-  font-size: 36px;
-  color: #0056b3;
-  font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-  margin-top: 20px;
-}
-
-.admin-container-kategori .admin-languageSelector {
-  padding: 10px;
-  border: 1px solid #ff9999;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: #c9daf8;
-  color: #0056b3;
-  margin-top: 10px;
-  margin-bottom: 15px;
-}
-
-
-.admin-container-kategori .user-notification-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
-}
-
-/* 通知アイコン */
-.admin-container-kategori .notification-container {
-  position: relative;
-}
-
-/* 通知アイコン */
-.notification-button img {
-  width: 28px;
-  height: 28px;
-  vertical-align: middle;
-}
-
-/* 通知ボタン */
-.notification-button {
-  background: none;
-  border: none;
-  cursor: pointer;
-  position: relative;
-  padding: 5px;
-}
-
-/* 通知のバッジ（未読件数） */
-.badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: red;
-  color: white;
-  font-size: 12px;
-  padding: 3px 7px;
-  border-radius: 50%;
-}
-
-/* 通知ポップアップ */
-.notification-popup {
-  position: absolute;
-  width: 320px;
-  background: white;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-  padding: 15px;
-  margin-top: -50px;
-  right: 0;
-  z-index: 1000;
-}
-
-/* 通知タイトル */
-.notification-popup h3 {
-  padding: 10px 0;
-  text-align: left;
-  font-size: 18px;
-  color: #0056b3;
-  border-bottom: 2px solid #cce7ff;
-}
-
-/* タブボタン */
-.tabs {
-  display: flex;
-  justify-content: space-around;
-  margin: 10px 0;
-}
-
-.tabs button {
-  flex: 1;
-  padding: 10px;
-  border: none;
-  background: #e0f3ff;
-  cursor: pointer;
-  font-size: 14px;
-  transition: 0.3s;
-}
-
-.tabs button:hover {
-  background: #b3d9ff;
-}
-
-.tabs button.active {
-  background: #0056b3;
-  color: white;
-  font-weight: bold;
-}
-
-.admin-container-kategori .admin-body {
-  margin: 20px auto;
-  background: rgba(255, 255, 255, 0.9);
-  padding: 25px;
-  border-radius: 12px;
-  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
-  text-align: center;
-  max-width: 900px;
-}
-
-.admin-container-kategori .question-admin{
-  font-size: 24px;
-  color: #0056b3;
-  font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-  margin-bottom: 10px;
-}
-
-.admin-container-kategori .admin-title {
-  font-size: 40px;
-  color: #0056b3;
-  font-weight: bold;
-  text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-.admin-container-kategori .admin-languageSelector {
-  padding: 10px;
-  border: 1px solid #e6f7ff;
-  border-radius: 6px;
-  font-size: 14px;
-  background-color: #e6f7ff;
-  color: #0056b3;
-}
-
-/* ページタイトル */
-.admin-container-kategori .admin-category-header {
-  text-align: center;
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #0056b3;
-}
-
-.admin-container-kategori .admin-kotoba {
-  text-align: center;
-  font-size: 24px;
-  font-weight: bold;
-  margin-bottom: 20px;
-  color: #0056b3;
-}
-
-/* カテゴリボタンのグリッド */
-.admin-container-kategori .admin-category-container {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 20px;
-  justify-content: center;
-  align-items: center;
-  padding: 20px;
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-/* カテゴリボタンのスタイル */
-.admin-container-kategori .admin-category-button {
-  padding: 15px;
-  border: none;
-  border-radius: 10px;
-  font-size: 20px;
-  height: 80px;
-  font-weight: bold;
-  text-align: center;
-  color: #333;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
-  background-color: #f4f4f4;
-}
-
-.admin-container-kategori .admin-category-button:hover,
-.admin-container-kategori .admin-category-button:focus {
-  transform: translateY(-5px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  font-size: 18px;
-}
-
-/* 各カテゴリごとの背景色 */
-.admin-container-kategori .admin-category-zairyu { background-color: #ffe599; }
-.admin-container-kategori .admin-category-zairyu:hover, .admin-container-kategori .admin-category-zairyu.selected { background-color: #ffd966; }
-
-.admin-container-kategori .admin-category-seikatsu { background-color: #d9ead3; }
-.admin-container-kategori .admin-category-seikatsu:hover, .admin-container-kategori .admin-category-seikatsu.selected { background-color: #b6d7a8; }
-
-.admin-container-kategori .admin-category-iryo { background-color: #f9cb9c; }
-.admin-container-kategori .admin-category-iryo:hover, .admin-container-kategori .admin-category-iryo.selected { background-color: #f6b26b; }
-
-.admin-container-kategori .admin-category-nenkin { background-color: #c9daf8; }
-.admin-container-kategori .admin-category-nenkin:hover, .admin-container-kategori .admin-category-nenkin.selected { background-color: #6d9eeb; }
-
-.admin-container-kategori .admin-category-roudou { background-color: #f6d7b0; }
-.admin-container-kategori .admin-category-roudou:hover, .admin-container-kategori .admin-category-roudou.selected { background-color: #f4b183; }
-
-.admin-container-kategori .admin-category-kyouiku { background-color: #e06666; }
-.admin-container-kategori .admin-category-kyouiku:hover, .admin-container-kategori .admin-category-kyouiku.selected { background-color: #cc0000; }
-
-.admin-container-kategori .admin-category-kekkon { background-color: #a4c2f4; }
-.admin-container-kategori .admin-category-kekkon:hover, .admin-container-kategori .admin-category-kekkon.selected { background-color: #6fa8dc; }
-
-.admin-container-kategori .admin-category-shussan { background-color: #d9d2e9; }
-.admin-container-kategori .admin-category-shussan:hover, .admin-container-kategori .admin-category-shussan.selected { background-color: #b4a7d6; }
-
-.admin-container-kategori .admin-category-jutaku { background-color: #b6d7a8; }
-.admin-container-kategori .admin-category-jutaku:hover, .admin-container-kategori .admin-category-jutaku.selected { background-color: #93c47d; }
-
-.admin-container-kategori .admin-category-zeikin { background-color: #cfe2f3; }
-.admin-container-kategori .admin-category-zeikin:hover, .admin-container-kategori .admin-category-zeikin.selected { background-color: #76a5af; }
-
-.admin-container-kategori .admin-category-fukushi { background-color: #f6e0b5; }
-.admin-container-kategori .admin-category-fukushi:hover, .admin-container-kategori .admin-category-fukushi.selected { background-color: #e69138; }
-
-.admin-container-kategori .admin-category-jiken { background-color: #ea9999; }
-.admin-container-kategori .admin-category-jiken:hover, .admin-container-kategori .admin-category-jiken.selected { background-color: #cc0000; }
-
-.admin-container-kategori .admin-category-saigai { background-color: #b4a7d6; }
-.admin-container-kategori .admin-category-saigai:hover, .admin-container-kategori .admin-category-saigai.selected { background-color: #674ea7; }
-
-.admin-container-kategori .admin-category-sonota { background-color: #f3cda8; }
-.admin-container-kategori .admin-category-sonota:hover, .admin-container-kategori .admin-category-sonota.selected { background-color: #e69138; }
-
-/* 質問登録ボタン */
-.admin-container-kategori .reg {
-  display: block; /* インライン要素をブロック要素に変更 */
-  width: 100%; /* 親要素いっぱいに広げる */
-  max-width: 900px; /* 幅を最大に設定 */
-  padding: 15px 20px; /* パディングを少し広めに */
-  background-color: #0056b3; /* 濃い赤色 (ダークレッド) */
-  text-align: center;
-  color: white; /* 文字色を白に */
-  border: none; /* ボーダーなし */
-  border-radius: 10px; /* 角を少し丸く */
-  font-size: 18px; /* フォントサイズを大きく */
-  font-weight: bold; /* 太字に設定 */
-  cursor: pointer; /* ポインタ表示 */
-  transition: background-color 0.3s ease, transform 0.2s ease; /* ホバー時のトランジション */
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* 影を追加して立体感 */
-  text-transform: uppercase; /* テキストを大文字に */
-  letter-spacing: 1px; /* 文字間隔を少し広く */
-  margin: 20px auto; /* 上下20pxの余白を設定し、中央揃え */
-  text-align: center;
-}
-
-.admin-container-kategori .reg:hover {
-  background-color: #0056b3; /* さらに濃い赤に変更（ホバー時） */
-  transform: translateY(-3px); /* ホバー時に少し浮き上がる */
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3); /* ホバー時の影を強調 */
-}
-
-.admin-container-kategori .reg:active {
-  background-color: #0056b3; /* クリック時はさらに濃い色に */
-  transform: translateY(0); /* クリック時に元の位置に戻す */
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); /* 影を少し弱める */
-}
-
-.admin-container-kategori .reg:disabled {
-  background-color: #ccc; /* 無効時のグレー */
-  color: #777; /* 文字も薄く */
-  cursor: not-allowed; /* 無効時のカーソル */
-  box-shadow: none; /* 影を削除 */
-}
-
-@media (max-width: 768px) {
-  .admin-container-kategori {
-    max-width: 100%;
-    padding: 20px;
+    font-family: 'Open Sans', sans-serif;
+    margin: 0 auto;
+    border-radius: 12px;
+    width: 100vw;
+    height: 100vh;
+    padding: 30px;
+    background: linear-gradient(135deg, #ffe6e6, #ffcccc);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+    animation: fadeIn 0.7s ease-out;
+    border: 1px solid #ff9999;
+    overflow-y: auto;
   }
-
-  .admin-container-kategori .admin-header {
-    flex-direction: column;
+  
+  
+  .admin-container-kategori .header {
+    display: flex;
+    flex-direction: column; /* デフォルトは縦並び */
+    align-items: center;
+    justify-content: center;
+    padding: 15px 20px;
+    background-color: #ffdddd;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 900px;
+    margin: 0 auto; /* ヘッダーを中央配置 */
+  }
+  
+  
+  /* タイトルを中央配置 */
+  .admin-container-kategori .header h1 {
+    flex: 1;
+    text-align: center; /* タイトルを中央に固定 */
+    font-size: 36px;
+    color: #b30000;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    margin-top: 20px;
+  }
+  
+  .admin-container-kategori .admin-languageSelector {
+    padding: 10px;
+    border: 1px solid #ff9999;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: #ffffff;
+    color: #b30000;
+    margin-top: 10px;
+    margin-bottom: 15px;
+  }
+  
+  
+  .admin-container-kategori .user-notification-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: auto;
+  }
+  
+  /* 通知アイコン */
+  .admin-container-kategori .notification-container {
+    position: relative;
+  }
+  
+  /* 通知アイコン */
+  .notification-button img {
+    width: 28px;
+    height: 28px;
+    vertical-align: middle;
+  }
+  
+  /* 通知ボタン */
+  .notification-button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    padding: 5px;
+  }
+  
+  /* 通知のバッジ（未読件数） */
+  .badge {
+    position: absolute;
+    top: -5px;
+    right: -5px;
+    background: red;
+    color: white;
+    font-size: 12px;
+    padding: 3px 7px;
+    border-radius: 50%;
+  }
+  
+  /* 通知ポップアップ */
+  .notification-popup {
+    position: absolute;
+    width: 320px;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    padding: 15px;
+    margin-top: -50px;
+    right: 0;
+    z-index: 1000;
+  }
+  
+  /* 通知タイトル */
+  .notification-popup h3 {
+    padding: 10px 0;
+    text-align: left;
+    font-size: 18px;
+    color: #0056b3;
+    border-bottom: 2px solid #cce7ff;
+  }
+  
+  /* タブボタン */
+  .tabs {
+    display: flex;
+    justify-content: space-around;
+    margin: 10px 0;
+  }
+  
+  .tabs button {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    background: #e0f3ff;
+    cursor: pointer;
+    font-size: 14px;
+    transition: 0.3s;
+  }
+  
+  .tabs button:hover {
+    background: #b3d9ff;
+  }
+  
+  .tabs button.active {
+    background: #0056b3;
+    color: white;
+    font-weight: bold;
+  }
+  
+  .admin-container-kategori .admin-body {
+    margin: 20px auto;
+    background: rgba(255, 255, 255, 0.9);
+    padding: 25px;
+    border-radius: 12px;
+    box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    max-width: 900px;
+  }
+  
+  .admin-container-kategori .question-admin{
+    font-size: 24px;
+    color: #b30000;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+    margin-bottom: 10px;
+  }
+  
+  .admin-container-kategori .admin-title {
+    font-size: 40px;
+    color: #b30000;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  .admin-container-kategori .admin-languageSelector {
+    padding: 10px;
+    border: 1px solid #ffdddd;
+    border-radius: 6px;
+    font-size: 14px;
+    background-color: #ffffff;
+    color: #b30000;
+  }
+  
+  /* ページタイトル */
+  .admin-container-kategori .admin-category-header {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #b30000;
+  }
+  
+  .admin-container-kategori .admin-kotoba {
+    text-align: center;
+    font-size: 24px;
+    font-weight: bold;
+    margin-bottom: 20px;
+    color: #b30000;
+  }
+  
+  /* カテゴリボタンのグリッド */
+  .admin-container-kategori .admin-category-container {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  /* カテゴリボタンのスタイル */
+  .admin-container-kategori .admin-category-button {
+    padding: 15px;
+    border: none;
+    border-radius: 10px;
+    font-size: 20px;
+    height: 80px;
+    font-weight: bold;
+    text-align: center;
+    color: #333;
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.3s ease;
+    background-color: #f4f4f4;
+  }
+  
+  .admin-container-kategori .admin-category-button:hover,
+  .admin-container-kategori .admin-category-button:focus {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    font-size: 18px;
+  }
+  
+  /* 各カテゴリごとの背景色 */
+  .admin-container-kategori .admin-category-zairyu { background-color: #ffe599; }
+  .admin-container-kategori .admin-category-zairyu:hover, .admin-container-kategori .admin-category-zairyu.selected { background-color: #ffd966; }
+  
+  .admin-container-kategori .admin-category-seikatsu { background-color: #d9ead3; }
+  .admin-container-kategori .admin-category-seikatsu:hover, .admin-container-kategori .admin-category-seikatsu.selected { background-color: #b6d7a8; }
+  
+  .admin-container-kategori .admin-category-iryo { background-color: #f9cb9c; }
+  .admin-container-kategori .admin-category-iryo:hover, .admin-container-kategori .admin-category-iryo.selected { background-color: #f6b26b; }
+  
+  .admin-container-kategori .admin-category-nenkin { background-color: #c9daf8; }
+  .admin-container-kategori .admin-category-nenkin:hover, .admin-container-kategori .admin-category-nenkin.selected { background-color: #6d9eeb; }
+  
+  .admin-container-kategori .admin-category-roudou { background-color: #f6d7b0; }
+  .admin-container-kategori .admin-category-roudou:hover, .admin-container-kategori .admin-category-roudou.selected { background-color: #f4b183; }
+  
+  .admin-container-kategori .admin-category-kyouiku { background-color: #e06666; }
+  .admin-container-kategori .admin-category-kyouiku:hover, .admin-container-kategori .admin-category-kyouiku.selected { background-color: #cc0000; }
+  
+  .admin-container-kategori .admin-category-kekkon { background-color: #a4c2f4; }
+  .admin-container-kategori .admin-category-kekkon:hover, .admin-container-kategori .admin-category-kekkon.selected { background-color: #6fa8dc; }
+  
+  .admin-container-kategori .admin-category-shussan { background-color: #d9d2e9; }
+  .admin-container-kategori .admin-category-shussan:hover, .admin-container-kategori .admin-category-shussan.selected { background-color: #b4a7d6; }
+  
+  .admin-container-kategori .admin-category-jutaku { background-color: #b6d7a8; }
+  .admin-container-kategori .admin-category-jutaku:hover, .admin-container-kategori .admin-category-jutaku.selected { background-color: #93c47d; }
+  
+  .admin-container-kategori .admin-category-zeikin { background-color: #cfe2f3; }
+  .admin-container-kategori .admin-category-zeikin:hover, .admin-container-kategori .admin-category-zeikin.selected { background-color: #76a5af; }
+  
+  .admin-container-kategori .admin-category-fukushi { background-color: #f6e0b5; }
+  .admin-container-kategori .admin-category-fukushi:hover, .admin-container-kategori .admin-category-fukushi.selected { background-color: #e69138; }
+  
+  .admin-container-kategori .admin-category-jiken { background-color: #ea9999; }
+  .admin-container-kategori .admin-category-jiken:hover, .admin-container-kategori .admin-category-jiken.selected { background-color: #cc0000; }
+  
+  .admin-container-kategori .admin-category-saigai { background-color: #b4a7d6; }
+  .admin-container-kategori .admin-category-saigai:hover, .admin-container-kategori .admin-category-saigai.selected { background-color: #674ea7; }
+  
+  .admin-container-kategori .admin-category-sonota { background-color: #f3cda8; }
+  .admin-container-kategori .admin-category-sonota:hover, .admin-container-kategori .admin-category-sonota.selected { background-color: #e69138; }
+  
+  /* 質問登録ボタン */
+  .admin-container-kategori .reg {
+    display: block; /* インライン要素をブロック要素に変更 */
+    width: 100%; /* 親要素いっぱいに広げる */
+    max-width: 900px; /* 幅を最大に設定 */
+    padding: 15px 20px; /* パディングを少し広めに */
+    background-color: #8B0000; /* 濃い赤色 (ダークレッド) */
+    text-align: center;
+    color: white; /* 文字色を白に */
+    border: none; /* ボーダーなし */
+    border-radius: 10px; /* 角を少し丸く */
+    font-size: 18px; /* フォントサイズを大きく */
+    font-weight: bold; /* 太字に設定 */
+    cursor: pointer; /* ポインタ表示 */
+    transition: background-color 0.3s ease, transform 0.2s ease; /* ホバー時のトランジション */
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2); /* 影を追加して立体感 */
+    text-transform: uppercase; /* テキストを大文字に */
+    letter-spacing: 1px; /* 文字間隔を少し広く */
+    margin: 20px auto; /* 上下20pxの余白を設定し、中央揃え */
     text-align: center;
   }
-}
-
-/* レスポンシブ対応 */
-@media (max-width: 1024px) {
-  .admin-container-kategori {
-    max-width: 100%;
-    padding: 22px;
+  
+  .admin-container-kategori .reg:hover {
+    background-color: #660000; /* さらに濃い赤に変更（ホバー時） */
+    transform: translateY(-3px); /* ホバー時に少し浮き上がる */
+    box-shadow: 0 6px 14px rgba(0, 0, 0, 0.3); /* ホバー時の影を強調 */
   }
-
-  .admin-container-kategori .admin-category-button {
-    font-size: 14px;
-    padding: 10px;
-    max-width: 220px;
+  
+  .admin-container-kategori .reg:active {
+    background-color: #4B0000; /* クリック時はさらに濃い色に */
+    transform: translateY(0); /* クリック時に元の位置に戻す */
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2); /* 影を少し弱める */
   }
-}
-
-@media (max-width: 768px) {
-  .container-kategori {
-    max-width: 100%;
+  
+  .admin-container-kategori .reg:disabled {
+    background-color: #ccc; /* 無効時のグレー */
+    color: #777; /* 文字も薄く */
+    cursor: not-allowed; /* 無効時のカーソル */
+    box-shadow: none; /* 影を削除 */
+  }
+  
+  @media (max-width: 768px) {
+    .admin-container-kategori {
+      max-width: 100%;
+      padding: 20px;
+    }
+  
+    .admin-container-kategori .admin-header {
+      flex-direction: column;
+      text-align: center;
+    }
+  }
+  
+  /* レスポンシブ対応 */
+  @media (max-width: 1024px) {
+    .admin-container-kategori {
+      max-width: 100%;
+      padding: 22px;
+    }
+  
+    .admin-container-kategori .admin-category-button {
+      font-size: 14px;
+      padding: 10px;
+      max-width: 220px;
+    }
+  }
+  
+  @media (max-width: 768px) {
+    .container-kategori {
+      max-width: 100%;
+      padding: 20px;
+    }
+  
+    .container-kategori .category-button {
+      font-size: 14px;
+      padding: 8px;
+      max-width: 180px;
+    }
+  }
+  
+  /* フェードインアニメーション */
+  @keyframes fadeIn {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+  
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  
+  
+  }/* 質問登録フォームのコンテナ */
+  .register-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .register-container {
+    font-family: 'Open Sans', sans-serif;
+    max-width: 800px; /* 幅を広く設定 */
+    width: 90%; /* 幅を90%に設定 */
+    margin: 20px auto;
     padding: 20px;
+    background: #ffdddd;
+    border-radius: 12px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    animation: fadeIn 0.8s ease-out;
+    
   }
-
-  .container-kategori .category-button {
-    font-size: 14px;
-    padding: 8px;
-    max-width: 180px;
-  }
-}
-
-/* フェードインアニメーション */
-@keyframes fadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-
-
-}/* 質問登録フォームのコンテナ */
-.register-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.register-container {
-  font-family: 'Open Sans', sans-serif;
-  max-width: 800px; /* 幅を広く設定 */
-  width: 90%; /* 幅を90%に設定 */
-  margin: 20px auto;
-  padding: 20px;
-  background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
-  animation: fadeIn 0.8s ease-out;
   
-}
-
-/* フォームのタイトル */
-.register-container h1 {
-  font-size: 24px;
-  margin-bottom: 20px;
-  color: #333;
-  text-align: center; /* 文字を中央に配置 */
-}
-
-/* エラーメッセージ */
-.register-container .error-message {
-  color: red;
-  font-weight: bold;
-  margin-bottom: 20px;
-}
-
-/* ラベル */
-.register-container label {
-  font-weight: bold;
-  color: #333;
-  display: block;
-  margin: 10px;
-  pointer-events: auto; /* クリックをボタン内のみに制限 */
-}
-
-/* セレクトボックス、テキストエリア、インプット */
-.register-container select,
-.register-container textarea,
-.register-container input {
-  width: 100%;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 8px;
-  font-size: 16px;
-  margin-bottom: 20px;
-}
-
-/* テキストエリアの高さ */
-.register-container textarea {
-  resize: vertical;
-  height: 100px;
-}
-
-/* トグルスイッチのラッパー */
-.register-container .toggle-wrapper {
-  margin-top: 10px;
-  gap: 10px;
-  z-index: 999; /* ✅ メニューオーバーレイの下にする */
-}
-
-
-.toggle-container {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  justify-content: flex-end;
-  gap: 8px;
-}
-
-
-/* 公開/非公開のラベル */
-.toggle-text {
-  font-size: 16px;
-  font-weight: bold;
-  color: #0056b3;
-  white-space: nowrap;
-  position: relative;
-  justify-content: flex-end;
-  z-index: 2; /* ✅ スイッチの下に隠れないようにする */
+  /* フォームのタイトル */
+  .register-container h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
+    color: #333;
+    text-align: center; /* 文字を中央に配置 */
+  }
   
-}
-
-/* トグルスイッチ */
-.register-container .toggle-switch {
-  width: 50px;
-  height: 25px;
-  background-color: #ccc;
-  border-radius: 25px;
-  cursor: pointer;
-  transition: background-color 0.3s;
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  z-index: 1; /* ✅ ラベルの下にならないようにする */
-}
-
-.register-container .toggle-switch.active {
-  background-color: #4caf50;
-  justify-content: flex-end;
-}
-
-.register-container .toggle-circle {
-  width: 21px;
-  height: 21px;
-  background-color: white;
-  border-radius: 50%;
-  position: absolute;
-  left: 2px;
-  transition: transform 0.3s ease-in-out;
-}
-
-.register-container .toggle-switch.active .toggle-circle {
-  width: 21px;
-  height: 21px;
-  background-color: white;
-  border-radius: 50%;
-  position: absolute;
-  left: 2px;
-  transition: transform 0.3s ease-in-out;
-}
-/* タイトルボタン */
-.title-buttons {
-  display: flex !important;
-  gap: 10px !important;
-  margin-right: 20px !important;
-}
-
-.title-button {
-  width: 50px !important;
-  height: 25px;
-  background-color: rgb(200, 200, 200) !important;
-  border: none !important;
-  border-radius: 8px !important; /* 角だけ丸みを持たせる */
-  cursor: pointer !important;
-  transition: background-color 0.3s ease !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  font-size: 10px !important;
-  color: #333 !important;
-  font-weight: bold !important;
-}
-
-.title-button.active{
-  background-color: gold !important;
-}
-
-.register-container .category-button {
-  background-color: #007BFF!important;
-  /* 青 */
-  color: white!important;
-  border: none;
-  padding: 10px 15px !important;
-  font-size: 14px!important;
-  border-radius: 6px!important;
-  cursor: pointer!important;
-  transition: 0.3s!important;
-  pointer-events: auto; /* クリックをボタン内のみに制限 */
-}
-
-.register-container .category-button:hover {
-  background-color: #0056b3 !important;
-  transform: scale(1.05)  !important;
-  pointer-events: auto; /* クリックをボタン内のみに制限 */
-}
-
-
-/* カテゴリ選択ポップアップ */
-.category-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.category-modal-content {
-  background: #fff;
-  padding: 20px;
-  border-radius: 12px;
-  max-width: 500px;
-  width: 100%;
-}
-
-.category-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 10px;
-  margin-top: 20px;
-}
-
-.category-option-button {
-  padding: 10px;
-  background-color: #f0f0f0;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.category-option-button:hover {
-  background-color: #ddd;
-}
-
-.category-option-button:disabled {
-  background-color: #ccc;
-  cursor: not-allowed;
-}
-
-.modal-close-button {
-  margin-top: 20px;
-  padding: 10px 20px;
-  background-color: #ff6666;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-}
-
-.modal-close-button:hover {
-  background-color: #ff3333;
-}/* タイトルボタン */
-
-.register-container .register{
-  background: linear-gradient(135deg, #007BFF, #007BFF);
-  color: #ffffff;
-  padding: 15px 20px;
-  border: none;
-  border-radius: 8px;
-  font-size: 18px;
-  font-weight: bold;
-  cursor: pointer;
-  transition: all 0.3s ease;
-  width: 100%;
-  margin-top: 20px;
-  text-align: center;
-}
-.register-container .register:hover{
-  background: linear-gradient(135deg,#0056b3, #0056b3);
-  transition: background-color 0.3s ease;
-  transform: translateY(-3px); /* ホバー時に少し浮き上がる */
-}
-
-.register-container .close{
-  background: #ccc;
-  color: black;
-  padding: 10px;
-  border: none;
-  width: 100%;
-  margin-top: 15px;
-  border-radius: 8px;
-  cursor: pointer;
-}
-.register-container .close:hover{
-  background: #999;
-}
+  /* エラーメッセージ */
+  .register-container .error-message {
+    color: red;
+    font-weight: bold;
+    margin-bottom: 20px;
+  }
+  
+  /* ラベル */
+  .register-container label {
+    font-weight: bold;
+    color: #333;
+    display: block;
+    margin: 10px;
+    pointer-events: auto; /* クリックをボタン内のみに制限 */
+  }
+  
+  /* セレクトボックス、テキストエリア、インプット */
+  .register-container select,
+  .register-container textarea,
+  .register-container input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+    font-size: 16px;
+    margin-bottom: 20px;
+  }
+  
+  /* テキストエリアの高さ */
+  .register-container textarea {
+    resize: vertical;
+    height: 100px;
+  }
+  
+  /* トグルスイッチのラッパー */
+  .register-container .toggle-wrapper {
+    margin-top: 10px;
+    gap: 10px;
+    z-index: 999; /* ✅ メニューオーバーレイの下にする */
+  }
+  
+  
+  .toggle-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  
+  
+  /* 公開/非公開のラベル */
+  .toggle-text {
+    font-size: 16px;
+    font-weight: bold;
+    color: #0056b3;
+    white-space: nowrap;
+    position: relative;
+    justify-content: flex-end;
+    z-index: 2; /* ✅ スイッチの下に隠れないようにする */
+    
+  }
+  
+  /* トグルスイッチ */
+  .register-container .toggle-switch {
+    width: 50px;
+    height: 25px;
+    background-color: #ccc;
+    border-radius: 25px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: flex-start;
+    z-index: 1; /* ✅ ラベルの下にならないようにする */
+  }
+  
+  .register-container .toggle-switch.active {
+    background-color: #4caf50;
+    justify-content: flex-end;
+  }
+  
+  .register-container .toggle-circle {
+    width: 21px;
+    height: 21px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    left: 2px;
+    transition: transform 0.3s ease-in-out;
+  }
+  
+  .register-container .toggle-switch.active .toggle-circle {
+    width: 21px;
+    height: 21px;
+    background-color: white;
+    border-radius: 50%;
+    position: absolute;
+    left: 2px;
+    transition: transform 0.3s ease-in-out;
+  }
+  /* タイトルボタン */
+  .title-buttons {
+    display: flex !important;
+    gap: 10px !important;
+    margin-right: 20px !important;
+  }
+  
+  .title-button {
+    width: 50px !important;
+    height: 25px;
+    background-color: rgb(200, 200, 200) !important;
+    border: none !important;
+    border-radius: 8px !important; /* 角だけ丸みを持たせる */
+    cursor: pointer !important;
+    transition: background-color 0.3s ease !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    font-size: 10px !important;
+    color: #333 !important;
+    font-weight: bold !important;
+  }
+  
+  .title-button.active{
+    background-color: gold !important;
+  }
+  
+  .register-container .category-button {
+    background-color: #007BFF!important;
+    /* 青 */
+    color: white!important;
+    border: none;
+    padding: 10px 15px !important;
+    font-size: 14px!important;
+    border-radius: 6px!important;
+    cursor: pointer!important;
+    transition: 0.3s!important;
+    pointer-events: auto; /* クリックをボタン内のみに制限 */
+  }
+  
+  .register-container .category-button:hover {
+    background-color: #0056b3 !important;
+    transform: scale(1.05)  !important;
+    pointer-events: auto; /* クリックをボタン内のみに制限 */
+  }
+  
+  
+  /* カテゴリ選択ポップアップ */
+  .category-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  .category-modal-content {
+    background: #fff;
+    padding: 20px;
+    border-radius: 12px;
+    max-width: 500px;
+    width: 100%;
+  }
+  
+  .category-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 10px;
+    margin-top: 20px;
+  }
+  
+  .category-option-button {
+    padding: 10px;
+    background-color: #f0f0f0;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .category-option-button:hover {
+    background-color: #ddd;
+  }
+  
+  .category-option-button:disabled {
+    background-color: #ccc;
+    cursor: not-allowed;
+  }
+  
+  .modal-close-button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    background-color: #ff6666;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  .modal-close-button:hover {
+    background-color: #ff3333;
+  }/* タイトルボタン */
+  
+  .register-container .register{
+    background: linear-gradient(135deg, #b30000, #940000);
+    color: #ffffff;
+    padding: 15px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .register-container .register:hover{
+    background: linear-gradient(135deg, #7a0000, #920101);
+    transition: background-color 0.3s ease;
+    transform: translateY(-3px); /* ホバー時に少し浮き上がる */
+  }
+  
+  .register-container .close{
+    background: #ccc;
+    color: black;
+    padding: 10px;
+    border: none;
+    width: 100%;
+    margin-top: 15px;
+    border-radius: 8px;
+    cursor: pointer;
+  }
+  .register-container .close:hover{
+    background: #999;
+  }
+  

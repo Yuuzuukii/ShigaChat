@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { UserContext } from "../../UserContext"; // ユーザー情報を取得
 import "./Question_Admin.css";
 
-const API_BASE_URL = "https://si-lab.org/shigachat/api/";
 
 const decodeToken = (token) => {
   try {
