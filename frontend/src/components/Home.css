@@ -3,8 +3,10 @@
   font-family: 'Open Sans', sans-serif;
   margin: 0 auto;
   border-radius: 12px;
-  width: 100vw;  /* 横幅をビューポート全体に */
-  height: 100vh; /* 高さをビューポート全体に */
+  width: 100vw;
+  /* 横幅をビューポート全体に */
+  height: 100vh;
+  /* 高さをビューポート全体に */
   padding: 30px;
   background: linear-gradient(135deg, #e6f7ff, #cce7ff);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
@@ -16,7 +18,8 @@
 /* ヘッダー部分 */
 .home-container .header {
   display: flex;
-  flex-direction: column; /* デフォルトは縦並び */
+  flex-direction: column;
+  /* デフォルトは縦並び */
   align-items: center;
   justify-content: center;
   padding: 15px 20px;
@@ -25,14 +28,16 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 900px;
-  margin: 0 auto; /* ヘッダーを中央配置 */
+  margin: 0 auto;
+  /* ヘッダーを中央配置 */
 }
 
 
 /* タイトルを中央配置 */
 .home-container .header h1 {
   flex: 1;
-  text-align: center; /* タイトルを中央に固定 */
+  text-align: center;
+  /* タイトルを中央に固定 */
   font-size: 36px;
   color: #0056b3;
   font-weight: bold;
@@ -71,7 +76,7 @@
   vertical-align: middle;
 }
 
-.globe-icon{
+.globe-icon {
   width: 24px;
   height: 24px;
   margin-right: 10px;
@@ -219,10 +224,12 @@
 
 /* 本文部分 */
 .home-container .qa_section {
-  background: rgba(255, 255, 255, 0.9); /* 白に少し透明感を追加 */
+  background: rgba(255, 255, 255, 0.9);
+  /* 白に少し透明感を追加 */
   padding: 25px;
   border-radius: 12px;
-  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1); /* ログインボックスの立体感 */
+  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+  /* ログインボックスの立体感 */
   text-align: left;
   margin-top: 20px;
   max-width: 900px;
@@ -241,7 +248,8 @@
   margin-bottom: 8px;
   font-size: 16px;
   font-weight: bold;
-  color: #0056b3; /* ラベルも青に統一 */
+  color: #0056b3;
+  /* ラベルも青に統一 */
 }
 
 .home-container .textArea {
@@ -251,7 +259,8 @@
   font-size: 14px;
   border: 1px solid #aad4ff;
   border-radius: 6px;
-  background-color: #f4faff; /* 薄い青背景 */
+  background-color: #f4faff;
+  /* 薄い青背景 */
   color: #333;
   resize: none;
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
@@ -267,7 +276,8 @@
 .home-container .button {
   padding: 12px 24px;
   font-size: 14px;
-  background: linear-gradient(90deg, #007bff, #0056b3); /* 青グラデーション */
+  background: linear-gradient(90deg, #007bff, #0056b3);
+  /* 青グラデーション */
   color: white;
   border: none;
   border-radius: 25px;
@@ -276,8 +286,9 @@
   box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
 }
 
-.home-container .button:disabled{
-  opacity: 0.5; cursor: not-allowed;
+.home-container .button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .home-container .button:hover {
@@ -292,7 +303,8 @@
 
 .home-container .answerLabel {
   font-weight: bold;
-  color: #0056b3; /* ラベルの青色化 */
+  color: #0056b3;
+  /* ラベルの青色化 */
   margin-bottom: 8px;
 }
 
@@ -321,6 +333,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);
@@ -359,19 +372,25 @@
 /* トグルスイッチとテキストのコンテナ */
 .toggle-wrapper {
   display: flex;
-  align-items: center; /* 縦の中央揃え */
-  justify-content: flex-end; /* 右寄せ */
+  align-items: center;
+  /* 縦の中央揃え */
+  justify-content: flex-end;
+  /* 右寄せ */
   margin: 15px 0;
   width: 100%;
-  gap: 10px; /* テキストとボタンの間隔 */
+  gap: 10px;
+  /* テキストとボタンの間隔 */
 }
 
 /* 質問を公開する / しない のラベル */
 .toggle-text {
   font-size: 16px;
-  font-weight: bold; /* フォントを太字に */
-  color: #0056b3; /* ラベルの色を青に統一 */
-  white-space: nowrap; /* 改行を防ぐ */
+  font-weight: bold;
+  /* フォントを太字に */
+  color: #0056b3;
+  /* ラベルの色を青に統一 */
+  white-space: nowrap;
+  /* 改行を防ぐ */
 }
 
 /* トグルスイッチの背景部分 */
@@ -391,7 +410,8 @@
 
 /* スイッチがアクティブ (ON) の時の背景色 */
 .toggle-switch.active {
-  background-color: #4caf50; /* 緑色 */
+  background-color: #4caf50;
+  /* 緑色 */
 }
 
 /* 丸いスイッチ部分（白い丸） */
@@ -401,11 +421,13 @@
   background-color: white;
   border-radius: 50%;
   position: absolute;
-  left: 2px; /* 初期位置を調整 */
+  left: 2px;
+  /* 初期位置を調整 */
   transition: transform 0.3s ease-in-out;
 }
 
 /* アクティブ状態 (ON) のときのスイッチの位置 */
 .toggle-switch.active .toggle-circle {
-  transform: translateX(25px); /* 右端にスライド */
+  transform: translateX(25px);
+  /* 右端にスライド */
 }

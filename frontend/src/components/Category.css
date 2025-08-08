@@ -1,8 +1,10 @@
 /* 共通スタイル */
 .category-question-container {
   font-family: 'Open Sans', sans-serif;
-  width: 100vw;  /* 横幅をビューポート全体に */
-  height: 100vh; /* 高さをビューポート全体に */
+  width: 100vw;
+  /* 横幅をビューポート全体に */
+  height: 100vh;
+  /* 高さをビューポート全体に */
   margin: 0 auto;
   border-radius: 12px;
   padding: 30px;
@@ -10,12 +12,14 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.7s ease-out;
   border: 1px solid #aad4ff;
-  overflow-y: auto; /* 縦スクロールを許可 */
+  overflow-y: auto;
+  /* 縦スクロールを許可 */
 }
 
 .category-question-container .header {
   display: flex;
-  flex-direction: column; /* デフォルトは縦並び */
+  flex-direction: column;
+  /* デフォルトは縦並び */
   align-items: center;
   justify-content: center;
   padding: 15px 20px;
@@ -24,12 +28,14 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 900px;
-  margin: 0 auto; /* ヘッダーを中央配置 */
+  margin: 0 auto;
+  /* ヘッダーを中央配置 */
 }
 
 .category-question-container .header h1 {
   flex: 1;
-  text-align: center; /* タイトルを中央に固定 */
+  text-align: center;
+  /* タイトルを中央に固定 */
   font-size: 36px;
   color: #0056b3;
   font-weight: bold;
@@ -236,12 +242,14 @@
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s ease-in-out; /* 🔄 滑らかなアニメーション */
+  transition: all 0.2s ease-in-out;
+  /* 🔄 滑らかなアニメーション */
 }
 
 .question-item:hover {
   background-color: #eaf4fc;
-  transform: translateY(-3px); /* 上に少し浮かせる */
+  transform: translateY(-3px);
+  /* 上に少し浮かせる */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -267,10 +275,13 @@
   color: #333;
 }
 
-.situmon-header{
-  justify-content: center; /* 水平方向の中央揃え */
-  align-items: center; /* 垂直方向の中央揃え */
+.situmon-header {
+  justify-content: center;
+  /* 水平方向の中央揃え */
+  align-items: center;
+  /* 垂直方向の中央揃え */
 }
+
 .no-questions {
   text-align: center;
   font-size: 16px;
@@ -288,9 +299,12 @@
 
 /* 戻るボタン */
 .back-button {
-  display: block; /* インライン要素をブロック要素に変更 */
-  width: 100%; /* 親要素いっぱいに広げる */
-  max-width: 900px; /* ボタンの最大幅を適切に設定 */
+  display: block;
+  /* インライン要素をブロック要素に変更 */
+  width: 100%;
+  /* 親要素いっぱいに広げる */
+  max-width: 900px;
+  /* ボタンの最大幅を適切に設定 */
   background: linear-gradient(135deg, #0056b3, #004494);
   color: #ffffff;
   padding: 15px 20px;
@@ -300,7 +314,8 @@
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
-  margin: 20px auto; /* 上下20pxの余白を設定し、中央揃え */
+  margin: 20px auto;
+  /* 上下20pxの余白を設定し、中央揃え */
   text-align: center;
 }
 
@@ -320,31 +335,32 @@
 /* アニメーション */
 @keyframes fadeIn {
   0% {
-      opacity: 0;
-      transform: translateY(20px);
+    opacity: 0;
+    transform: translateY(20px);
   }
+
   100% {
-      opacity: 1;
-      transform: translateY(0);
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
 /* レスポンシブ対応 */
 @media (max-width: 1024px) {
   .container {
-      max-width: 100%;
+    max-width: 100%;
   }
 }
 
 @media (max-width: 768px) {
   .container {
-      max-width: 100%;
-      padding: 20px;
+    max-width: 100%;
+    padding: 20px;
   }
 
   .header {
-      flex-direction: column;
-      text-align: center;
+    flex-direction: column;
+    text-align: center;
   }
 }
 

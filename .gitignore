@@ -3,6 +3,8 @@
 __pycache__/
 *.pyc
 nginx/log/
+env/
+.python-version
 __pycache__/
-*.pyc
-nginx/log/
+*.py[cod]
+*$py.class

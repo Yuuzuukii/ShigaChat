@@ -5,9 +5,6 @@ import NavBar from "./components/NavBar";
 import New from "./components/New";
 import Home from "./components/home";
 import Keyword from "./components/keyword";
-import Kategori from "./components/kategori";
-import Shitsumonnrireki from "./components/Shitsumonnrireki";
-import Etsurannrireki from "./components/Etsurannrireki";
 import CategoryDetail from "./components/CategoryDetail"; // 新しいカテゴリ詳細ページ
 import Question_Admin from "./components/Admin/Question_Admin";
 import Q_List from "./components/Admin/Q_List";
@@ -29,9 +26,6 @@ function App() {
           <Route path="/new" element={<New />} />
           <Route path="/home" element={<Home />} />
           <Route path="/keyword" element={<Keyword />} />
-          <Route path="/kategori" element={<Kategori />} />
-          <Route path="/Shitsumonnrireki" element={<Shitsumonnrireki />} />
-          <Route path="/Etsurannrireki" element={<Etsurannrireki />} />
           <Route path="/category/:categoryId" element={<CategoryDetail />} /> {/* 動的ルート */}
           <Route path="/admin/QuestionAdmin" element={<Question_Admin />} />
           <Route path="/admin/category/:categoryId" element={<Q_List />} />

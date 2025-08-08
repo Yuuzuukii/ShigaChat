@@ -146,15 +146,6 @@ const NavBar = () => {
                 <Link to="/keyword" onClick={closeMenu}>{t.keyword}</Link>
               </li>
               <li>
-                <Link to="/kategori" onClick={closeMenu}>{t.category}</Link>
-              </li>
-              <li>
-                <Link to="/Shitsumonnrireki" onClick={closeMenu}>{t.questionHistory}</Link>
-              </li>
-              <li>
-                <Link to="/Etsurannrireki" onClick={closeMenu}>{t.viewingHistory}</Link>
-              </li>
-              <li>
                   <Link to="/Admin/QuestionAdmin" onClick={closeMenu}>{t.questionAdmin}</Link>
                 </li>
             
