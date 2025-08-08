@@ -113,18 +113,18 @@ function CategoryDetail() {
 
     useEffect(() => {
         if (user && token) {
-          fetchQuestions(
-            categoryId,
-            user,
-            token,
-            t,
-            setLanguage,
-            setCategoryName,
-            setQuestions,
-            navigate
-          );
+            fetchQuestions(
+                categoryId,
+                user,
+                token,
+                t,
+                setLanguage,
+                setCategoryName,
+                setQuestions,
+                navigate
+            );
         }
-      }, [categoryId, language, user, token]);      
+    }, [categoryId, language, user, token]);
 
     const handleClickOutside = (event) => {
         if (popupRef.current && !popupRef.current.contains(event.target)) {

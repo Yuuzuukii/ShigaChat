@@ -52,7 +52,7 @@ function Home() {
         setLanguage("ja"); // fallback
       }
     }
-  }, [user]);  
+  }, [user]);
 
   useEffect(() => {
     if (userId && token) {
@@ -82,7 +82,7 @@ function Home() {
       window.removeEventListener("tokenUpdated", handleTokenUpdate);
     };
   }, [user, navigate, fetchUser]);
-  
+
   useEffect(() => {
     if (showPopup) {
       document.addEventListener("click", handleClickOutside);
@@ -127,9 +127,9 @@ function Home() {
     const newLanguage = event.target.value;
     setLanguage(newLanguage);
     await updateUserLanguage(newLanguage, setUser);
-  
+
     const langId = languageCodeToId[newLanguage];
-  
+
     if (answerId) {
       try {
         const response = await fetch(
@@ -145,7 +145,7 @@ function Home() {
           const errorData = await response.json();
           throw new Error(errorData.detail || t.failtogetanswer);
         }
-  
+
         const data = await response.json();
         setAnswer(data.text || t.failtogetanswer);
       } catch (error) {
@@ -153,7 +153,7 @@ function Home() {
         console.error("回答翻訳エラー:", error);
       }
     }
-  
+
     if (similarQuestions.length > 0) {
       const translatedQuestions = await fetchTranslatedSimilarQuestions(similarQuestions, newLanguage);
       const translatedQuestionsWithAnswers = await fetchTranslatedSimilarAnswers(translatedQuestions, newLanguage);
@@ -175,7 +175,7 @@ function Home() {
     setAnswer("");
     setSimilarQuestions([]);
     setErrorMessage("");
-    
+
     try {
       const postRes = await fetch(`${API_BASE_URL}/question/post_question`, {
         method: "POST",
@@ -190,12 +190,12 @@ function Home() {
           public: isPublic ? 1 : 0,
         }),
       });
-      
+
       if (!postRes.ok) {
         const errorData = await postRes.json();
         throw new Error(errorData.detail || t.failedtopost);
       }
-      
+
       const { question_id } = await postRes.json();
 
       const getRes = await fetch(`${API_BASE_URL}/question/get_answer`, {
@@ -204,22 +204,22 @@ function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ 
+        body: JSON.stringify({
           thread_id: Date.now(), // ユニークなスレッドIDを生成
-          text: question 
+          text: question
         }),
       });
-      
+
       if (!getRes.ok) {
         const errorData = await getRes.json();
         throw new Error(errorData.detail || t.failtogetanswer);
       }
-      
+
       const data = await getRes.json();
 
       setAnswer(data.answer || t.failtogetanswer);
       setAnswerId(data.answer_id || null);
-      
+
       if (data.rag_qa && data.rag_qa.length > 0) {
         const translated = await fetchTranslatedSimilarQuestions(data.rag_qa);
         const withAnswers = await fetchTranslatedSimilarAnswers(translated);
@@ -394,13 +394,13 @@ function Home() {
         <button onClick={handleQuestionSubmit} className="button" disabled={loading}>
           {t.askButton}
         </button>
-        
+
         {errorMessage && (
           <div className="error-message">
             {errorMessage}
           </div>
         )}
-        
+
         {loading ? (
           <p>{t.generatingAnswer}</p>
         ) : (

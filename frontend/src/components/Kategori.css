@@ -1,8 +1,10 @@
 /* メインコンテナ */
 .container-kategori {
   font-family: 'Open Sans', sans-serif;
-  width: 100vw;  /* 横幅をビューポート全体に */
-  height: 100vh; /* 高さをビューポート全体に */
+  width: 100vw;
+  /* 横幅をビューポート全体に */
+  height: 100vh;
+  /* 高さをビューポート全体に */
   margin: 0 auto;
   border-radius: 12px;
   padding: 30px;
@@ -16,7 +18,8 @@
 /* ヘッダー部分 */
 .container-kategori .header {
   display: flex;
-  flex-direction: column; /* デフォルトは縦並び */
+  flex-direction: column;
+  /* デフォルトは縦並び */
   align-items: center;
   justify-content: center;
   padding: 15px 20px;
@@ -24,14 +27,16 @@
   border-radius: 12px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   max-width: 900px;
-  margin: 0 auto; /* ヘッダーを中央配置 */
+  margin: 0 auto;
+  /* ヘッダーを中央配置 */
 }
 
 
 /* タイトルを中央配置 */
 .container-kategori .header h1 {
   flex: 1;
-  text-align: center; /* タイトルを中央に固定 */
+  text-align: center;
+  /* タイトルを中央に固定 */
   font-size: 36px;
   color: #0056b3;
   font-weight: bold;
@@ -207,13 +212,15 @@
   }
 }
 
-.container-kategori .body{
+.container-kategori .body {
   margin: 0 auto;
   max-width: 900px;
-  background: rgba(255, 255, 255, 0.9); /* 白に少し透明感を追加 */
+  background: rgba(255, 255, 255, 0.9);
+  /* 白に少し透明感を追加 */
   padding: 25px;
   border-radius: 12px;
-  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1); /* ログインボックスの立体感 */
+  box-shadow: 0px 3px 10px rgba(0, 0, 0, 0.1);
+  /* ログインボックスの立体感 */
   text-align: center;
   margin-top: 20px;
 }
@@ -227,7 +234,7 @@
   color: #0056b3;
 }
 
-.container-kategori .kotoba{
+.container-kategori .kotoba {
   text-align: center;
   font-size: 20px;
   font-weight: bold;
@@ -266,78 +273,136 @@
 .container-kategori .category-button:focus {
   transform: translateY(-5px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-  font-size: 18px; /* フォーカス時文字を少し大きく */
+  font-size: 18px;
+  /* フォーカス時文字を少し大きく */
 }
 
 /* 各カテゴリごとの背景色 */
 /* 各カテゴリごとの背景色 */
-.container-kategori .category-zairyu { background-color: #ffe599; }
-.container-kategori .category-zairyu:hover, .category-zairyu.selected {
-  background-color: #ffd966; /* 選択時に色を濃く */
+.container-kategori .category-zairyu {
+  background-color: #ffe599;
 }
 
-.container-kategori .category-seikatsu { background-color: #d9ead3; }
-.container-kategori .category-seikatsu:hover, .category-seikatsu.selected {
+.container-kategori .category-zairyu:hover,
+.category-zairyu.selected {
+  background-color: #ffd966;
+  /* 選択時に色を濃く */
+}
+
+.container-kategori .category-seikatsu {
+  background-color: #d9ead3;
+}
+
+.container-kategori .category-seikatsu:hover,
+.category-seikatsu.selected {
   background-color: #b6d7a8;
 }
 
-.container-kategori .category-iryo { background-color: #f9cb9c; }
-.container-kategori .category-iryo:hover, .category-iryo.selected {
+.container-kategori .category-iryo {
+  background-color: #f9cb9c;
+}
+
+.container-kategori .category-iryo:hover,
+.category-iryo.selected {
   background-color: #f6b26b;
 }
 
-.container-kategori .category-nenkin { background-color: #c9daf8; }
-.container-kategori .category-nenkin:hover, .category-nenkin.selected {
+.container-kategori .category-nenkin {
+  background-color: #c9daf8;
+}
+
+.container-kategori .category-nenkin:hover,
+.category-nenkin.selected {
   background-color: #6d9eeb;
 }
 
-.container-kategori .category-roudou { background-color: #f6d7b0; }
-.container-kategori .category-roudou:hover, .category-roudou.selected {
+.container-kategori .category-roudou {
+  background-color: #f6d7b0;
+}
+
+.container-kategori .category-roudou:hover,
+.category-roudou.selected {
   background-color: #f4b183;
 }
 
-.container-kategori .category-kyouiku { background-color: #e06666; }
-.container-kategori .category-kyouiku:hover, .category-kyouiku.selected {
+.container-kategori .category-kyouiku {
+  background-color: #e06666;
+}
+
+.container-kategori .category-kyouiku:hover,
+.category-kyouiku.selected {
   background-color: #cc0000;
 }
 
-.container-kategori .category-kekkon { background-color: #a4c2f4; }
-.container-kategori .category-kekkon:hover, .category-kekkon.selected {
+.container-kategori .category-kekkon {
+  background-color: #a4c2f4;
+}
+
+.container-kategori .category-kekkon:hover,
+.category-kekkon.selected {
   background-color: #6fa8dc;
 }
 
-.container-kategori .category-shussan { background-color: #d9d2e9; }
-.container-kategori .category-shussan:hover, .category-shussan.selected {
+.container-kategori .category-shussan {
+  background-color: #d9d2e9;
+}
+
+.container-kategori .category-shussan:hover,
+.category-shussan.selected {
   background-color: #b4a7d6;
 }
 
-.container-kategori .category-jutaku { background-color: #b6d7a8; }
-.container-kategori .category-jutaku:hover, .category-jutaku.selected {
+.container-kategori .category-jutaku {
+  background-color: #b6d7a8;
+}
+
+.container-kategori .category-jutaku:hover,
+.category-jutaku.selected {
   background-color: #93c47d;
 }
 
-.container-kategori .category-zeikin { background-color: #cfe2f3; }
-.container-kategori .category-zeikin:hover, .category-zeikin.selected {
+.container-kategori .category-zeikin {
+  background-color: #cfe2f3;
+}
+
+.container-kategori .category-zeikin:hover,
+.category-zeikin.selected {
   background-color: #76a5af;
 }
 
-.container-kategori .category-fukushi { background-color: #f6e0b5; }
-.container-kategori .category-fukushi:hover, .category-fukushi.selected {
+.container-kategori .category-fukushi {
+  background-color: #f6e0b5;
+}
+
+.container-kategori .category-fukushi:hover,
+.category-fukushi.selected {
   background-color: #e69138;
 }
 
-.container-kategori .category-jiken { background-color: #ea9999; }
-.container-kategori .category-jiken:hover, .category-jiken.selected {
+.container-kategori .category-jiken {
+  background-color: #ea9999;
+}
+
+.container-kategori .category-jiken:hover,
+.category-jiken.selected {
   background-color: #cc0000;
 }
 
-.container-kategori .category-saigai { background-color: #b4a7d6; }
-.container-kategori .category-saigai:hover, .category-saigai.selected {
+.container-kategori .category-saigai {
+  background-color: #b4a7d6;
+}
+
+.container-kategori .category-saigai:hover,
+.category-saigai.selected {
   background-color: #674ea7;
 }
 
-.container-kategori .category-sonota { background-color: #f3cda8; }
-.container-kategori .category-sonota:hover, .category-sonota.selected {
+.container-kategori .category-sonota {
+  background-color: #f3cda8;
+}
+
+.container-kategori .category-sonota:hover,
+.category-sonota.selected {
   background-color: #e69138;
 }
 
@@ -354,7 +419,7 @@
     max-width: 220px;
   }
 
-  
+
 }
 
 @media (max-width: 768px) {
@@ -376,6 +441,7 @@
     opacity: 0;
     transform: translateY(20px);
   }
+
   100% {
     opacity: 1;
     transform: translateY(0);

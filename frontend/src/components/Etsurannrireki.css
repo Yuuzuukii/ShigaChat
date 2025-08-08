@@ -1,7 +1,9 @@
 .view-history-container {
   font-family: 'Open Sans', sans-serif;
-  width: 100vw;  /* 横幅をビューポート全体に */
-  height: 100vh; /* 高さをビューポート全体に */
+  width: 100vw;
+  /* 横幅をビューポート全体に */
+  height: 100vh;
+  /* 高さをビューポート全体に */
   margin: 0 auto;
   border-radius: 12px;
   padding: 30px;
@@ -9,13 +11,15 @@
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.7s ease-out;
   border: 1px solid #aad4ff;
-  overflow-y: auto; /* 縦スクロールを許可 */
+  overflow-y: auto;
+  /* 縦スクロールを許可 */
 }
 
 /* ヘッダー全体のスタイル */
 .view-history-container .header {
   display: flex;
-  flex-direction: column; /* デフォルトは縦並び */
+  flex-direction: column;
+  /* デフォルトは縦並び */
   align-items: center;
   justify-content: center;
   padding: 15px 20px;
@@ -24,13 +28,15 @@
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
   width: 100%;
   max-width: 900px;
-  margin: 0 auto; /* ヘッダーを中央配置 */
+  margin: 0 auto;
+  /* ヘッダーを中央配置 */
 }
 
 /* タイトルを中央配置 */
 .view-history-container .header h1 {
   flex: 1;
-  text-align: center; /* タイトルを中央に固定 */
+  text-align: center;
+  /* タイトルを中央に固定 */
   font-size: 36px;
   color: #0056b3;
   font-weight: bold;
@@ -234,13 +240,15 @@
   flex-direction: column;
   gap: 10px;
   cursor: pointer;
-  transition: all 0.2s ease-in-out; /* 🔄 滑らかなアニメーション */
+  transition: all 0.2s ease-in-out;
+  /* 🔄 滑らかなアニメーション */
 }
 
 
 .view-history-container .history-item:hover {
   background-color: #eaf4fc;
-  transform: translateY(-3px); /* 上に少し浮かせる */
+  transform: translateY(-3px);
+  /* 上に少し浮かせる */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -251,7 +259,7 @@
   margin-bottom: 8px;
 }
 
-.view-history-container .history-question{
+.view-history-container .history-question {
   font-size: 18px;
   font-weight: bold;
   color: #333;
@@ -273,35 +281,43 @@
   border-radius: 8px;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
 }
+
 /* ボタンのコンテナを中央配置 */
 .view-history-container .button-container {
   margin: 0 auto;
   display: flex;
-  justify-content: right; /* 中央揃え */
+  justify-content: right;
+  /* 中央揃え */
   align-items: center;
   max-width: 900px;
 }
+
 /* ボタンのスタイル */
 .view-history-container .clear-history-button {
   display: block;
   max-width: 900px;
   padding: 10px 20px;
-  background-color: #4CAF50; /* 緑色 */
+  background-color: #4CAF50;
+  /* 緑色 */
   color: white;
   border: none;
   border-radius: 5px;
   font-size: 14px;
   cursor: pointer;
-  transition: all 0.3s ease-in-out; /* 🔄 アニメーションをスムーズに */
+  transition: all 0.3s ease-in-out;
+  /* 🔄 アニメーションをスムーズに */
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   text-align: center;
 }
 
 /* ホバー時のスタイル */
 .view-history-container .clear-history-button:hover {
-  background-color: #45a049; /* ホバー時の色 */
-  transform: scale(1.05); /* ✅ ホバー時に少し大きくする */
-  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2); /* ✅ ホバー時の影を強調 */
+  background-color: #45a049;
+  /* ホバー時の色 */
+  transform: scale(1.05);
+  /* ✅ ホバー時に少し大きくする */
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
+  /* ✅ ホバー時の影を強調 */
 }
 
 .history-question .category-current {
