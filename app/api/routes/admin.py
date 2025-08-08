@@ -503,6 +503,8 @@ async def register_question(
 
         # 各言語に翻訳
         for target_lang_id in languages:
+            if target_lang_id == language_id:
+                continue  # 🔥 元言語はスキップ（すでにINSERT済み）
             try:
                 answer_translate(answer_id, target_lang_id, current_user)
             except Exception as e:
