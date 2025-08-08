@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect, useRef } from "react";
+import React, { useState, useContext, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../UserContext";
 import { updateUserLanguage } from "../utils/language";
@@ -16,44 +16,63 @@ import {
 } from "../utils/notifications";
 import "./Home.css";
 
-function Home() {
-  const { user, setUser, token, setToken, fetchUser } = useContext(UserContext);
-  const [question, setQuestion] = useState("");
-  const [answer, setAnswer] = useState("");
-  const [similarQuestions, setSimilarQuestions] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [answerId, setAnswerId] = useState(null);
+// --- Local persistence keys (per-browser) ---
+const LS_THREADS_KEY = "chat_threads";             // array of {id, title, lastUpdated}
+const LS_CUR_THREAD_KEY = "chat_current_thread";   // string
+const LS_MSGS_PREFIX = "chat_msgs_";               // per-thread messages
+
+function loadThreads() {
+  try { return JSON.parse(localStorage.getItem(LS_THREADS_KEY)) || []; } catch { return []; }
+}
+function saveThreads(threads) {
+  localStorage.setItem(LS_THREADS_KEY, JSON.stringify(threads));
+}
+function loadMsgs(threadId) {
+  try { return JSON.parse(localStorage.getItem(LS_MSGS_PREFIX + threadId)) || []; } catch { return []; }
+}
+function saveMsgs(threadId, msgs) {
+  localStorage.setItem(LS_MSGS_PREFIX + threadId, JSON.stringify(msgs));
+}
+
+export default function Home() {
+  const { user, setUser, token, fetchUser } = useContext(UserContext);
   const [language, setLanguage] = useState("ja");
-  const [visibleAnswer, setVisibleAnswer] = useState(null);
-  const [sortBy, setSortBy] = useState("similarity");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [isPublic, setIsPublic] = useState(true);
+  const t = translations[language];
+  const navigate = useNavigate();
+
+  // Notifications (existing)
+  const userId = user?.id;
   const [notifications, setNotifications] = useState([]);
+  const [globalNotifications, setGlobalNotifications] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
   const [unreadCount, setUnreadCount] = useState(null);
-  const [globalNotifications, setGlobalNotifications] = useState([]);
   const [activeTab, setActiveTab] = useState("personal");
   const [isNotifLoading, setIsNotifLoading] = useState(true);
   const popupRef = useRef(null);
 
-  const t = translations[language];
-  const navigate = useNavigate();
+  // Threaded chat
+  const [threads, setThreads] = useState(loadThreads());
+  const [currentThreadId, setCurrentThreadId] = useState(localStorage.getItem(LS_CUR_THREAD_KEY) || null);
+  const [messages, setMessages] = useState(() => currentThreadId ? loadMsgs(currentThreadId) : []);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
-  // ユーザーIDを取得
-  const userId = user?.id;
+  // Derived
+  const currentThread = useMemo(
+    () => threads.find(t => String(t.id) === String(currentThreadId)) || null,
+    [threads, currentThreadId]
+  );
 
+  // Language bootstrap from user profile
   useEffect(() => {
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
-      if (code) {
-        setLanguage(code);
-      } else {
-        console.warn("❗未対応のspokenLanguage:", user.spokenLanguage);
-        setLanguage("ja"); // fallback
-      }
+      if (code) setLanguage(code); else setLanguage("ja");
     }
   }, [user]);
 
+  // Notifications loading
   useEffect(() => {
     if (userId && token) {
       fetchNotifications({
@@ -65,39 +84,42 @@ function Home() {
         setUnreadCount,
       }).finally(() => setIsNotifLoading(false));
     }
-  }, [user, token, language]);
+  }, [userId, token, language]);
 
+  // Auth guard + token refresh listener
   useEffect(() => {
-    if (user === null) {
-      navigate("/new");
-    }
+    if (user === null) navigate("/new");
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
-      if (latestToken) {
-        fetchUser(latestToken);
-      }
+      if (latestToken) fetchUser(latestToken);
     };
     window.addEventListener("tokenUpdated", handleTokenUpdate);
-    return () => {
-      window.removeEventListener("tokenUpdated", handleTokenUpdate);
-    };
+    return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
   }, [user, navigate, fetchUser]);
 
+  // Notification popup outside-click
   useEffect(() => {
-    if (showPopup) {
-      document.addEventListener("click", handleClickOutside);
-    } else {
-      document.removeEventListener("click", handleClickOutside);
-    }
+    const handleClickOutside = (event) => {
+      if (popupRef.current && !popupRef.current.contains(event.target)) setShowPopup(false);
+    };
+    if (showPopup) document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showPopup]);
 
-  const handleClickOutside = (event) => {
-    if (popupRef.current && !popupRef.current.contains(event.target)) {
-      setShowPopup(false);
-    }
-  };
+  // Persist messages for active thread
+  useEffect(() => {
+    if (currentThreadId) saveMsgs(currentThreadId, messages);
+  }, [messages, currentThreadId]);
 
+  // Load messages when switching thread
+  useEffect(() => {
+    if (!currentThreadId) return;
+    const m = loadMsgs(currentThreadId);
+    setMessages(m);
+    localStorage.setItem(LS_CUR_THREAD_KEY, currentThreadId);
+  }, [currentThreadId]);
+
+  // Notification handlers
   const onNotificationClick = () => {
     handleNotificationClick({
       showPopup,
@@ -110,13 +132,11 @@ function Home() {
       setUnreadCount,
     });
   };
-
   const onNotificationMove = (notification) => {
     handleNotificationMove(notification, navigate, token, () => {
       fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
     });
   };
-
   const onGlobalNotificationMove = (notification) => {
     handleGlobalNotificationMove(notification, navigate, token, () => {
       fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
@@ -127,157 +147,129 @@ function Home() {
     const newLanguage = event.target.value;
     setLanguage(newLanguage);
     await updateUserLanguage(newLanguage, setUser);
+  };
 
-    const langId = languageCodeToId[newLanguage];
+  // --- Thread ops ---
+  const createThread = () => {
+    const id = Date.now().toString();
+    const title = t?.newChat || "新しいチャット";
+    const newThreads = [{ id, title, lastUpdated: new Date().toISOString() }, ...threads];
+    setThreads(newThreads);
+    saveThreads(newThreads);
+    setCurrentThreadId(id);
+    setMessages([]);
+    localStorage.setItem(LS_CUR_THREAD_KEY, id);
+  };
 
-    if (answerId) {
-      try {
-        const response = await fetch(
-          `${API_BASE_URL}/translator/get_translated_answer?answer_id=${answerId}&language_id=${langId}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.detail || t.failtogetanswer);
-        }
+  const selectThread = (id) => setCurrentThreadId(String(id));
 
-        const data = await response.json();
-        setAnswer(data.text || t.failtogetanswer);
-      } catch (error) {
-        setAnswer(t.error + error.message);
-        console.error("回答翻訳エラー:", error);
+  const renameThread = (id, title) => {
+    const updated = threads.map(th => th.id === id ? { ...th, title } : th);
+    setThreads(updated);
+    saveThreads(updated);
+  };
+
+  const removeThread = (id) => {
+    const idx = threads.findIndex(t => t.id === id);
+    const updated = threads.filter(t => t.id !== id);
+    setThreads(updated);
+    saveThreads(updated);
+    localStorage.removeItem(LS_MSGS_PREFIX + id);
+    if (String(id) === String(currentThreadId)) {
+      const next = updated[Math.max(0, idx-1)];
+      if (next) setCurrentThreadId(String(next.id));
+      else {
+        setCurrentThreadId(null);
+        localStorage.removeItem(LS_CUR_THREAD_KEY);
+        setMessages([]);
       }
-    }
-
-    if (similarQuestions.length > 0) {
-      const translatedQuestions = await fetchTranslatedSimilarQuestions(similarQuestions, newLanguage);
-      const translatedQuestionsWithAnswers = await fetchTranslatedSimilarAnswers(translatedQuestions, newLanguage);
-      setSimilarQuestions(translatedQuestionsWithAnswers);
     }
   };
 
-  const handleQuestionSubmit = async () => {
+  // --- Send message (/question/get_answer) ---
+  const sendMessage = async () => {
     if (!token) {
       setErrorMessage(t.errorLogin);
       navigate("/new");
       return;
     }
-    if (!question.trim()) {
-      setAnswer(t.enterquestion);
-      return;
+    const text = input.trim();
+    if (!text) return;
+
+    // ensure a thread exists
+    let threadId = currentThreadId;
+    if (!threadId) {
+      const id = Date.now().toString();
+      const newThreads = [{ id, title: text.slice(0, 24) || (t?.newChat || "新しいチャット"), lastUpdated: new Date().toISOString() }, ...threads];
+      setThreads(newThreads);
+      saveThreads(newThreads);
+      setCurrentThreadId(id);
+      threadId = id;
+      setMessages([]);
+      localStorage.setItem(LS_CUR_THREAD_KEY, id);
     }
+
+    // optimistic UI
+    const userMsg = { id: crypto.randomUUID(), role: "user", content: text, time: new Date().toISOString() };
+    const typingMsg = { id: "typing", role: "assistant", content: "…", typing: true };
+    setMessages(prev => [...prev, userMsg, typingMsg]);
+    setInput("");
     setLoading(true);
-    setAnswer("");
-    setSimilarQuestions([]);
     setErrorMessage("");
 
     try {
-      const getRes = await fetch(`${API_BASE_URL}/question/get_answer`, {
+      const res = await fetch(`${API_BASE_URL}/question/get_answer`, {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          thread_id: Date.now(), // ユニークなスレッドIDを生成
-          text: question
-        }),
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ thread_id: threadId, text })
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail || t.failtogetanswer || "Failed to get answer");
+      }
+      const data = await res.json();
+
+      // title bootstrap
+      if (!currentThread || !currentThread.title || currentThread.title === (t?.newChat || "新しいチャット")) {
+        renameThread(threadId, text.slice(0, 24) || (t?.newChat || "新しいチャット"));
+      }
+
+      const asstMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data.answer,
+        time: new Date().toISOString(),
+        rag_qa: data.rag_qa || []
+      };
+
+      setMessages(prev => {
+        const next = prev.filter(m => m.id !== "typing");
+        next.push(asstMsg);
+        return next;
       });
 
-      if (!getRes.ok) {
-        const errorData = await getRes.json();
-        throw new Error(errorData.detail || t.failtogetanswer);
-      }
-
-      const data = await getRes.json();
-
-      setAnswer(data.answer || t.failtogetanswer);
-      setAnswerId(data.answer_id || null);
-
-      if (data.rag_qa && data.rag_qa.length > 0) {
-        const translated = await fetchTranslatedSimilarQuestions(data.rag_qa);
-        const withAnswers = await fetchTranslatedSimilarAnswers(translated);
-        setSimilarQuestions(withAnswers);
-      }
-    } catch (error) {
-      console.error("質問投稿エラー:", error);
-      setAnswer(t.error + error.message);
-      setErrorMessage(error.message);
+      // update thread time
+      const updated = threads.map(th => th.id === threadId ? { ...th, lastUpdated: new Date().toISOString() } : th);
+      setThreads(updated);
+      saveThreads(updated);
+    } catch (e) {
+      setMessages(prev => prev.filter(m => m.id !== "typing"));
+      setErrorMessage(e.message);
     } finally {
       setLoading(false);
-      setQuestion("");
     }
   };
 
-  const fetchTranslatedSimilarQuestions = async (questions) => {
-    try {
-      return await Promise.all(questions.map(async (q) => {
-        const res = await fetch(`${API_BASE_URL}/question/get_translated_question?question_id=${q.question_id || q.question}&language_id=${languageCodeToId[language]}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        return { ...q, content: data.text || q.content || q.question };
-      }));
-    } catch (error) {
-      console.error("翻訳取得エラー:", error.message);
-      return questions;
+  const handleKeyDown = (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+      e.preventDefault();
+      sendMessage();
     }
-  };
-
-  const fetchTranslatedSimilarAnswers = async (questions) => {
-    try {
-      return await Promise.all(questions.map(async (q) => {
-        if (!q.answer_id) return q;
-        const res = await fetch(`${API_BASE_URL}/question/get_translated_answer?answer_id=${q.answer_id}&language_id=${languageCodeToId[language]}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const data = await res.json();
-        return { ...q, answer: data.text || q.answer };
-      }));
-    } catch (error) {
-      console.error("回答翻訳取得エラー:", error.message);
-      return questions;
-    }
-  };
-
-  const handleSortChange = (event) => {
-    setSortBy(event.target.value);
-  };
-
-  const sortedSimilarQuestions = [...similarQuestions].sort((a, b) => {
-    if (sortBy === "similarity") return (b.score || 0) - (a.score || 0);
-    if (sortBy === "date") return new Date(b.retrieved_at || b.time) - new Date(a.retrieved_at || a.time);
-    return 0;
-  });
-
-  const addHistory = async (questionId) => {
-    if (!questionId) return;
-    try {
-      await fetch(`${API_BASE_URL}/history/add_history`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ question_id: questionId }),
-      });
-    } catch (e) {
-      console.error("履歴追加エラー:", e);
-    }
-  };
-
-  const toggleAnswer = (questionId) => {
-    setVisibleAnswer(visibleAnswer === questionId ? null : questionId);
-    addHistory(questionId);
   };
 
   return (
-    <div className="home-container">
+    <div className="home-container" style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
+      {/* Header (existing) */}
       <header className="header">
         <div className="language-wrapper">
           <img src="./globe.png" alt="言語" className="globe-icon" />
@@ -296,7 +288,6 @@ function Home() {
               <img src="./bell.png" alt="通知" className="notification-icon" />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
-
             {showPopup && (
               <div className="notification-popup" ref={popupRef}>
                 <div className="tabs">
@@ -307,35 +298,25 @@ function Home() {
                     {t.global}
                   </button>
                 </div>
-
                 <div className="notifications-list">
                   {activeTab === "personal" && (
                     notifications.length > 0 ? (
-                      notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${notification.is_read ? "read" : "unread"}`}
-                          onClick={() => onNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                      notifications.map((n) => (
+                        <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
+                          {n.message}
+                          <span className="time">{new Date(n.time).toLocaleString()}</span>
                         </div>
                       ))
                     ) : (
                       <p>{t.noNotifications}</p>
                     )
                   )}
-
                   {activeTab === "global" && (
                     globalNotifications.length > 0 ? (
-                      globalNotifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${Array.isArray(notification.read_users) && notification.read_users.includes(userId) ? "read" : "unread"}`}
-                          onClick={() => onGlobalNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                      globalNotifications.map((n) => (
+                        <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
+                          {n.message}
+                          <span className="time">{new Date(n.time).toLocaleString()}</span>
                         </div>
                       ))
                     ) : (
@@ -346,83 +327,98 @@ function Home() {
               </div>
             )}
           </div>
-          <div className="userIcon">
-            {user ? `${user.nickname} ` : t.guest}
-          </div>
+          <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
         </div>
       </header>
-      <div className="qa_section">
-        <h2 className="kotoba">{t.askQuestion}</h2>
-        <label htmlFor="question" className="label">
-          {t.questionLabel}
-        </label>
-        <textarea
-          id="question"
-          value={question}
-          onChange={(e) => setQuestion(e.target.value)}
-          className="textArea"
-          placeholder={t.placeholder}
-        ></textarea>
-        <div className="toggle-wrapper">
-          <span className="toggle-text">{isPublic ? t.makepublicToggle : t.makeprivateToggle}</span>
-          <div className={`toggle-switch ${isPublic ? "active" : ""}`} onClick={() => setIsPublic(!isPublic)}>
-            <div className="toggle-circle"></div>
+
+      {/* Body: sidebar + chat area */}
+      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
+        {/* Sidebar: Threads */}
+        <aside style={{ width: 280, borderRight: "1px solid #eee", padding: 12, overflowY: "auto" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <h3 style={{ margin: 0 }}>{t?.threads || "スレッド"}</h3>
+            <button className="button" style={{ padding: "6px 10px" }} onClick={createThread}>{t?.newChat || "新規"}</button>
           </div>
-        </div>
+          {threads.length === 0 && (
+            <p style={{ color: "#777" }}>{t?.noThreads || "まだスレッドがありません"}</p>
+          )}
+          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
+            {threads.map(th => (
+              <li key={th.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 8, background: String(th.id) === String(currentThreadId) ? "#f6f6f6" : "transparent", cursor: "pointer" }}>
+                <div onClick={() => selectThread(th.id)} style={{ flex: 1 }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{th.title}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>{new Date(th.lastUpdated).toLocaleString()}</div>
+                </div>
+                <button className="button" style={{ padding: "4px 8px" }} onClick={() => {
+                  const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
+                  if (title !== null && title.trim()) renameThread(th.id, title.trim());
+                }}>✏️</button>
+                <button className="button" style={{ padding: "4px 8px" }} onClick={() => removeThread(th.id)}>🗑️</button>
+              </li>
+            ))}
+          </ul>
+        </aside>
 
-        <button onClick={handleQuestionSubmit} className="button" disabled={loading}>
-          {t.askButton}
-        </button>
-
-        {errorMessage && (
-          <div className="error-message">
-            {errorMessage}
-          </div>
-        )}
-
-        {loading ? (
-          <p>{t.generatingAnswer}</p>
-        ) : (
-          <div className="answerSection">
-            <p className="answerLabel">{t.answer}</p>
-            <div className="answerBox">{answer}</div>
-            {similarQuestions.length > 0 && (
-              <div className="similarQuestions">
-                <h3>{t.similarQuestions}</h3>
-                <select value={sortBy} onChange={handleSortChange} className="sortSelector">
-                  <option value="similarity">{t.sortBySimilarity}</option>
-                  <option value="date">{t.sortByDate}</option>
-                </select>
-                <ul className="question-list">
-                  {sortedSimilarQuestions.map((q, index) => (
-                    <div className="question-item" key={index} onClick={() => toggleAnswer(q.question_id)} style={{ cursor: "pointer" }}>
-                      <div className="question-header">
-                        <div className="question-content">
-                          <strong>{q.content || q.question}</strong>
-                        </div>
-                        {q.title === "official" && (
-                          <span className="official-badge">{t.official}</span>
-                        )}
-                      </div>
-                      <div className="question-time" style={{ textAlign: "right" }}>
-                        {`${t.questionDate} ${new Date(q.retrieved_at || q.time).toLocaleString()}`}
-                      </div>
-                      {visibleAnswer === q.question_id && (
-                        <div className="answer-section">
-                          <strong>{t.answer}</strong>
-                          <p>{q.answer || t.failtogetanswer}</p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </ul>
+        {/* Chat area */}
+        <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
+          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
+            {(!currentThreadId || messages.length === 0) && (
+              <div style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
+                <p style={{ fontSize: 18 }}>{t?.askQuestion || "質問を入力してください"}</p>
               </div>
             )}
+
+            {messages.map((m) => (
+              <div key={m.id} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 12 }}>
+                <div style={{ maxWidth: 720, width: "fit-content", background: m.role === "user" ? "#dbeafe" : "#f3f4f6", padding: 12, borderRadius: 12, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
+                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
+                  <div style={{ whiteSpace: "pre-wrap" }}>{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
+
+                  {/* Related (rag_qa) */}
+                  {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
+                    <details style={{ marginTop: 10 }}>
+                      <summary style={{ cursor: "pointer" }}>{t?.similarQuestions || "関連質問"}</summary>
+                      <ul style={{ marginTop: 8 }}>
+                        {m.rag_qa.map((q, idx) => (
+                          <li key={idx} style={{ marginBottom: 6 }}>
+                            <div style={{ fontWeight: 600 }}>{q.question}</div>
+                            <div style={{ fontSize: 14 }}>{q.answer}</div>
+                            {q.retrieved_at && (
+                              <div style={{ fontSize: 12, color: "#6b7280" }}>{new Date(q.retrieved_at).toLocaleString()}</div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-        )}
+
+          {/* Composer */}
+          <div style={{ borderTop: "1px solid #eee", padding: 12 }}>
+            {errorMessage && (
+              <div className="error-message" style={{ marginBottom: 8 }}>{errorMessage}</div>
+            )}
+            <div style={{ display: "flex", gap: 8 }}>
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t.placeholder}
+                className="textArea"
+                style={{ flex: 1, minHeight: 60 }}
+              />
+              <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
+                {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
+              </button>
+            </div>
+            <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>⌘/Ctrl + Enter で送信</div>
+          </div>
+        </main>
       </div>
     </div>
   );
 }
 
-export default Home;
