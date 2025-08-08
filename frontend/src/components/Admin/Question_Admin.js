@@ -1,12 +1,10 @@
-
-import React, { useState, useContext, useEffect, useRef } from "react"; // 修正: useStateをインポート
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { UserContext } from "../../UserContext"; // ユーザー情報を取得
+import { UserContext } from "../../UserContext";
 import { updateUserLanguage } from "../../utils/language";
 import {
   API_BASE_URL,
   translations,
-  languageCodeToId,
   languageLabelToCode,
   categoryList,
 } from "../../config/constants";
@@ -14,49 +12,39 @@ import {
   fetchNotifications,
   handleNotificationClick,
   handleNotificationMove,
-  handleGlobalNotificationMove
+  handleGlobalNotificationMove,
 } from "../../utils/notifications";
 import "./Question_Admin.css";
 
 const Question_Admin = () => {
   const navigate = useNavigate();
-  const { user, setUser, token, setToken, fetchUser } = useContext(UserContext); // UserContextからユーザー情報を取得
-  const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
+  const { user, token, fetchUser } = useContext(UserContext);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedCategoryName, setSelectedCategoryName] = useState(null);
-  const [title, setTitle] = useState("official");
   const [content, setContent] = useState("");
   const [answerText, setAnswerText] = useState("");
   const [language, setLanguage] = useState("ja");
-  const [isPublic, setIsPublic] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [notifications, setNotifications] = useState([]);
-  const [showPopup, setShowPopup] = useState(false); // ポップアップの表示制御
+  const [showPopup, setShowPopup] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
-  const [globalNotifications, setGlobalNotifications] = useState([]); // 全体通知を管理
-  const [activeTab, setActiveTab] = useState("personal"); // "personal" または "global"
-  const [isNotifLoading, setIsNotifLoading] = useState(true);
+  const [globalNotifications, setGlobalNotifications] = useState([]);
+  const [activeTab, setActiveTab] = useState("personal");
   const popupRef = useRef(null);
 
-  const t = translations[language]; // 現在の言語の翻訳を取得
+  const t = translations[language];
 
   useEffect(() => {
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
-      if (code) {
-        setLanguage(code);
-      } else {
-        console.warn("❗未対応のspokenLanguage:", user.spokenLanguage);
-        setLanguage("ja"); // fallback
-      }
+      setLanguage(code || "ja");
     }
   }, [user]);
 
   useEffect(() => {
     if (user?.id && token) {
-      //console.log("✅ fetchNotifications を開始:", user?.id);
       fetchNotifications({
         language,
         token,
@@ -64,41 +52,22 @@ const Question_Admin = () => {
         setNotifications,
         setGlobalNotifications,
         setUnreadCount,
-      }).finally(() => setIsNotifLoading(false));
-    } else {
-      //console.log("⚠️ user.id または token が未定義のため fetchNotifications をスキップ");
+      });
     }
-  }, [user, token]);
+  }, [user, token, language]);
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-    }
-  }, [language]);
-
-  useEffect(() => {
-    //console.log("UserContext 更新後のユーザー情報:", user);
-    if (user === null) {
-      navigate("/new");
-    }
+    if (user === null) navigate("/new");
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
-      if (latestToken) {
-        fetchUser(latestToken); // ✅ 正常に動作！
-      }
+      if (latestToken) fetchUser(latestToken);
     };
     window.addEventListener("tokenUpdated", handleTokenUpdate);
-    return () => {
-      window.removeEventListener("tokenUpdated", handleTokenUpdate);
-    };
-  }, [user, navigate, fetchUser]); // ← 依存に fetchUser を追加
+    return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
+  }, [user, navigate, fetchUser]);
 
   useEffect(() => {
-    if (showPopup) {
-      document.addEventListener("click", handleClickOutside);
-    } else {
-      document.removeEventListener("click", handleClickOutside);
-    }
+    if (showPopup) document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showPopup]);
 
@@ -114,7 +83,7 @@ const Question_Admin = () => {
       setShowPopup,
       language,
       token,
-      userId,
+      userId: user?.id,
       setNotifications,
       setGlobalNotifications,
       setUnreadCount,
@@ -123,37 +92,24 @@ const Question_Admin = () => {
 
   const onNotificationMove = (notification) => {
     handleNotificationMove(notification, navigate, token, () => {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
+      fetchNotifications({ language, token, userId: user?.id, setNotifications, setGlobalNotifications, setUnreadCount });
     });
   };
 
   const onGlobalNotificationMove = (notification) => {
     handleGlobalNotificationMove(notification, navigate, token, () => {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
+      fetchNotifications({ language, token, userId: user?.id, setNotifications, setGlobalNotifications, setUnreadCount });
     });
   };
 
   const handleLanguageChange = (event) => {
     const newLanguage = event.target.value;
-    setLanguage(newLanguage); // 即時反映
-    updateUserLanguage(newLanguage); // サーバー側に反映
+    setLanguage(newLanguage);
+    updateUserLanguage(newLanguage);
   };
 
-  const openCategoryModal = () => {
-    setIsCategoryModalOpen(true);
-  };
-
-  const closeCategoryModal = () => {
-    setIsCategoryModalOpen(false);
-  };
-
-  const openRegisterModal = () => {
-    setIsRegisterModalOpen(true);
-  };
-
-  const closeRegisterModal = () => {
-    setIsRegisterModalOpen(false);
-  };
+  const openCategoryModal = () => setIsCategoryModalOpen(true);
+  const closeCategoryModal = () => setIsCategoryModalOpen(false);
 
   const handleChangeCategory = (id, name) => {
     setSelectedCategoryId(id);
@@ -162,20 +118,9 @@ const Question_Admin = () => {
   };
 
   const handleRegisterQuestion = async () => {
-    if (!content.trim()) {
-      setErrorMessage(`${t.questionerror}`);
-      return;
-    }
-
-    if (!answerText.trim()) {
-      setErrorMessage(`${t.answererror}`);
-      return;
-    }
-
-    if (!selectedCategoryId) {
-      setErrorMessage(`${t.selectcategory}`);
-      return;
-    }
+    if (!content.trim()) return setErrorMessage(t.questionerror);
+    if (!answerText.trim()) return setErrorMessage(t.answererror);
+    if (!selectedCategoryId) return setErrorMessage(t.selectcategory);
 
     setIsSubmitting(true);
     setErrorMessage("");
@@ -189,25 +134,22 @@ const Question_Admin = () => {
         },
         body: JSON.stringify({
           category_id: selectedCategoryId,
-          title: title === "official" ? "official" : "ユーザー質問",
           content,
-          public: isPublic,
           answer_text: answerText,
+          public: true,
         }),
+
       });
 
       if (!response.ok) {
         const errorData = await response.json();
-        console.error("サーバーレスポンス:", errorData);
-        throw new Error(errorData.detail || "質問の登録に失敗しました。");
+        throw new Error(errorData.detail || "QA登録に失敗しました。")
       }
 
-      const data = await response.json();
-      alert(`${t.register}`);
+      alert(t.register);
       clearForm();
-
     } catch (error) {
-      console.error("質問登録エラー:", error);
+      console.error("QA登録エラー:", error);
       setErrorMessage(error.message);
     } finally {
       setIsSubmitting(false);
@@ -219,8 +161,6 @@ const Question_Admin = () => {
     setAnswerText("");
     setSelectedCategoryId(null);
     setSelectedCategoryName("");
-    setTitle("official");
-    setIsPublic(true);
   };
 
   const userData = localStorage.getItem("user");
@@ -240,142 +180,57 @@ const Question_Admin = () => {
           </select>
         </div>
         <h1>Shiga Chat</h1>
-        {/* ユーザーアイコンと通知をまとめたラッパー */}
         <div className="user-notification-wrapper">
-          {/* 🔔 通知ボタン（画像版） */}
           <div className={`notification-container ${showPopup ? "show" : ""}`}>
-            {/* 🔔 通知ボタン */}
             <button className="notification-button" onClick={onNotificationClick}>
               <img src="./../bell.png" alt="通知" className="notification-icon" />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
-
-            {/* 🔔 通知ポップアップ */}
             {showPopup && (
               <div className="notification-popup" ref={popupRef}>
-                {/* タブ切り替えボタン */}
                 <div className="tabs">
-                  <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                    {t.personal}
-                  </button>
-                  <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                    {t.global}
-                  </button>
+                  <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>{t.personal}</button>
+                  <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>{t.global}</button>
                 </div>
-
                 <div className="notifications-list">
-                  {/* 🔹 個人通知リスト */}
                   {activeTab === "personal" && (
-                    notifications.length > 0 ? (
-                      notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${notification.is_read ? "read" : "unread"}`}
-                          onClick={() => onNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p> // 🔹 個人通知がない場合のメッセージ
-                    )
+                    notifications.length > 0 ? notifications.map((notification) => (
+                      <div key={notification.id} className={`notification-item ${notification.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(notification)}>
+                        {notification.message}
+                        <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                      </div>
+                    )) : <p>{t.noNotifications}</p>
                   )}
-
-                  {/* 🔹 全体通知リスト */}
                   {activeTab === "global" && (
-                    globalNotifications.length > 0 ? (
-                      globalNotifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${Array.isArray(notification.read_users) && notification.read_users.includes(userId) ? "read" : "unread"}`}
-                          onClick={() => onGlobalNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p> // 🔹 全体通知がない場合のメッセージ
-                    )
+                    globalNotifications.length > 0 ? globalNotifications.map((notification) => (
+                      <div key={notification.id} className={`notification-item ${Array.isArray(notification.read_users) && notification.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(notification)}>
+                        {notification.message}
+                        <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                      </div>
+                    )) : <p>{t.noNotifications}</p>
                   )}
                 </div>
               </div>
             )}
           </div>
-          {/* ユーザー名 */}
-          <div className="userIcon">
-            {user ? `${user.nickname} ` : t.guest}
-          </div>
+          <div className="userIcon">{user ? `${user.nickname}` : t.guest}</div>
         </div>
       </header>
-      <div className="admin-body">
-        <h1 className="question-admin">{t.questionmanagement}</h1>
-        <div>
-          <div className="admin-category-container">
-            {categoryList.map((category) => (
-              <button
-                key={category.id}
-                className={`admin-category-button admin-${category.className}`}
-                onClick={() => navigate(`/admin/category/${category.id}`)}
-              >
-                {category.name[language]}
-              </button>
-            ))}
-          </div>
-        </div>
+
+      <div className="register-container">
+        <h1>{t.register_question}</h1>
+        {errorMessage && <p className="error-message">{errorMessage}</p>}
+        <label>{t.category}: {selectedCategoryName || t.notSelected}</label>
+        <button className="category-button" onClick={openCategoryModal}>{t.selectcategory}</button>
+        <label>{t.qtext}</label>
+        <textarea value={content} onChange={(e) => setContent(e.target.value)}></textarea>
+        <label>{t.answer}</label>
+        <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)}></textarea>
+        <button className="register" onClick={handleRegisterQuestion} disabled={isSubmitting}>
+          {isSubmitting ? t.loading : t.register_question}
+        </button>
       </div>
-      <button className="reg" onClick={openRegisterModal}>
-        {t.registerquestion}
-      </button>
-      {isRegisterModalOpen && (
-        <div className="register-modal">
-          <div className="register-container">
-            <h1>{t.register_question}</h1>
-            {errorMessage && <p className="error-message">{errorMessage}</p>}
 
-            <label>{t.category}:{selectedCategoryName}</label>
-            <button className="category-button" onClick={openCategoryModal}>
-              {t.selectcategory}
-            </button>
-
-            <label>{t.qtext}</label>
-            <textarea value={content} onChange={(e) => setContent(e.target.value)}></textarea>
-
-            <label>{t.answer}:</label>
-            <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)}></textarea>
-
-            <div className="toggle-wrapper">
-              <div className="title-buttons">
-                <button
-                  className={`title-button ${title === "official" ? "active" : ""}`}
-                  onClick={() => setTitle("official")}
-                >
-                  {t.official}
-                </button>
-                <button
-                  className={`title-button ${title === "unofficial" ? "active" : ""}`}
-                  onClick={() => setTitle("unofficial")}
-                >
-                  {t.unofficial}
-                </button>
-              </div>
-              <div className="toggle-container">
-                <span className="toggle-text">{isPublic ? t.public : t.unpublic}</span>
-                <div className={`toggle-switch ${isPublic ? "active" : ""}`} onClick={() => setIsPublic(!isPublic)}>
-                  <div className="toggle-circle"></div>
-                </div>
-              </div>
-            </div>
-
-            <button className="register" onClick={handleRegisterQuestion} disabled={isSubmitting}>
-              {isSubmitting ? t.loading : t.register_question}
-            </button>
-            <button className="close" onClick={closeRegisterModal}>{t.close}</button>
-          </div>
-        </div>
-      )}
-      {/* ✅ カテゴリ選択ポップアップ */}
       {isCategoryModalOpen && (
         <div className="category-modal">
           <div className="category-modal-content">
@@ -386,7 +241,7 @@ const Question_Admin = () => {
                   key={category.id}
                   className={`category-option-button ${category.className}`}
                   onClick={() => handleChangeCategory(category.id, category.name[language] || category.name.ja)}
-                  disabled={category.id === selectedCategoryId} // ✅ 現在のカテゴリは選択不可
+                  disabled={category.id === selectedCategoryId}
                 >
                   {category.name[language] || category.name.ja}
                 </button>

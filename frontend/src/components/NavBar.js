@@ -13,7 +13,7 @@ const translations = {
     category: "カテゴリ検索",
     questionHistory: "質問履歴",
     viewingHistory: "閲覧履歴",
-    questionAdmin: "🛠️質問管理",
+    questionAdmin: "Q&A登録",
     officialWebsite: "公式ホームページ",
     logout: "ログアウト",
   },
@@ -25,7 +25,7 @@ const translations = {
     category: "Category Search",
     questionHistory: "Question History",
     viewingHistory: "Viewing History",
-    questionAdmin: "🛠️Question Management",
+    questionAdmin: "Q&A Registration",
     officialWebsite: "Official Website",
     logout: "Logout",
   },
@@ -37,7 +37,7 @@ const translations = {
     category: "类别搜索",
     questionHistory: "问题历史",
     viewingHistory: "浏览历史",
-    questionAdmin: "🛠️问题管理",
+    questionAdmin: "问答注册",
     officialWebsite: "官方网站",
     logout: "登出",
   },
@@ -49,7 +49,7 @@ const translations = {
     category: "Tìm kiếm danh mục",
     questionHistory: "Lịch sử câu hỏi",
     viewingHistory: "Lịch sử xem",
-    questionAdmin: "🛠️Quản lý câu hỏi",
+    questionAdmin: "Đăng ký Hỏi và Đáp",
     officialWebsite: "Trang web chính thức",
     logout: "Đăng xuất",
   },
@@ -61,7 +61,7 @@ const translations = {
     category: "카테고리 검색",
     questionHistory: "질문 기록",
     viewingHistory: "조회 기록",
-    questionAdmin: "🛠️질문 관리",
+    questionAdmin: "질문 답변 등록",
     officialWebsite: "공식 홈페이지",
     logout: "로그아웃",
   }
@@ -154,11 +154,9 @@ const NavBar = () => {
               <li>
                 <Link to="/Etsurannrireki" onClick={closeMenu}>{t.viewingHistory}</Link>
               </li>
-              {user.isAdmin && (
-                <li>
+              <li>
                   <Link to="/Admin/QuestionAdmin" onClick={closeMenu}>{t.questionAdmin}</Link>
-                </li>
-              )}
+              </li>         
               <li>
                 <a href="https://www.s-i-a.or.jp" className="important-link" target="_blank" rel="noopener noreferrer">
                   {t.officialWebsite}

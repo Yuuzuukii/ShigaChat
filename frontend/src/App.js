@@ -33,10 +33,9 @@ function App() {
           <Route path="/Shitsumonnrireki" element={<Shitsumonnrireki />} />
           <Route path="/Etsurannrireki" element={<Etsurannrireki />} />
           <Route path="/category/:categoryId" element={<CategoryDetail />} /> {/* 動的ルート */}
+          <Route path="/admin/QuestionAdmin" element={<Question_Admin />} />
+          <Route path="/admin/category/:categoryId" element={<Q_List />} />
 
-          {/* 管理者ページのアクセス制御 */}
-          <Route path="/admin/QuestionAdmin" element={user?.isAdmin ? <Question_Admin /> : <Navigate to="/home" />} />
-          <Route path="/admin/category/:categoryId" element={user?.isAdmin ? <Q_List /> : <Navigate to="/home" />} />
         </Routes>
       </div>
     </Router>

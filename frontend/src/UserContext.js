@@ -39,9 +39,8 @@ export const UserProvider = ({ children }) => {
         if (data.id) {
           const userData = {
             id: data.id,
-            nickname: data.nickname,
+            nickname: data.name,
             spokenLanguage: data.spoken_language,
-            isAdmin: data.isAdmin === 1,
           };
           setUser(userData);
           setLanguage(data.spoken_language);
