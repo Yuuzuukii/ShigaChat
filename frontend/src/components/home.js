@@ -17,7 +17,7 @@ import {
 import "./Home.css";
 
 function Home() {
-  const { user, setUser, token, setToken, fetchUser, } = useContext(UserContext);
+  const { user, setUser, token, setToken, fetchUser } = useContext(UserContext);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState("");
   const [similarQuestions, setSimilarQuestions] = useState([]);
@@ -39,6 +39,9 @@ function Home() {
   const t = translations[language];
   const navigate = useNavigate();
 
+  // ユーザーIDを取得
+  const userId = user?.id;
+
   useEffect(() => {
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
@@ -52,43 +55,33 @@ function Home() {
   }, [user]);  
 
   useEffect(() => {
-    if (user?.id && token) {
-      //console.log("✅ fetchNotifications を開始:", user?.id);
+    if (userId && token) {
       fetchNotifications({
         language,
         token,
-        userId: user.id,
+        userId,
         setNotifications,
         setGlobalNotifications,
         setUnreadCount,
       }).finally(() => setIsNotifLoading(false));
-    } else {
-      //console.log("⚠️ user.id または token が未定義のため fetchNotifications をスキップ");
     }
-  }, [user, token]);
+  }, [user, token, language]);
 
   useEffect(() => {
-    if (user) {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-    }
-  }, [language]);
-
-  useEffect(() => {
-    //console.log("UserContext 更新後のユーザー情報:", user);
     if (user === null) {
       navigate("/new");
     }
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
       if (latestToken) {
-        fetchUser(latestToken); // ✅ 正常に動作！
+        fetchUser(latestToken);
       }
     };
     window.addEventListener("tokenUpdated", handleTokenUpdate);
     return () => {
       window.removeEventListener("tokenUpdated", handleTokenUpdate);
     };
-  }, [user, navigate, fetchUser]); // ← 依存に fetchUser を追加
+  }, [user, navigate, fetchUser]);
   
   useEffect(() => {
     if (showPopup) {
@@ -132,8 +125,8 @@ function Home() {
 
   const handleLanguageChange = async (event) => {
     const newLanguage = event.target.value;
-    setLanguage(newLanguage); // UI反映
-    await updateUserLanguage(newLanguage, setUser); // サーバー反映
+    setLanguage(newLanguage);
+    await updateUserLanguage(newLanguage, setUser);
   
     const langId = languageCodeToId[newLanguage];
   
@@ -154,10 +147,10 @@ function Home() {
         }
   
         const data = await response.json();
-        setAnswer(data.text || t.error + t.failtogetanswer);
+        setAnswer(data.text || t.failtogetanswer);
       } catch (error) {
         setAnswer(t.error + error.message);
-        alert(JSON.stringify(error, null, 2));
+        console.error("回答翻訳エラー:", error);
       }
     }
   
@@ -181,6 +174,8 @@ function Home() {
     setLoading(true);
     setAnswer("");
     setSimilarQuestions([]);
+    setErrorMessage("");
+    
     try {
       const postRes = await fetch(`${API_BASE_URL}/question/post_question`, {
         method: "POST",
@@ -195,7 +190,12 @@ function Home() {
           public: isPublic ? 1 : 0,
         }),
       });
-      if (!postRes.ok) throw new Error((await postRes.json()).detail || t.failedtopost);
+      
+      if (!postRes.ok) {
+        const errorData = await postRes.json();
+        throw new Error(errorData.detail || t.failedtopost);
+      }
+      
       const { question_id } = await postRes.json();
 
       const getRes = await fetch(`${API_BASE_URL}/question/get_answer`, {
@@ -204,19 +204,31 @@ function Home() {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ question_id }),
+        body: JSON.stringify({ 
+          thread_id: Date.now(), // ユニークなスレッドIDを生成
+          text: question 
+        }),
       });
-      if (!getRes.ok) throw new Error((await getRes.json()).detail || t.failtogetanswer);
+      
+      if (!getRes.ok) {
+        const errorData = await getRes.json();
+        throw new Error(errorData.detail || t.failtogetanswer);
+      }
+      
       const data = await getRes.json();
 
       setAnswer(data.answer || t.failtogetanswer);
       setAnswerId(data.answer_id || null);
-      const translated = await fetchTranslatedSimilarQuestions(data.source_documents);
-      const withAnswers = await fetchTranslatedSimilarAnswers(translated);
-      setSimilarQuestions(withAnswers);
+      
+      if (data.rag_qa && data.rag_qa.length > 0) {
+        const translated = await fetchTranslatedSimilarQuestions(data.rag_qa);
+        const withAnswers = await fetchTranslatedSimilarAnswers(translated);
+        setSimilarQuestions(withAnswers);
+      }
     } catch (error) {
-      console.error(error.message);
+      console.error("質問投稿エラー:", error);
       setAnswer(t.error + error.message);
+      setErrorMessage(error.message);
     } finally {
       setLoading(false);
       setQuestion("");
@@ -226,11 +238,11 @@ function Home() {
   const fetchTranslatedSimilarQuestions = async (questions) => {
     try {
       return await Promise.all(questions.map(async (q) => {
-        const res = await fetch(`${API_BASE_URL}/question/get_translated_question?question_id=${q.question_id}&language_id=${languageCodeToId[language]}`, {
+        const res = await fetch(`${API_BASE_URL}/question/get_translated_question?question_id=${q.question_id || q.question}&language_id=${languageCodeToId[language]}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await res.json();
-        return { ...q, content: data.text || q.content };
+        return { ...q, content: data.text || q.content || q.question };
       }));
     } catch (error) {
       console.error("翻訳取得エラー:", error.message);
@@ -241,6 +253,7 @@ function Home() {
   const fetchTranslatedSimilarAnswers = async (questions) => {
     try {
       return await Promise.all(questions.map(async (q) => {
+        if (!q.answer_id) return q;
         const res = await fetch(`${API_BASE_URL}/question/get_translated_answer?answer_id=${q.answer_id}&language_id=${languageCodeToId[language]}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
@@ -258,8 +271,8 @@ function Home() {
   };
 
   const sortedSimilarQuestions = [...similarQuestions].sort((a, b) => {
-    if (sortBy === "similarity") return b.similarity - a.similarity;
-    if (sortBy === "date") return new Date(b.time) - new Date(a.time);
+    if (sortBy === "similarity") return (b.score || 0) - (a.score || 0);
+    if (sortBy === "date") return new Date(b.retrieved_at || b.time) - new Date(a.retrieved_at || a.time);
     return 0;
   });
 
@@ -284,9 +297,6 @@ function Home() {
     addHistory(questionId);
   };
 
-  const userData = localStorage.getItem("user");
-  const userId = userData ? JSON.parse(userData).id : null;
-
   return (
     <div className="home-container">
       <header className="header">
@@ -301,20 +311,15 @@ function Home() {
           </select>
         </div>
         <h1>Shiga Chat</h1>
-        {/* ユーザーアイコンと通知をまとめたラッパー */}
         <div className="user-notification-wrapper">
-          {/* 🔔 通知ボタン（画像版） */}
           <div className={`notification-container ${showPopup ? "show" : ""}`}>
-            {/* 🔔 通知ボタン */}
             <button className="notification-button" onClick={onNotificationClick}>
               <img src="./bell.png" alt="通知" className="notification-icon" />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
 
-            {/* 🔔 通知ポップアップ */}
             {showPopup && (
               <div className="notification-popup" ref={popupRef}>
-                {/* タブ切り替えボタン */}
                 <div className="tabs">
                   <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
                     {t.personal}
@@ -325,7 +330,6 @@ function Home() {
                 </div>
 
                 <div className="notifications-list">
-                  {/* 🔹 個人通知リスト */}
                   {activeTab === "personal" && (
                     notifications.length > 0 ? (
                       notifications.map((notification) => (
@@ -339,11 +343,10 @@ function Home() {
                         </div>
                       ))
                     ) : (
-                      <p>{t.noNotifications}</p> // 🔹 個人通知がない場合のメッセージ
+                      <p>{t.noNotifications}</p>
                     )
                   )}
 
-                  {/* 🔹 全体通知リスト */}
                   {activeTab === "global" && (
                     globalNotifications.length > 0 ? (
                       globalNotifications.map((notification) => (
@@ -357,14 +360,13 @@ function Home() {
                         </div>
                       ))
                     ) : (
-                      <p>{t.noNotifications}</p> // 🔹 全体通知がない場合のメッセージ
+                      <p>{t.noNotifications}</p>
                     )
                   )}
                 </div>
               </div>
             )}
           </div>
-          {/* ユーザー名 */}
           <div className="userIcon">
             {user ? `${user.nickname} ` : t.guest}
           </div>
@@ -382,7 +384,6 @@ function Home() {
           className="textArea"
           placeholder={t.placeholder}
         ></textarea>
-        {/* 公開/非公開の切り替えスイッチ（右端に配置） */}
         <div className="toggle-wrapper">
           <span className="toggle-text">{isPublic ? t.makepublicToggle : t.makeprivateToggle}</span>
           <div className={`toggle-switch ${isPublic ? "active" : ""}`} onClick={() => setIsPublic(!isPublic)}>
@@ -393,6 +394,13 @@ function Home() {
         <button onClick={handleQuestionSubmit} className="button" disabled={loading}>
           {t.askButton}
         </button>
+        
+        {errorMessage && (
+          <div className="error-message">
+            {errorMessage}
+          </div>
+        )}
+        
         {loading ? (
           <p>{t.generatingAnswer}</p>
         ) : (
@@ -411,14 +419,14 @@ function Home() {
                     <div className="question-item" key={index} onClick={() => toggleAnswer(q.question_id)} style={{ cursor: "pointer" }}>
                       <div className="question-header">
                         <div className="question-content">
-                          <strong>{q.content}</strong>
+                          <strong>{q.content || q.question}</strong>
                         </div>
                         {q.title === "official" && (
                           <span className="official-badge">{t.official}</span>
                         )}
                       </div>
                       <div className="question-time" style={{ textAlign: "right" }}>
-                        {`${t.questionDate} ${new Date(q.time).toLocaleString()}`}
+                        {`${t.questionDate} ${new Date(q.retrieved_at || q.time).toLocaleString()}`}
                       </div>
                       {visibleAnswer === q.question_id && (
                         <div className="answer-section">
