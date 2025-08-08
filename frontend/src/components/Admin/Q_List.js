@@ -284,30 +284,6 @@ const Q_List = () => {
         }
     };
 
-    const toggleOfficialStatus = async (questionId, currentTitle) => {
-        const newTitle = currentTitle === "official" ? "ユーザ質問" : "official";
-        const message = currentTitle === "official" ? t.unofficialize : t.officialize;
-
-        if (!window.confirm(message)) return;
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/admin/official_question`, {
-                method: "PUT",
-                headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${localStorage.getItem("token")}`,
-                },
-                body: JSON.stringify({ question_id: questionId, title: newTitle }),
-            });
-
-            if (!response.ok) throw new Error("ステータス更新失敗");
-
-            await fetchQuestions(); // 正しく更新を待つ
-        } catch (error) {
-            console.error("エラー:", error);
-            window.alert(t.failtoupdate);
-        }
-    };
 
     const deleteQuestion = async (questionId) => {
         if (!window.confirm(t.confirmDelete)) return;
@@ -523,12 +499,6 @@ const Q_List = () => {
                             >
                                 <div className="admin-question-text">
                                     {question.質問}
-                                    <p>
-                                        {question.title === "official" && (
-                                            <span className="admin-official-badge">{t.official}</span>
-                                        )}
-
-                                    </p>
                                 </div>
 
 
@@ -537,9 +507,6 @@ const Q_List = () => {
                                     {new Date(question.time).toLocaleString()}
                                 </div>
 
-                                <button className="official-button" onClick={() => toggleOfficialStatus(question.question_id, question.title)}>
-                                    {question.title === "official" ? t.takeaway_official : t.give_official}
-                                </button>
                                 <button
                                     className="change-category-button"
                                     onClick={() => openCategoryModal(question.question_id, question.category_id)}
@@ -551,16 +518,7 @@ const Q_List = () => {
 
                             </div>
 
-                            {/* ✅ 公開/非公開スイッチ (初期状態を `public` の値で設定) */}
-                            <div className="toggle-wrapper">
-                                <span className="toggle-text">{question.public ? t.publicToggle : t.privateToggle}</span>
-                                <div
-                                    className={`toggle-switch ${question.public ? "active" : ""}`}
-                                    onClick={() => togglePublicStatus(question.question_id, question.public)}
-                                >
-                                    <div className="toggle-circle"></div>
-                                </div>
-                            </div>
+
                             {/* ✅ 削除ボタン */}
                             <button className="delete-button" onClick={() => deleteQuestion(question.question_id)}>
                                 {t.delete}

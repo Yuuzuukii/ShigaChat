@@ -21,13 +21,11 @@ const Question_Admin = () => {
   const navigate = useNavigate();
   const { user, token, fetchUser } = useContext(UserContext);
 
-  // --- UI states (second-UI style) ---
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
   const [selectedCategoryName, setSelectedCategoryName] = useState("");
   const [title, setTitle] = useState("official"); // "official" | "unofficial"
-  const [isPublic, setIsPublic] = useState(true);
 
   const [content, setContent] = useState("");
   const [answerText, setAnswerText] = useState("");
@@ -36,7 +34,6 @@ const Question_Admin = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
-  // notifications (kept using utils/* pattern)
   const [notifications, setNotifications] = useState([]);
   const [globalNotifications, setGlobalNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -46,7 +43,6 @@ const Question_Admin = () => {
 
   const t = translations[language] || translations.ja;
 
-  // --- derive language from user ---
   useEffect(() => {
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
@@ -54,7 +50,6 @@ const Question_Admin = () => {
     }
   }, [user]);
 
-  // --- auth redirect & token refresh hook ---
   useEffect(() => {
     if (user === null) navigate("/new");
     const handleTokenUpdate = () => {
@@ -65,7 +60,6 @@ const Question_Admin = () => {
     return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
   }, [user, navigate, fetchUser]);
 
-  // --- notifications fetch on user/lang ready ---
   useEffect(() => {
     if (user?.id && token) {
       fetchNotifications({
@@ -79,7 +73,6 @@ const Question_Admin = () => {
     }
   }, [user, token, language]);
 
-  // --- click outside to close popup ---
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popupRef.current && !popupRef.current.contains(event.target)) {
@@ -90,7 +83,6 @@ const Question_Admin = () => {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showPopup]);
 
-  // --- handlers ---
   const onNotificationClick = () => {
     handleNotificationClick({
       showPopup,
@@ -133,7 +125,7 @@ const Question_Admin = () => {
   const handleLanguageChange = (e) => {
     const newLang = e.target.value;
     setLanguage(newLang);
-    updateUserLanguage(newLang); // server + tokenUpdated
+    updateUserLanguage(newLang);
   };
 
   const handleCategoryClick = (id) => {
@@ -157,7 +149,6 @@ const Question_Admin = () => {
     setSelectedCategoryId(null);
     setSelectedCategoryName("");
     setTitle("official");
-    setIsPublic(true);
   };
 
   const handleRegisterQuestion = async () => {
@@ -169,8 +160,6 @@ const Question_Admin = () => {
     setErrorMessage("");
 
     try {
-      // NOTE: backendに合わせてエンドポイント名は調整可
-      // 例) /admin/register_question を使う
       const res = await fetch(`${API_BASE_URL}/admin/register_question`, {
         method: "POST",
         headers: {
@@ -182,7 +171,7 @@ const Question_Admin = () => {
           title: title === "official" ? "official" : "ユーザー質問",
           content,
           answer_text: answerText,
-          public: isPublic,
+          public: true, // ← トグル削除に伴い常に公開（不要ならこの行を消す）
         }),
       });
 
@@ -202,7 +191,6 @@ const Question_Admin = () => {
     }
   };
 
-  // --- render ---
   const userData = localStorage.getItem("user");
   const localUserId = userData ? JSON.parse(userData).id : null;
 
@@ -289,7 +277,6 @@ const Question_Admin = () => {
         </div>
       </header>
 
-      {/* 上部：カテゴリ一覧（ボタンでカテゴリページへ） */}
       <div className="admin-body">
         <h1 className="question-admin">{t.questionmanagement}</h1>
         <div className="admin-category-container">
@@ -305,12 +292,10 @@ const Question_Admin = () => {
         </div>
       </div>
 
-      {/* 右下固定などの登録ボタン（UIお好みで） */}
       <button className="reg" onClick={openRegisterModal}>
         {t.registerquestion}
       </button>
 
-      {/* 質問登録モーダル */}
       {isRegisterModalOpen && (
         <div className="register-modal">
           <div className="register-container">
@@ -330,34 +315,7 @@ const Question_Admin = () => {
             <label>{t.answer}</label>
             <textarea value={answerText} onChange={(e) => setAnswerText(e.target.value)} />
 
-            <div className="toggle-wrapper">
-              {/* 公式/非公式 */}
-              <div className="title-buttons">
-                <button
-                  className={`title-button ${title === "official" ? "active" : ""}`}
-                  onClick={() => setTitle("official")}
-                >
-                  {t.official}
-                </button>
-                <button
-                  className={`title-button ${title === "unofficial" ? "active" : ""}`}
-                  onClick={() => setTitle("unofficial")}
-                >
-                  {t.unofficial}
-                </button>
-              </div>
 
-              {/* 公開/非公開 */}
-              <div className="toggle-container">
-                <span className="toggle-text">{isPublic ? t.public : t.unpublic}</span>
-                <div
-                  className={`toggle-switch ${isPublic ? "active" : ""}`}
-                  onClick={() => setIsPublic((v) => !v)}
-                >
-                  <div className="toggle-circle" />
-                </div>
-              </div>
-            </div>
 
             <button className="register" onClick={handleRegisterQuestion} disabled={isSubmitting}>
               {isSubmitting ? (t.loading || "Loading...") : t.register_question}
@@ -369,7 +327,6 @@ const Question_Admin = () => {
         </div>
       )}
 
-      {/* カテゴリ選択モーダル */}
       {isCategoryModalOpen && (
         <div className="category-modal">
           <div className="category-modal-content">
