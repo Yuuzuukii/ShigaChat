@@ -459,3 +459,121 @@ def get_translated_answer(
             )
 
         return {"text": translated_answer[0]}
+
+@router.get("/get_qa")
+def get_qa(
+    question_id: int,
+    current_user: dict = Depends(current_user_info)
+):
+    """
+    質問IDに基づいて質問と回答を取得する
+    """
+    spoken_language = current_user["spoken_language"]
+    language_id = language_mapping.get(spoken_language)
+
+    if not language_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported spoken language: {spoken_language}"
+        )
+
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+
+        # 質問を取得
+        cursor.execute("""
+            SELECT q.question_id, qt.texts, q.title, q.time, c.description
+            FROM question q
+            JOIN question_translation qt ON q.question_id = qt.question_id
+            JOIN category c ON q.category_id = c.id
+            WHERE q.question_id = ? AND qt.language_id = ?
+        """, (question_id, language_id))
+        question_row = cursor.fetchone()
+
+        if not question_row:
+            raise HTTPException(status_code=404, detail="質問が見つかりません")
+
+        question_data = {
+            "question_id": question_row[0],
+            "text": question_row[1],
+            "title": question_row[2],
+            "time": question_row[3],
+            "category": question_row[4]
+        }
+
+        # 回答を取得
+        cursor.execute("""
+            SELECT a.answer_id, at.texts, a.time
+            FROM answer a
+            JOIN answer_translation at ON a.answer_id = at.answer_id
+            WHERE a.question_id = ? AND at.language_id = ?
+        """, (question_id, language_id))
+        answers = cursor.fetchall()
+
+        answer_data = []
+        for answer in answers:
+            answer_data.append({
+                "answer_id": answer[0],
+                "text": answer[1],
+                "time": answer[2]
+            })
+
+    return {
+        "question": question_data,
+        "answers": answer_data
+    }
+
+@router.get("/get_qa_list")
+def get_qa_list(
+    mine: bool = Query(False, description="自分の質問のみを取得するかどうか"),
+    category_id: int = Query(None, description="カテゴリIDでフィルタリング"),
+    current_user: dict = Depends(current_user_info)
+):
+    """
+    質問の一覧を追加日順で取得（オプションで自分の質問のみ、カテゴリ絞り込み）
+    """
+    spoken_language = current_user["spoken_language"]
+    user_id = current_user["id"]
+    language_id = language_mapping.get(spoken_language)
+
+    if not language_id:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported spoken language: {spoken_language}"
+        )
+
+    with sqlite3.connect(DATABASE) as conn:
+        cursor = conn.cursor()
+
+        # SQL構築
+        query = """
+            SELECT q.question_id, qt.texts, q.title, q.time, c.description
+            FROM question q
+            JOIN question_translation qt ON q.question_id = qt.question_id
+            JOIN category c ON q.category_id = c.id
+            WHERE qt.language_id = ?
+        """
+        params = [language_id]
+
+        if mine:
+            query += " AND q.user_id = ?"
+            params.append(user_id)
+
+        if category_id is not None:
+            query += " AND q.category_id = ?"
+            params.append(category_id)
+
+        query += " ORDER BY q.time DESC"
+
+        cursor.execute(query, tuple(params))
+        rows = cursor.fetchall()
+
+        qa_list = [{
+            "question_id": row[0],
+            "text": row[1],
+            "title": row[2],
+            "time": row[3],
+            "category": row[4]
+        } for row in rows]
+
+    return {"qa_list": qa_list}
