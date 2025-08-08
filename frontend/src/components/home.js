@@ -177,27 +177,6 @@ function Home() {
     setErrorMessage("");
 
     try {
-      const postRes = await fetch(`${API_BASE_URL}/question/post_question`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          category_id: 1,
-          content: question,
-          language_id: languageCodeToId[language],
-          public: isPublic ? 1 : 0,
-        }),
-      });
-
-      if (!postRes.ok) {
-        const errorData = await postRes.json();
-        throw new Error(errorData.detail || t.failedtopost);
-      }
-
-      const { question_id } = await postRes.json();
-
       const getRes = await fetch(`${API_BASE_URL}/question/get_answer`, {
         method: "POST",
         headers: {

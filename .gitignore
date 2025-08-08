@@ -3,6 +3,5 @@
 __pycache__/
 *.pyc
 nginx/log/
-__pycache__/
-*.pyc
-nginx/log/
+env/
+.python-version
