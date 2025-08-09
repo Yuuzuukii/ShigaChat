@@ -134,14 +134,12 @@ def get_category_questions_admin(
                 question.title AS question_title,
                 question.public AS public,
                 question.category_id AS category_id,
-                question.time AS time,
-                user.name AS user_name  -- 質問者の名前を取得
+                question.time AS time
             FROM QA
             JOIN question ON QA.question_id = question.question_id
             JOIN answer ON QA.answer_id = answer.id
             JOIN question_translation ON question.question_id = question_translation.question_id
             JOIN answer_translation ON answer.id = answer_translation.answer_id
-            JOIN user ON question.user_id = user.id  -- 質問者の情報を結合
             WHERE question.category_id = ? AND 
             question_translation.language_id = ? AND 
             answer_translation.language_id = ? 
@@ -163,8 +161,7 @@ def get_category_questions_admin(
                 "title": qa[4],         # 質問タイトル
                 "public": qa[5],        # 公開状態
                 "category_id": qa[6],
-                "time": qa[7],
-                "user_name": qa[8]      # 質問者の名前を追加
+                "time": qa[7]
             }
             for qa in qa_list
         ]
