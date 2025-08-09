@@ -57,6 +57,9 @@ export default function Home() {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  
+  // Drawer state
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Derived
   const currentThread = useMemo(
@@ -176,7 +179,7 @@ export default function Home() {
     saveThreads(updated);
     localStorage.removeItem(LS_MSGS_PREFIX + id);
     if (String(id) === String(currentThreadId)) {
-      const next = updated[Math.max(0, idx-1)];
+      const next = updated[Math.max(0, idx - 1)];
       if (next) setCurrentThreadId(String(next.id));
       else {
         setCurrentThreadId(null);
@@ -268,157 +271,174 @@ export default function Home() {
   };
 
   return (
-    <div className="home-container" style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      {/* Header (existing) */}
-      <header className="header">
-        <div className="language-wrapper">
-          <img src="./globe.png" alt="言語" className="globe-icon" />
-          <select className="languageSelector" onChange={handleLanguageChange} value={language}>
-            <option value="ja">日本語</option>
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-            <option value="vi">Tiếng Việt</option>
-            <option value="ko">한국어</option>
-          </select>
-        </div>
-        <h1>Shiga Chat</h1>
-        <div className="user-notification-wrapper">
-          <div className={`notification-container ${showPopup ? "show" : ""}`}>
-            <button className="notification-button" onClick={onNotificationClick}>
-              <img src="./bell.png" alt="通知" className="notification-icon" />
-              {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-            </button>
-            {showPopup && (
-              <div className="notification-popup" ref={popupRef}>
-                <div className="tabs">
-                  <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                    {t.personal}
-                  </button>
-                  <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                    {t.global}
-                  </button>
-                </div>
-                <div className="notifications-list">
-                  {activeTab === "personal" && (
-                    notifications.length > 0 ? (
-                      notifications.map((n) => (
-                        <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
-                          {n.message}
-                          <span className="time">{new Date(n.time).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p>
-                    )
-                  )}
-                  {activeTab === "global" && (
-                    globalNotifications.length > 0 ? (
-                      globalNotifications.map((n) => (
-                        <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
-                          {n.message}
-                          <span className="time">{new Date(n.time).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p>
-                    )
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-          <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
-        </div>
-      </header>
-
-      {/* Body: sidebar + chat area */}
-      <div style={{ display: "flex", flex: 1, minHeight: 0 }}>
-        {/* Sidebar: Threads */}
-        <aside style={{ width: 280, borderRight: "1px solid #eee", padding: 12, overflowY: "auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <h3 style={{ margin: 0 }}>{t?.threads || "スレッド"}</h3>
+    <div className="home-container">
+      {/* Drawer Overlay */}
+      {isDrawerOpen && <div className="drawer-overlay" onClick={() => setIsDrawerOpen(false)}></div>}
+      
+      {/* Sidebar: Threads Drawer */}
+      <aside className={`chat-sidebar drawer ${isDrawerOpen ? "open" : ""}`}>
+        <div className="sidebar-header">
+          <h3 className="sidebar-title">{t?.threads || "スレッド"}</h3>
+          <div className="header-buttons">
             <button className="button" style={{ padding: "6px 10px" }} onClick={createThread}>{t?.newChat || "新規"}</button>
+            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>×</button>
           </div>
-          {threads.length === 0 && (
-            <p style={{ color: "#777" }}>{t?.noThreads || "まだスレッドがありません"}</p>
-          )}
-          <ul style={{ listStyle: "none", margin: 0, padding: 0 }}>
-            {threads.map(th => (
-              <li key={th.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: 8, borderRadius: 8, background: String(th.id) === String(currentThreadId) ? "#f6f6f6" : "transparent", cursor: "pointer" }}>
-                <div onClick={() => selectThread(th.id)} style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 600, fontSize: 14, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{th.title}</div>
-                  <div style={{ fontSize: 12, color: "#666" }}>{new Date(th.lastUpdated).toLocaleString()}</div>
-                </div>
-                <button className="button" style={{ padding: "4px 8px" }} onClick={() => {
-                  const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
-                  if (title !== null && title.trim()) renameThread(th.id, title.trim());
-                }}>✏️</button>
-                <button className="button" style={{ padding: "4px 8px" }} onClick={() => removeThread(th.id)}>🗑️</button>
-              </li>
-            ))}
-          </ul>
-        </aside>
-
-        {/* Chat area */}
-        <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
-          <div style={{ flex: 1, overflowY: "auto", padding: 16 }}>
-            {(!currentThreadId || messages.length === 0) && (
-              <div style={{ textAlign: "center", color: "#666", marginTop: 40 }}>
-                <p style={{ fontSize: 18 }}>{t?.askQuestion || "質問を入力してください"}</p>
+        </div>
+        {threads.length === 0 && (
+          <p className="no-threads-message">{t?.noThreads || "まだスレッドがありません"}</p>
+        )}
+        <ul className="threads-list">
+          {threads.map(th => (
+            <li key={th.id} className={`thread-item ${String(th.id) === String(currentThreadId) ? "active" : "inactive"}`}>
+              <div onClick={() => {
+                selectThread(th.id);
+                setIsDrawerOpen(false);
+              }} className="thread-content">
+                <div className="thread-title">{th.title}</div>
+                <div className="thread-time">{new Date(th.lastUpdated).toLocaleString()}</div>
               </div>
-            )}
+              <button className="button thread-button" onClick={() => {
+                const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
+                if (title !== null && title.trim()) renameThread(th.id, title.trim());
+              }}>✏️</button>
+              <button className="button thread-button" onClick={() => removeThread(th.id)}>🗑️</button>
+            </li>
+          ))}
+        </ul>
+      </aside>
 
-            {messages.map((m) => (
-              <div key={m.id} style={{ display: "flex", justifyContent: m.role === "user" ? "flex-end" : "flex-start", marginBottom: 12 }}>
-                <div style={{ maxWidth: 720, width: "fit-content", background: m.role === "user" ? "#dbeafe" : "#f3f4f6", padding: 12, borderRadius: 12, boxShadow: "0 1px 2px rgba(0,0,0,.05)" }}>
-                  <div style={{ fontSize: 13, color: "#6b7280", marginBottom: 6 }}>{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
-                  <div style={{ whiteSpace: "pre-wrap" }}>{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
 
-                  {/* Related (rag_qa) */}
-                  {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
-                    <details style={{ marginTop: 10 }}>
-                      <summary style={{ cursor: "pointer" }}>{t?.similarQuestions || "関連質問"}</summary>
-                      <ul style={{ marginTop: 8 }}>
-                        {m.rag_qa.map((q, idx) => (
-                          <li key={idx} style={{ marginBottom: 6 }}>
-                            <div style={{ fontWeight: 600 }}>{q.question}</div>
-                            <div style={{ fontSize: 14 }}>{q.answer}</div>
-                            {q.retrieved_at && (
-                              <div style={{ fontSize: 12, color: "#6b7280" }}>{new Date(q.retrieved_at).toLocaleString()}</div>
-                            )}
-                          </li>
-                        ))}
-                      </ul>
-                    </details>
+        {/* Main Content Area: Header + Chat */}
+        <div className="main-content">
+          <div className="chat-frame">
+            <header className="header">
+              <div className="header-left">
+                <button className="hamburger-btn" onClick={() => setIsDrawerOpen(true)}>
+                  <span></span>
+                  <span></span>
+                  <span></span>
+                </button>
+                <div className="language-wrapper">
+                  <img src="./globe.png" alt="言語" className="globe-icon" />
+                  <select className="languageSelector" onChange={handleLanguageChange} value={language}>
+                    <option value="ja">日本語</option>
+                    <option value="en">English</option>
+                    <option value="zh">中文</option>
+                    <option value="vi">Tiếng Việt</option>
+                    <option value="ko">한국어</option>
+                  </select>
+                </div>
+              </div>
+              <h1>Shiga Chat</h1>
+              <div className="user-notification-wrapper">
+                <div className={`notification-container ${showPopup ? "show" : ""}`}>
+                  <button className="notification-button" onClick={onNotificationClick}>
+                    <img src="./bell.png" alt="通知" className="notification-icon" />
+                    {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+                  </button>
+                  {showPopup && (
+                    <div className="notification-popup" ref={popupRef}>
+                      <div className="tabs">
+                        <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
+                          {t.personal}
+                        </button>
+                        <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
+                          {t.global}
+                        </button>
+                      </div>
+                      <div className="notifications-list">
+                        {activeTab === "personal" && (
+                          notifications.length > 0 ? (
+                            notifications.map((n) => (
+                              <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
+                                {n.message}
+                                <span className="time">{new Date(n.time).toLocaleString()}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p>{t.noNotifications}</p>
+                          )
+                        )}
+                        {activeTab === "global" && (
+                          globalNotifications.length > 0 ? (
+                            globalNotifications.map((n) => (
+                              <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
+                                {n.message}
+                                <span className="time">{new Date(n.time).toLocaleString()}</span>
+                              </div>
+                            ))
+                          ) : (
+                            <p>{t.noNotifications}</p>
+                          )
+                        )}
+                      </div>
+                    </div>
                   )}
                 </div>
+                <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
               </div>
-            ))}
-          </div>
+            </header>
 
-          {/* Composer */}
-          <div style={{ borderTop: "1px solid #eee", padding: 12 }}>
-            {errorMessage && (
-              <div className="error-message" style={{ marginBottom: 8 }}>{errorMessage}</div>
-            )}
-            <div style={{ display: "flex", gap: 8 }}>
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t.placeholder}
-                className="textArea"
-                style={{ flex: 1, minHeight: 60 }}
-              />
-              <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
-                {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
-              </button>
-            </div>
-            <div style={{ marginTop: 6, fontSize: 12, color: "#6b7280" }}>⌘/Ctrl + Enter で送信</div>
+            {/* Chat area */}
+            <main className="chat-main">
+              <div className="chat-messages">
+                {(!currentThreadId || messages.length === 0) && (
+                  <div className="empty-chat-message">
+                    <p className="empty-chat-title">{t?.askQuestion || "質問を入力してください"}</p>
+                  </div>
+                )}
+
+                {messages.map((m) => (
+                  <div key={m.id} className={`message-container ${m.role}`}>
+                    <div className={`message-bubble ${m.role}`}>
+                      <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
+                      <div className="message-content">{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
+
+                      {/* Related (rag_qa) */}
+                      {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
+                        <details className="rag-details">
+                          <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
+                          <ul className="rag-list">
+                            {m.rag_qa.map((q, idx) => (
+                              <li key={idx} className="rag-item">
+                                <div className="rag-question">{q.question}</div>
+                                <div className="rag-answer">{q.answer}</div>
+                                {q.retrieved_at && (
+                                  <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        </details>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Composer */}
+              <div className="composer-area">
+                {errorMessage && (
+                  <div className="error-message">{errorMessage}</div>
+                )}
+                <div className="composer-input">
+                  <textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={t.placeholder}
+                    className="textArea composer-textarea"
+                  />
+                  <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
+                    {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
+                  </button>
+                </div>
+                <div className="composer-help">⌘/Ctrl + Enter で送信</div>
+              </div>
+            </main>
           </div>
-        </main>
+        </div>
       </div>
-    </div>
   );
 }
 
