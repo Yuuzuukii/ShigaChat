@@ -18,6 +18,11 @@ from models.schemas import SimpleQuestion, QuestionRequest, Question, AnswerRequ
 from api.utils.security import detect_privacy_info
 from api.utils.translator import question_translate, answer_translate
 from api.utils.RAG import rag, generate_answer_with_llm
+from api.utils.RAG import (
+    rag,
+    LanguageDetectionError,
+    UnsupportedLanguageError,
+)
 
 
 router = APIRouter()
@@ -111,9 +116,10 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 )
                 conn.commit()
 
-        # 🔹 RAG結果取得と整形
+        # 🔹 RAG結果取得（言語判定エラーはここで例外→下のexceptへ）
         rag_result = rag(question_text)
 
+        # 🔹 整形
         raw_rag_qa = []
         for rank in rag_result:
             answer, question, retrieved_at, distance = rag_result[rank]
@@ -124,8 +130,6 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 "retrieved_at": retrieved_at,
                 "score": score
             })
-
-        # 🔹 関連度が高い順（スコア降順）に並び替え
         rag_qa = sorted(raw_rag_qa, key=lambda x: x["score"], reverse=True)
 
         # 🔹 過去履歴の取得（最新5件を時系列順に）
@@ -138,7 +142,7 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 LIMIT 5
             """, (thread_id,))
             past_qa_rows = cursor.fetchall()
-        history_qa = list(reversed(past_qa_rows))  # 時系列順に並べ替え
+        history_qa = list(reversed(past_qa_rows))
 
         # 🔹 回答生成
         generated_answer = generate_answer_with_llm(
@@ -166,11 +170,19 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             "rag_qa": rag_qa
         }
 
+    except UnsupportedLanguageError as e:
+        # 許可外 → 400 Bad Request
+        raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_LANGUAGE", "message": str(e)})
+    except LanguageDetectionError as e:
+        # 検出不可 → 400 Bad Request
+        raise HTTPException(status_code=400, detail={"code": "LANG_DETECTION_FAILED", "message": str(e)})
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+    except RuntimeError as e:
+        # ベクトル未生成などの運用エラーは 500
+        raise HTTPException(status_code=500, detail=str(e))
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
-
 """
 @router.post("/get_answer")
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
