@@ -172,17 +172,27 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
 
     except UnsupportedLanguageError as e:
         # 許可外 → 400 Bad Request
-        raise HTTPException(status_code=400, detail={"code": "UNSUPPORTED_LANGUAGE", "message": str(e)})
+        error_detail = f"Unsupported language detected: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=400, detail=error_detail)
     except LanguageDetectionError as e:
         # 検出不可 → 400 Bad Request
-        raise HTTPException(status_code=400, detail={"code": "LANG_DETECTION_FAILED", "message": str(e)})
+        error_detail = f"Language detection failed: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=400, detail=error_detail)
     except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+        error_detail = f"DBエラー: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=500, detail=error_detail)
     except RuntimeError as e:
         # ベクトル未生成などの運用エラーは 500
-        raise HTTPException(status_code=500, detail=str(e))
+        error_detail = str(e)
+        print(f"❌ Runtime error: {error_detail}")  # ログに出力
+        raise HTTPException(status_code=500, detail=error_detail)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
+        error_detail = f"内部エラー: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=500, detail=error_detail)
 """
 @router.post("/get_answer")
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
@@ -351,9 +361,13 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         }
 
     except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
+        error_detail = f"データベースエラー: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=500, detail=error_detail)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
+        error_detail = f"エラーが発生しました: {str(e)}"
+        print(f"❌ {error_detail}")  # ログに出力
+        raise HTTPException(status_code=500, detail=error_detail)
 """
 
 @router.get("/get_translated_answer")

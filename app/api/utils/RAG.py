@@ -58,7 +58,7 @@ def detect_lang(text: str) -> str:
         iso = "ja"
 
     if iso not in ALLOWED_ISO:
-        raise UnsupportedLanguageError(f"未対応の言語が検出されました: {iso}")
+        raise UnsupportedLanguageError(f"maybe question is too short")
 
     return iso
 

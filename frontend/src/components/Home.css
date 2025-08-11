@@ -28,6 +28,11 @@ html, body, #root {
   height: 100%;
   background: rgba(0, 0, 0, 0.5);
   z-index: 998;
+  display: none; /* 初期状態では非表示 */
+}
+
+.drawer-overlay.show {
+  display: block; /* 表示状態のクラス */
 }
 
 /* -----------------------
@@ -46,6 +51,9 @@ html, body, #root {
   z-index: 999;
   transition: left 0.3s ease;
   box-shadow: 2px 0 12px rgba(0, 0, 0, 0.15);
+  /* 確実に表示されるように設定 */
+  display: block !important;
+  visibility: visible !important;
 }
 
 .chat-sidebar.drawer.open {
@@ -68,12 +76,14 @@ html, body, #root {
 .close-drawer-btn {
   background: #f3f4f6;
   border: 1px solid #d1d5db;
-  font-size: 12px;
+  font-size: 18px;
   cursor: pointer;
   padding: 6px 12px;
   border-radius: 6px;
   color: #374151;
   transition: all 0.15s ease;
+  font-weight: bold;
+  line-height: 1;
 }
 
 .close-drawer-btn:hover {
@@ -111,12 +121,17 @@ html, body, #root {
   cursor: pointer;
   margin-bottom: 6px;
   transition: background-color .15s;
-  color: #374151;
+  color: #021532;
+  z-index: 1;
+  position: relative; /* ボタンの位置調整のため */
+  min-height: 50px; /* 最小高さを確保 */
 }
 
 .thread-item.active {
   background: #0056b3;
   color: #ffffff;
+  padding-right: 20px; /* 右側のパディングを大幅に増やしてボタン用のスペースを確保 */
+  padding-left: 16px; /* 左側のパディングも調整 */
 }
 
 .thread-item.inactive:hover {
@@ -126,6 +141,10 @@ html, body, #root {
 .thread-content {
   flex: 1;
   min-width: 0;
+  margin-right: 16px; /* ボタンとの間隔を大幅に増加 */
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .thread-title {
@@ -145,11 +164,18 @@ html, body, #root {
   background: none;
   border: 1px solid transparent;
   cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  font-size: 12px;
   color: #6b7280;
   transition: all 0.15s ease;
+  position: relative; /* 位置調整のため */
+  z-index: 10; /* 他の要素より前面に */
+  min-width: 32px;
+  min-height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .thread-button:hover {
@@ -182,15 +208,74 @@ html, body, #root {
 }
 
 .thread-item.active .thread-delete-btn {
-  background: rgba(220, 38, 38, 0.2) !important;
-  color: #fecaca !important;
-  border-color: rgba(220, 38, 38, 0.4) !important;
+  background: rgba(220, 38, 38, 0.4) !important;
+  color: #ffffff !important;
+  border-color: rgba(220, 38, 38, 0.7) !important;
+  box-shadow: 0 2px 6px rgba(220, 38, 38, 0.4) !important; /* アクティブ時は影を強調 */
 }
 
 .thread-item.active .thread-delete-btn:hover {
   background: rgba(220, 38, 38, 0.3) !important;
   color: #ffffff !important;
   border-color: rgba(220, 38, 38, 0.6) !important;
+}
+
+/* ボタン内のアイコンスタイル */
+.button-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  filter: brightness(0) saturate(100%); /* アイコンを黒色に統一 */
+}
+
+/* 編集ボタンのスタイリング */
+.thread-edit-btn {
+  background: #e0f2fe !important;
+  color: #0277bd !important;
+  border-color: #b3e5fc !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  margin-left: 8px; /* 左側の間隔を大幅に調整 */
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15) !important; /* 影を強調 */
+  border: 2px solid #b3e5fc !important; /* ボーダーを太く */
+  font-weight: bold !important;
+}
+
+.thread-edit-btn:hover {
+  background: #b3e5fc !important;
+  color: #01579b !important;
+  border-color: #81d4fa !important;
+}
+
+.thread-item.active .thread-edit-btn {
+  background: rgba(2, 119, 189, 0.3) !important;
+  color: #ffffff !important;
+  border-color: rgba(2, 119, 189, 0.6) !important;
+  box-shadow: 0 2px 6px rgba(2, 119, 189, 0.4) !important; /* アクティブ時は影を強調 */
+}
+
+.thread-item.active .thread-edit-btn:hover {
+  background: rgba(2, 119, 189, 0.3) !important;
+  color: #ffffff !important;
+  border-color: rgba(2, 119, 189, 0.6) !important;
+}
+
+/* 削除ボタンもflex表示に */
+.thread-delete-btn {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 8px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  margin-left: 8px; /* 左側の間隔を大幅に調整 */
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15) !important; /* 影を強調 */
+  border: 2px solid #fca5a5 !important; /* ボーダーを太く */
+  font-weight: bold !important;
 }
 
 /* -----------------------
@@ -262,19 +347,68 @@ html, body, #root {
 
 /* チャットエリア内のスレッドボタン */
 .chat-hamburger {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
+  position: relative; /* absoluteからrelativeに変更 */
   background: rgba(255, 255, 255, 0.95);
   border: 1px solid #e5e5e5;
   border-radius: 8px;
-  padding: 10px;
+  padding: 14px; /* パディングを10pxから14pxに増加 */
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
+  min-width: 44px; /* 最小幅を設定 */
+  min-height: 44px; /* 最小高さを設定 */
+}
+
+/* チャットエリア内のボタンコンテナ */
+.chat-controls {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 10;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-direction: row; /* 横並びを明示的に指定 */
+  flex-wrap: nowrap; /* 折り返しを防ぐ */
+}
+
+/* 新しいチャット作成ボタン */
+.new-chat-btn {
+  background: #4caf50; /* 緑色に変更 */
+  color: white;
+  border: 1px solid #46a149; /* 緑色のボーダー */
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  white-space: nowrap;
+}
+
+.new-chat-btn:hover {
+  background: #388e3c; /* 緑色のホバー状態 */
+  border-color: #2e7532;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.new-chat-btn:active {
+  background: #047857; /* 緑色のアクティブ状態 */
+  transform: translateY(0);
+}
+
+/* 新規チャットアイコン */
+.new-chat-icon {
+  width: 16px;
+  height: 16px;
+  filter: brightness(0) saturate(100%) invert(100%);
 }
 
 .chat-hamburger:hover {
@@ -284,8 +418,8 @@ html, body, #root {
 }
 
 .threads-icon {
-  width: 20px;
-  height: 20px;
+  width: 24px; /* 20pxから24pxに拡大 */
+  height: 24px; /* 20pxから24pxに拡大 */
   opacity: 0.8;
   transition: opacity 0.2s ease, filter 0.2s ease;
 }
@@ -501,6 +635,22 @@ html, body, #root {
   cursor: pointer;
 }
 
+/* エラーメッセージのスタイル */
+.error-message {
+  background-color: #fee2e2;
+  border: 1px solid #fca5a5;
+  color: #dc2626;
+  padding: 12px;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  word-break: break-word;
+  white-space: pre-wrap;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
 /* -----------------------
    レスポンシブ対応
 ------------------------ */
@@ -515,6 +665,11 @@ html, body, #root {
   .chat-frame {
     max-width: 100%;
   }
+}
+
+/* ドロワーは常に表示可能にする */
+.chat-sidebar.drawer {
+  display: block !important;
 }
 
 /* ドロワー用レスポンシブ対応 */
@@ -534,17 +689,55 @@ html, body, #root {
   
   .chat-sidebar.drawer {
     width: 280px;
+    left: -280px; /* 初期位置を確実に設定 */
+  }
+  
+  .chat-sidebar.drawer.open {
+    left: 0; /* 開いた時の位置を確実に設定 */
   }
   
   .hamburger-btn {
     width: 20px;
     height: 16px;
   }
+  
+  /* モバイル用のドロワーボタン調整 */
+  .chat-hamburger {
+    padding: 12px; /* モバイルでは少し小さく */
+    min-width: 40px;
+    min-height: 40px;
+  }
+  
+  .threads-icon {
+    width: 22px; /* モバイルでは少し小さく */
+    height: 22px;
+  }
+  
+  /* モバイル用のボタン調整 */
+  .chat-controls {
+    gap: 6px;
+    flex-wrap: nowrap; /* モバイルでも折り返しを防ぐ */
+  }
+  
+  .new-chat-btn {
+    padding: 8px 10px;
+    font-size: 11px;
+  }
+  
+  .new-chat-icon {
+    width: 14px;
+    height: 14px;
+  }
 }
 
 @media (max-width: 480px) {
   .chat-sidebar.drawer {
     width: 260px;
+    left: -260px; /* 初期位置を確実に設定 */
+  }
+  
+  .chat-sidebar.drawer.open {
+    left: 0; /* 開いた時の位置を確実に設定 */
   }
   
   .main-content {
@@ -558,5 +751,33 @@ html, body, #root {
   
   .header h1 {
     font-size: 16px;
+  }
+  
+  /* 小さい画面用のボタン調整 */
+  .chat-controls {
+    gap: 4px;
+    flex-wrap: nowrap; /* 小さい画面でも折り返しを防ぐ */
+  }
+  
+  .new-chat-btn {
+    padding: 6px 8px;
+    font-size: 10px;
+  }
+  
+  .new-chat-icon {
+    width: 12px;
+    height: 12px;
+  }
+  
+  /* 小さい画面用のドロワーボタン調整 */
+  .chat-hamburger {
+    padding: 10px;
+    min-width: 36px;
+    min-height: 36px;
+  }
+  
+  .threads-icon {
+    width: 20px;
+    height: 20px;
   }
 }
