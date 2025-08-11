@@ -177,20 +177,94 @@ def rag(question: str) -> Dict[int, List[Union[str, float]]]:
     return results
 
 # LLMによる回答生成
-def generate_answer_with_llm(question_text: str, rag_qa: list, history_qa: list) -> str:
+def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt = "あなたは滋賀県に住む外国人に情報を提供する専門家です。\n"
     prompt += "以下は参考情報です:\n\n"
-
     prompt += "【RAGから抽出されたQA】\n"
     for i, qa in enumerate(rag_qa, 1):
         prompt += f"Q{i}: {qa['question']}\nA{i}: {qa['answer']}\n"
-
     prompt += "\n【これまでの会話履歴】\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"User{i}: {q}\nBot{i}: {a}\n"
-
     prompt += f"\n【現在の質問】\n{question_text}\n"
-    prompt += "\nこの質問に対して、参考情報と会話履歴を踏まえて適切に回答してください。"
+    prompt += "\n上記の参考情報と会話履歴を踏まえて、簡潔かつ正確に回答してください。"
+    return prompt
+
+def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = "You are a local information specialist for foreigners living in Shiga Prefecture.\n"
+    prompt += "Use the following as reference information:\n\n"
+    prompt += "[RAG Retrieved Q&A]\n"
+    for i, qa in enumerate(rag_qa, 1):
+        prompt += f"Q{i}: {qa['question']}\nA{i}: {qa['answer']}\n"
+    prompt += "\n[Conversation History]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"User{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Current Question]\n{question_text}\n"
+    prompt += "\nPlease answer concisely and accurately in English, using the references and history."
+    return prompt
+
+def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = "Bạn là chuyên gia cung cấp thông tin địa phương cho người nước ngoài sống tại tỉnh Shiga.\n"
+    prompt += "Hãy sử dụng các thông tin tham khảo sau:\n\n"
+    prompt += "[Q&A được truy xuất từ RAG]\n"
+    for i, qa in enumerate(rag_qa, 1):
+        prompt += f"H{i}: {qa['question']}\nĐ{i}: {qa['answer']}\n"
+    prompt += "\n[Lịch sử hội thoại]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"Người dùng{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Câu hỏi hiện tại]\n{question_text}\n"
+    prompt += "\nVui lòng trả lời ngắn gọn và chính xác bằng tiếng Việt, dựa trên thông tin tham khảo và lịch sử."
+    return prompt
+
+def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = "你是一位为居住在滋贺县的外国人提供信息的本地专家。\n"
+    prompt += "请参考以下信息：\n\n"
+    prompt += "【RAG 检索到的问答】\n"
+    for i, qa in enumerate(rag_qa, 1):
+        prompt += f"问{i}: {qa['question']}\n答{i}: {qa['answer']}\n"
+    prompt += "\n【对话历史】\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"用户{i}: {q}\n机器人{i}: {a}\n"
+    prompt += f"\n【当前问题】\n{question_text}\n"
+    prompt += "\n请基于以上参考信息和对话历史，用简体中文简洁且准确地作答。"
+    return prompt
+
+def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = "당신은 시가현에 거주하는 외국인을 위해 정보를 제공하는 지역 전문가입니다.\n"
+    prompt += "다음 정보를 참고하세요:\n\n"
+    prompt += "[RAG로 검색된 Q&A]\n"
+    for i, qa in enumerate(rag_qa, 1):
+        prompt += f"문{i}: {qa['question']}\n답{i}: {qa['answer']}\n"
+    prompt += "\n[대화 기록]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"사용자{i}: {q}\n봇{i}: {a}\n"
+    prompt += f"\n[현재 질문]\n{question_text}\n"
+    prompt += "\n위의 참고 정보와 대화 기록을 바탕으로, 한국어로 간결하고 정확하게 답변하세요."
+    return prompt
+
+# 検出言語ごとのビルダーマップ
+_PROMPT_BUILDERS = {
+    "ja": _build_prompt_ja,
+    "en": _build_prompt_en,
+    "vi": _build_prompt_vi,
+    "zh": _build_prompt_zh,
+    "ko": _build_prompt_ko,
+}
+
+def generate_answer_with_llm(question_text: str, rag_qa: list, history_qa: list) -> str:
+    """
+    検出言語に合わせてプロンプトを切り替え、LLMへ投げる。
+    ※ rag() 側でも言語検出・検証は済んでいるが、ここでも再判定して出力言語を確実化する。
+    """
+    # 言語判定（未対応/検出不可は上位へ例外伝播）
+    lang = detect_lang(question_text)  # 'ja'|'en'|'vi'|'zh'|'ko'
+
+    # ビルダー取得（理論上必ず存在するはずだが保険）
+    builder = _PROMPT_BUILDERS.get(lang)
+    if builder is None:
+        raise UnsupportedLanguageError(f"未対応の言語が検出されました: {lang}")
+
+    prompt = builder(question_text, rag_qa, history_qa)
 
     llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.3)
     response = llm.invoke([HumanMessage(content=prompt)])
