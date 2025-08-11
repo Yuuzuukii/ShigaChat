@@ -114,7 +114,7 @@ const Shinki = () => {
             </select>
           </div>
 
-          <button className="submit">{t.register}</button>
+          <button className="submit">{t.signUp}</button>
         </form>
 
         {success && <p style={{ color: 'green' }}>{success}</p>}

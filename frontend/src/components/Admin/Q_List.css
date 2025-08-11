@@ -252,16 +252,19 @@
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
 }
 
+.admin-question-meta {
+  font-size: 14px;
+  color: #777;
+}
+
+.admin-question-date {
+  text-align: right;
+}
+
 .admin-question-text {
   font-size: 18px;
   font-weight: bold;
   color: #333;
-}
-
-.admin-question-date {
-  font-size: 14px;
-  color: #777;
-  text-align: right;
 }
 
 .admin-answer-section {

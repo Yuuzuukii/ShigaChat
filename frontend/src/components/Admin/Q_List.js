@@ -70,17 +70,11 @@ const Q_List = () => {
         } else {
             //console.log("⚠️ user.id または token が未定義のため fetchNotifications をスキップ");
         }
-    }, [user, token]);
-
-    useEffect(() => {
-        if (user) {
-            fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-        }
-    }, [language]);
+    }, [user, token, language]);
 
     useEffect(() => {
         //console.log("UserContext 更新後のユーザー情報:", user);
-        if (user === null) {
+        if (user === null && navigate) {
             navigate("/new");
         }
         const handleTokenUpdate = () => {
@@ -159,7 +153,9 @@ const Q_List = () => {
     const fetchQuestions = async (categoryId, user, token, t, setLanguage, setCategoryName, setQuestions, navigate) => {
         if (!token || !user) {
             console.error("ユーザー情報またはトークンがありません。");
-            navigate("/new");
+            if (navigate) {
+                navigate("/new");
+            }
             return;
         }
 
@@ -188,7 +184,9 @@ const Q_List = () => {
 
             if (response.status === 401) {
                 console.warn("トークンが期限切れです。ログインページへ移動します。");
-                navigate("/new");
+                if (navigate) {
+                    navigate("/new");
+                }
                 return;
             }
 
@@ -299,13 +297,16 @@ const Q_List = () => {
 
             //console.log("削除成功:", response.data);
 
-            // UIの更新: 削除した質問をリストから削除
-            setPostedHistory((prevHistory) =>
-                prevHistory.filter((item) => item.question_id !== questionId)
+            // 成功メッセージを表示
+            window.alert(t.deleteSuccess || "質問が削除されました");
+
+            // 即座にUIを更新: 削除した質問をリストから削除
+            setQuestions((prevQuestions) =>
+                prevQuestions.filter((question) => question.question_id !== questionId)
             );
 
-            // 🔥 最新の質問リストを取得
-            await fetchQuestions();
+            // バックグラウンドで最新データを取得（オプション）
+            // await fetchQuestions();
 
         } catch (error) {
             console.error("質問削除に失敗:", error);
@@ -355,8 +356,17 @@ const Q_List = () => {
                 throw new Error("カテゴリ変更に失敗しました");
             }
 
-            window.alert(t.categorychanged);
-            fetchQuestions(); // 更新処理
+            // 成功メッセージを表示
+            const successMessage = `${t.categorychanged}: ${categoryName}`;
+            window.alert(successMessage);
+            
+            // 即座にUIを更新 - カテゴリ変更された質問をリストから削除
+            setQuestions((prevQuestions) =>
+                prevQuestions.filter((question) => question.question_id !== selectedQuestionId)
+            );
+            
+            // バックグラウンドで最新データを取得
+            fetchQuestions();
             closeCategoryModal(); // モーダルを閉じる
         } catch (error) {
             console.error("カテゴリ変更エラー:", error);
@@ -394,8 +404,15 @@ const Q_List = () => {
         setVisibleAnswerId((prevId) => (prevId === questionId ? null : questionId));
     };
 
+    // userIdの定義
     const userData = localStorage.getItem("user");
     const userId = userData ? JSON.parse(userData).id : null;
+
+    // navigateが正しく初期化されているかチェック
+    if (!navigate) {
+        console.error("navigate is not initialized");
+        return <div>Loading...</div>;
+    }
 
     if (questions === null) {
         return <div>Loading...</div>;
@@ -493,29 +510,26 @@ const Q_List = () => {
                             key={question.question_id}
                             style={{ cursor: "pointer" }}
                         >
-                            <div
-                                className="admin-question-header"
-                                onClick={() => toggleAnswer(question.question_id)}
-                            >
-                                <div className="admin-question-text">
-                                    {question.質問}
-                                </div>
-
-
-                                <div className="admin-question-date" style={{ textAlign: "right" }}>
-                                    {t.questionDate}
-                                    {new Date(question.time).toLocaleString()}
+                            <div className="admin-question-header" onClick={() => toggleAnswer(question.question_id)}>
+                                <div className="admin-question-headline">
+                                    <div className="admin-question-text">{question.質問}</div>
+                                    <div className="admin-question-meta">
+                                        <div className="admin-question-user">{t.editor}: {question.user_name || "—"}</div>
+                                        <div className="admin-question-date">
+                                            {t.questionDate}{new Date(question.time).toLocaleString()}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <button
                                     className="change-category-button"
-                                    onClick={() => openCategoryModal(question.question_id, question.category_id)}
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // ヘッダークリック（開閉）とバッティングしないように
+                                        openCategoryModal(question.question_id, question.category_id);
+                                    }}
                                 >
                                     {t.changecategory}
                                 </button>
-
-
-
                             </div>
 
 
@@ -588,7 +602,7 @@ const Q_List = () => {
                     </div>
                 )}
             </div>
-            <button onClick={() => navigate(-1)} className="admin-back-button">
+            <button onClick={() => navigate && navigate("/admin/QuestionAdmin")} className="admin-back-button">
                 {t.backButton}
             </button>
         </div>

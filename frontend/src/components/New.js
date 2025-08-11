@@ -131,7 +131,7 @@ function New() {
             className="btn btn-register"
             onClick={() => navigate("/shinki")}
           >
-            {t.register}
+            {t.signUp}
           </button>
         </div>
       </div>

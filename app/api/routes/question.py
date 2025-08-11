@@ -496,3 +496,126 @@ def get_qa_list(
         } for row in rows]
 
     return {"qa_list": qa_list}
+
+@router.get("/get_user_threads")
+def get_user_threads(current_user: dict = Depends(current_user_info)):
+    """
+    ユーザーのスレッド一覧を最新順で取得
+    """
+    user_id = current_user["id"]
+    
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT id, last_updated FROM threads
+                WHERE user_id = ?
+                ORDER BY last_updated DESC
+            """, (user_id,))
+            threads_data = cursor.fetchall()
+            
+            threads = []
+            for thread_id, last_updated in threads_data:
+                # 各スレッドの最初の質問を取得してタイトルにする
+                cursor.execute("""
+                    SELECT question FROM thread_qa
+                    WHERE thread_id = ?
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                """, (thread_id,))
+                first_question = cursor.fetchone()
+                
+                title = first_question[0][:50] + "..." if first_question and len(first_question[0]) > 50 else (first_question[0] if first_question else "無題のスレッド")
+                
+                threads.append({
+                    "thread_id": thread_id,
+                    "title": title,
+                    "last_updated": last_updated
+                })
+            
+            return {"threads": threads}
+            
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
+
+@router.get("/get_thread_messages/{thread_id}")
+def get_thread_messages(thread_id: str, current_user: dict = Depends(current_user_info)):
+    """
+    指定されたスレッドのメッセージ履歴を取得
+    """
+    user_id = current_user["id"]
+    
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            
+            # スレッドの所有者確認
+            cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
+            thread_data = cursor.fetchone()
+            
+            if not thread_data:
+                raise HTTPException(status_code=404, detail="スレッドが見つかりません")
+            
+            if thread_data[0] != user_id:
+                raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
+            
+            # メッセージ履歴を取得
+            cursor.execute("""
+                SELECT question, answer, created_at FROM thread_qa
+                WHERE thread_id = ?
+                ORDER BY created_at ASC
+            """, (thread_id,))
+            messages_data = cursor.fetchall()
+            
+            messages = []
+            for question, answer, created_at in messages_data:
+                messages.append({
+                    "question": question,
+                    "answer": answer,
+                    "created_at": created_at
+                })
+            
+            return {"messages": messages}
+            
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
+
+@router.delete("/delete_thread/{thread_id}")
+def delete_thread(thread_id: str, current_user: dict = Depends(current_user_info)):
+    """
+    指定されたスレッドとその関連メッセージを削除
+    """
+    user_id = current_user["id"]
+    
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            
+            # スレッドの所有者確認
+            cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
+            thread_data = cursor.fetchone()
+            
+            if not thread_data:
+                raise HTTPException(status_code=404, detail="スレッドが見つかりません")
+            
+            if thread_data[0] != user_id:
+                raise HTTPException(status_code=403, detail="このスレッドを削除する権限がありません")
+            
+            # 関連するメッセージを削除
+            cursor.execute("DELETE FROM thread_qa WHERE thread_id = ?", (thread_id,))
+            
+            # スレッドを削除
+            cursor.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
+            
+            conn.commit()
+            
+            return {"message": "スレッドが正常に削除されました", "thread_id": thread_id}
+            
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")

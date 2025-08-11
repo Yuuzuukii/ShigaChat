@@ -51,12 +51,14 @@ export default function Home() {
   const popupRef = useRef(null);
 
   // Threaded chat
-  const [threads, setThreads] = useState(loadThreads());
-  const [currentThreadId, setCurrentThreadId] = useState(localStorage.getItem(LS_CUR_THREAD_KEY) || null);
-  const [messages, setMessages] = useState(() => currentThreadId ? loadMsgs(currentThreadId) : []);
+  const [threads, setThreads] = useState([]);
+  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -74,6 +76,55 @@ export default function Home() {
       if (code) setLanguage(code); else setLanguage("ja");
     }
   }, [user]);
+
+  // Server-side thread loading on mount
+  useEffect(() => {
+    const loadThreadsFromServer = async () => {
+      if (!token || !userId) return;
+      
+      try {
+        setThreadsLoading(true);
+        const response = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          setThreads(data.threads || []);
+          
+          // Auto-load the most recent thread if available
+          if (data.threads && data.threads.length > 0) {
+            const mostRecentThread = data.threads[0];
+            console.log('Auto-loading most recent thread:', mostRecentThread);
+            setCurrentThreadId(mostRecentThread.thread_id);
+            // loadThreadMessages will be called by useEffect when currentThreadId changes
+          }
+        } else {
+          console.error('Failed to load threads from server');
+          // Fallback to localStorage
+          setThreads(loadThreads());
+          const localThreadId = localStorage.getItem(LS_CUR_THREAD_KEY);
+          if (localThreadId) {
+            setCurrentThreadId(localThreadId);
+            setMessages(loadMsgs(localThreadId));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading threads:', error);
+        // Fallback to localStorage
+        setThreads(loadThreads());
+        const localThreadId = localStorage.getItem(LS_CUR_THREAD_KEY);
+        if (localThreadId) {
+          setCurrentThreadId(localThreadId);
+          setMessages(loadMsgs(localThreadId));
+        }
+      } finally {
+        setThreadsLoading(false);
+      }
+    };
+    
+    loadThreadsFromServer();
+  }, [token, userId]);
 
   // Notifications loading
   useEffect(() => {
@@ -109,18 +160,81 @@ export default function Home() {
     return () => document.removeEventListener("click", handleClickOutside);
   }, [showPopup]);
 
-  // Persist messages for active thread
-  useEffect(() => {
-    if (currentThreadId) saveMsgs(currentThreadId, messages);
-  }, [messages, currentThreadId]);
+  // Load messages from server when switching thread
+  const loadThreadMessages = async (threadId) => {
+    if (!token || !threadId) {
+      setMessages([]);
+      return;
+    }
+    
+    // Clear messages first to show loading state
+    setMessages([]);
+    setMessagesLoading(true);
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/question/get_thread_messages/${threadId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Loaded messages for thread:', threadId, data.messages);
+        
+        // Convert server format to client format
+        const clientMessages = [];
+        if (data.messages && data.messages.length > 0) {
+          data.messages.forEach((msg) => {
+            clientMessages.push({
+              id: crypto.randomUUID(),
+              role: "user",
+              content: msg.question,
+              time: msg.created_at
+            });
+            clientMessages.push({
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: msg.answer,
+              time: msg.created_at
+            });
+          });
+        }
+        
+        setMessages(clientMessages);
+        // Still backup to localStorage for offline access
+        saveMsgs(threadId, clientMessages);
+      } else {
+        console.warn('Failed to load from server, using localStorage');
+        // Fallback to localStorage
+        const localMessages = loadMsgs(threadId);
+        setMessages(localMessages);
+      }
+    } catch (error) {
+      console.error('Error loading thread messages:', error);
+      // Fallback to localStorage
+      const localMessages = loadMsgs(threadId);
+      setMessages(localMessages);
+    } finally {
+      setMessagesLoading(false);
+    }
+  };
 
   // Load messages when switching thread
   useEffect(() => {
-    if (!currentThreadId) return;
-    const m = loadMsgs(currentThreadId);
-    setMessages(m);
-    localStorage.setItem(LS_CUR_THREAD_KEY, currentThreadId);
-  }, [currentThreadId]);
+    if (currentThreadId) {
+      console.log('Switching to thread:', currentThreadId);
+      loadThreadMessages(currentThreadId);
+      localStorage.setItem(LS_CUR_THREAD_KEY, currentThreadId);
+    } else {
+      // Clear messages when no thread is selected
+      setMessages([]);
+      localStorage.removeItem(LS_CUR_THREAD_KEY);
+    }
+  }, [currentThreadId, token]);
+
+  // Still persist messages for backup
+  useEffect(() => {
+    if (currentThreadId) saveMsgs(currentThreadId, messages);
+  }, [messages, currentThreadId]);
 
   // Notification handlers
   const onNotificationClick = () => {
@@ -164,7 +278,11 @@ export default function Home() {
     localStorage.setItem(LS_CUR_THREAD_KEY, id);
   };
 
-  const selectThread = (id) => setCurrentThreadId(String(id));
+  const selectThread = (id) => {
+    const threadId = String(id);
+    console.log('Selecting thread:', threadId);
+    setCurrentThreadId(threadId);
+  };
 
   const renameThread = (id, title) => {
     const updated = threads.map(th => th.id === id ? { ...th, title } : th);
@@ -172,19 +290,70 @@ export default function Home() {
     saveThreads(updated);
   };
 
-  const removeThread = (id) => {
-    const idx = threads.findIndex(t => t.id === id);
-    const updated = threads.filter(t => t.id !== id);
-    setThreads(updated);
-    saveThreads(updated);
-    localStorage.removeItem(LS_MSGS_PREFIX + id);
-    if (String(id) === String(currentThreadId)) {
-      const next = updated[Math.max(0, idx - 1)];
-      if (next) setCurrentThreadId(String(next.id));
-      else {
-        setCurrentThreadId(null);
-        localStorage.removeItem(LS_CUR_THREAD_KEY);
-        setMessages([]);
+  const removeThread = async (id) => {
+    const threadId = String(id);
+    
+    if (!window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？")) {
+      return;
+    }
+    
+    if (!token) {
+      setErrorMessage(t?.errorLogin || "ログインが必要です");
+      return;
+    }
+    
+    try {
+      const response = await fetch(`${API_BASE_URL}/question/delete_thread/${threadId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      if (response.ok) {
+        // サーバーから正常に削除された場合、ローカル状態を更新
+        const idx = threads.findIndex(t => String(t.thread_id || t.id) === threadId);
+        const updated = threads.filter(t => String(t.thread_id || t.id) !== threadId);
+        setThreads(updated);
+        saveThreads(updated);
+        localStorage.removeItem(LS_MSGS_PREFIX + threadId);
+        
+        // 削除されたスレッドが現在選択中の場合、別のスレッドに切り替え
+        if (threadId === String(currentThreadId)) {
+          if (updated.length > 0) {
+            // 残っているスレッドの中から最新のものを選択
+            const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
+            setCurrentThreadId(String(nextThread.thread_id || nextThread.id));
+          } else {
+            // スレッドがなくなった場合
+            setCurrentThreadId(null);
+            setMessages([]);
+            localStorage.removeItem(LS_CUR_THREAD_KEY);
+          }
+        }
+        
+        console.log('Thread deleted successfully:', threadId);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.detail || "スレッドの削除に失敗しました");
+      }
+    } catch (error) {
+      console.error('Error deleting thread:', error);
+      setErrorMessage(error.message);
+      // エラー時はローカルのみ削除（フォールバック）
+      const idx = threads.findIndex(t => String(t.thread_id || t.id) === threadId);
+      const updated = threads.filter(t => String(t.thread_id || t.id) !== threadId);
+      setThreads(updated);
+      saveThreads(updated);
+      localStorage.removeItem(LS_MSGS_PREFIX + threadId);
+      
+      if (threadId === String(currentThreadId)) {
+        if (updated.length > 0) {
+          const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
+          setCurrentThreadId(String(nextThread.thread_id || nextThread.id));
+        } else {
+          setCurrentThreadId(null);
+          setMessages([]);
+          localStorage.removeItem(LS_CUR_THREAD_KEY);
+        }
       }
     }
   };
@@ -284,24 +453,31 @@ export default function Home() {
             <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>閉じる</button>
           </div>
         </div>
-        {threads.length === 0 && (
+        {threadsLoading && (
+          <p className="no-threads-message">スレッドを読み込み中...</p>
+        )}
+        {!threadsLoading && threads.length === 0 && (
           <p className="no-threads-message">{t?.noThreads || "まだスレッドがありません"}</p>
         )}
         <ul className="threads-list">
           {threads.map(th => (
-            <li key={th.id} className={`thread-item ${String(th.id) === String(currentThreadId) ? "active" : "inactive"}`}>
+            <li key={th.thread_id || th.id} className={`thread-item ${String(th.thread_id || th.id) === String(currentThreadId) ? "active" : "inactive"}`}>
               <div onClick={() => {
-                selectThread(th.id);
+                selectThread(th.thread_id || th.id);
                 setIsDrawerOpen(false);
               }} className="thread-content">
                 <div className="thread-title">{th.title}</div>
-                <div className="thread-time">{new Date(th.lastUpdated).toLocaleString()}</div>
+                <div className="thread-time">{new Date(th.last_updated || th.lastUpdated).toLocaleString()}</div>
               </div>
-              <button className="button thread-button" onClick={() => {
+              <button className="button thread-button" onClick={(e) => {
+                e.stopPropagation();
                 const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
-                if (title !== null && title.trim()) renameThread(th.id, title.trim());
+                if (title !== null && title.trim()) renameThread(th.thread_id || th.id, title.trim());
               }}>編集</button>
-              <button className="button thread-button" onClick={() => removeThread(th.id)}>削除</button>
+              <button className="button thread-button thread-delete-btn" onClick={(e) => {
+                e.stopPropagation();
+                removeThread(th.thread_id || th.id);
+              }}>削除</button>
             </li>
           ))}
         </ul>
@@ -380,13 +556,18 @@ export default function Home() {
                 <img src="./threads.png" alt="スレッド一覧" className="threads-icon" />
               </button>
               <div className="chat-messages">
-                {(!currentThreadId || messages.length === 0) && (
+                {messagesLoading && currentThreadId && (
+                  <div className="empty-chat-message">
+                    <p className="empty-chat-title">メッセージを読み込み中...</p>
+                  </div>
+                )}
+                {!messagesLoading && (!currentThreadId || messages.length === 0) && (
                   <div className="empty-chat-message">
                     <p className="empty-chat-title">{t?.askQuestion || "質問を入力してください"}</p>
                   </div>
                 )}
 
-                {messages.map((m) => (
+                {!messagesLoading && messages.length > 0 && messages.map((m) => (
                   <div key={m.id} className={`message-container ${m.role}`}>
                     <div className={`message-bubble ${m.role}`}>
                       <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>

@@ -55,6 +55,11 @@ export const translations = {
     global: "全体",
     noNotifications: "通知はありません。",
     questionmanagement: "質問管理",
+    newChat: "新しいチャット",
+    threads: "スレッド",
+    noThreads: "まだスレッドがありません",
+    renameThread: "スレッド名を変更",
+    confirmDeleteThread: "スレッドを削除しますか？",
     register: "Q&Aを登録しました",
     qtext: "質問：",
     unpublic: "非公開",
@@ -93,6 +98,7 @@ export const translations = {
     successRegistration: "登録が完了しました！",
     errorRegistration: "登録に失敗しました",
     selectLanguage: "言語を選択",
+    editor: "編集者",
   },
   en: {
     welcome: "Welcome!",
@@ -146,6 +152,11 @@ export const translations = {
     personal: "Personal",
     global: "General",
     noNotifications: "No notifications.",
+    newChat: "New Chat",
+    threads: "Threads",
+    noThreads: "No threads yet",
+    renameThread: "Rename Thread",
+    confirmDeleteThread: "Delete this thread?",
     questionmanagement: "Question Management",
     register: "Q&A has been registered",
     qtext: "Question: ",
@@ -185,6 +196,7 @@ export const translations = {
     successRegistration: "Registration successful!",
     errorRegistration: "Registration failed",
     selectLanguage: "Select Language",
+    editor: "editor",
   },  
   zh: {
     welcome: "欢迎！",
@@ -277,6 +289,7 @@ export const translations = {
     successRegistration: "注册成功！",
     errorRegistration: "注册失败",
     selectLanguage: "选择语言",
+    editor: "编辑",
   },
   vi: {
     welcome: "Chào mừng!",
@@ -369,6 +382,7 @@ export const translations = {
     successRegistration: "Đăng ký thành công!",
     errorRegistration: "Đăng ký thất bại",
     selectLanguage: "Chọn ngôn ngữ",
+    editor: "biên tập viên",
   },
   ko: {
     welcome: "환영합니다!",
@@ -461,6 +475,7 @@ export const translations = {
     successRegistration: "회원가입 성공!",
     errorRegistration: "회원가입 실패",
     selectLanguage: "언어 선택",
+    editor: "편집자",
   },
 };
 
