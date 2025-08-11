@@ -281,7 +281,7 @@ export default function Home() {
           <h3 className="sidebar-title">{t?.threads || "スレッド"}</h3>
           <div className="header-buttons">
             <button className="button" style={{ padding: "6px 10px" }} onClick={createThread}>{t?.newChat || "新規"}</button>
-            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>×</button>
+            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>閉じる</button>
           </div>
         </div>
         {threads.length === 0 && (
@@ -300,8 +300,8 @@ export default function Home() {
               <button className="button thread-button" onClick={() => {
                 const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
                 if (title !== null && title.trim()) renameThread(th.id, title.trim());
-              }}>✏️</button>
-              <button className="button thread-button" onClick={() => removeThread(th.id)}>🗑️</button>
+              }}>編集</button>
+              <button className="button thread-button" onClick={() => removeThread(th.id)}>削除</button>
             </li>
           ))}
         </ul>
@@ -313,11 +313,6 @@ export default function Home() {
           <div className="chat-frame">
             <header className="header">
               <div className="header-left">
-                <button className="hamburger-btn" onClick={() => setIsDrawerOpen(true)}>
-                  <span></span>
-                  <span></span>
-                  <span></span>
-                </button>
                 <div className="language-wrapper">
                   <img src="./globe.png" alt="言語" className="globe-icon" />
                   <select className="languageSelector" onChange={handleLanguageChange} value={language}>
@@ -381,6 +376,9 @@ export default function Home() {
 
             {/* Chat area */}
             <main className="chat-main">
+              <button className="hamburger-btn chat-hamburger" onClick={() => setIsDrawerOpen(true)}>
+                <img src="./threads.png" alt="スレッド一覧" className="threads-icon" />
+              </button>
               <div className="chat-messages">
                 {(!currentThreadId || messages.length === 0) && (
                   <div className="empty-chat-message">
