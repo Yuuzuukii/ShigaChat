@@ -493,30 +493,29 @@ const Q_List = () => {
                             key={question.question_id}
                             style={{ cursor: "pointer" }}
                         >
-                            <div
-                                className="admin-question-header"
-                                onClick={() => toggleAnswer(question.question_id)}
-                            >
-                                <div className="admin-question-text">
-                                    {question.質問}
-                                </div>
+<div className="admin-question-header" onClick={() => toggleAnswer(question.question_id)}>
+  <div className="admin-question-headline">
+    <div className="admin-question-text">{question.質問}</div>
+    <div className="admin-question-meta">
+      <span className="admin-question-user">👤 {question.user_name || "—"}</span>
+      <span className="admin-question-sep">•</span>
+      <span className="admin-question-date">
+        {t.questionDate}{new Date(question.time).toLocaleString()}
+      </span>
+    </div>
+  </div>
 
+  <button
+    className="change-category-button"
+    onClick={(e) => {
+      e.stopPropagation(); // ヘッダークリック（開閉）とバッティングしないように
+      openCategoryModal(question.question_id, question.category_id);
+    }}
+  >
+    {t.changecategory}
+  </button>
+</div>
 
-                                <div className="admin-question-date" style={{ textAlign: "right" }}>
-                                    {t.questionDate}
-                                    {new Date(question.time).toLocaleString()}
-                                </div>
-
-                                <button
-                                    className="change-category-button"
-                                    onClick={() => openCategoryModal(question.question_id, question.category_id)}
-                                >
-                                    {t.changecategory}
-                                </button>
-
-
-
-                            </div>
 
 
                             {/* ✅ 削除ボタン */}
