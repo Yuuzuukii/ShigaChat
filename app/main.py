@@ -3,7 +3,19 @@ from fastapi.middleware.cors import CORSMiddleware
 import logging
 from api.routes import user, question, category, keyword, notification, history, admin
 
-logging.basicConfig(level=logging.DEBUG)
+# ログ設定を改善
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(),
+        logging.FileHandler('app.log')
+    ]
+)
+
+# FastAPIのログレベルも調整
+uvicorn_logger = logging.getLogger("uvicorn")
+uvicorn_logger.setLevel(logging.INFO)
 
 app= FastAPI()
 

@@ -212,7 +212,7 @@ const Q_List = () => {
         }
     };
 
-    const handleSaveEdit = async (answerId) => {
+    const handleSaveEdit = async (answerId, questionId) => {
         if (!answerId || isNaN(Number(answerId))) {
             console.error("無効な answerId:", answerId);
             window.alert("回答のIDが無効です。");
@@ -252,18 +252,39 @@ const Q_List = () => {
 
             const result = await response.json();
             //console.log("Updated by user ID:", result.editor_id);
+            
+            // 即座にUIを更新 - 編集された回答をローカル状態で更新
+            setQuestions(prevQuestions => 
+                prevQuestions.map(question => {
+                    // answerIdでマッチするか、questionIdでマッチするかをチェック
+                    const isTargetQuestion = 
+                        question.answer_id === Number(answerId) || 
+                        (questionId && question.question_id === Number(questionId));
+                    
+                    if (isTargetQuestion) {
+                        return {
+                            ...question,
+                            回答: editText.trim() // 編集されたテキストで回答を更新
+                        };
+                    }
+                    return question;
+                })
+            );
+            
             setEditingAnswerId(null);
+            setEditText(""); // 編集テキストもクリア
             window.alert(t.answerupdated);
-
+            
+            // バックグラウンドで最新データを取得（オプション）
             if (typeof fetchQuestions === "function") {
-                await fetchQuestions();  // 最新の質問リストを取得
-            } else {
-                console.warn("fetchQuestions が未定義のため、リストを更新できません。");
+                fetchQuestions().catch(console.error); // エラーが発生してもUIの更新は既に完了している
             }
 
         } catch (error) {
             console.error("Error updating answer:", error);
             window.alert(`${t.failtoupdate}: ${error.message}`);
+            // エラー時は編集状態を維持してユーザーが再試行できるようにする
+            // setEditingAnswerId(null); // コメントアウト - エラー時は編集状態を維持
         } finally {
             setIsSaving(false); // 🔥 保存完了後に元に戻す
         }
@@ -271,13 +292,17 @@ const Q_List = () => {
 
     const handleEditClick = (questionId, answerId, answerText) => {
         if (editingAnswerId === questionId) {
+            // 編集キャンセル
             if (window.confirm("編集をキャンセルしますか？")) {
                 setEditingAnswerId(null);
                 setEditText("");
+                setIsSaving(false); // 保存状態もリセット
             }
         } else {
+            // 編集開始
             setEditingAnswerId(questionId);
             setEditText(answerText || "");  // 回答が空の場合、空文字をセット
+            setIsSaving(false); // 念のため保存状態をリセット
             //console.log("編集対象の質問ID:", questionId, "回答ID:", answerId);
         }
     };
@@ -557,7 +582,7 @@ const Q_List = () => {
                                     {/* 編集モードの時は保存・キャンセルボタンを表示 */}
                                     {editingAnswerId === question.question_id ? (
                                         <div className="admin-edit-actions">
-                                            <button onClick={() => handleSaveEdit(question.answer_id)} disabled={isSaving}>
+                                            <button onClick={() => handleSaveEdit(question.answer_id, question.question_id)} disabled={isSaving}>
                                                 {isSaving ? "保存中..." : t.save} {/* 🔥 ここでボタンの表示を変更 */}
                                             </button>
                                             <button onClick={() => handleEditClick(question.question_id)} disabled={isSaving}>

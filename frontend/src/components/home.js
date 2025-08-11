@@ -59,7 +59,7 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
-  
+
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -81,17 +81,17 @@ export default function Home() {
   useEffect(() => {
     const loadThreadsFromServer = async () => {
       if (!token || !userId) return;
-      
+
       try {
         setThreadsLoading(true);
         const response = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-        
+
         if (response.ok) {
           const data = await response.json();
           setThreads(data.threads || []);
-          
+
           // Auto-load the most recent thread if available
           if (data.threads && data.threads.length > 0) {
             const mostRecentThread = data.threads[0];
@@ -122,7 +122,7 @@ export default function Home() {
         setThreadsLoading(false);
       }
     };
-    
+
     loadThreadsFromServer();
   }, [token, userId]);
 
@@ -166,20 +166,20 @@ export default function Home() {
       setMessages([]);
       return;
     }
-    
+
     // Clear messages first to show loading state
     setMessages([]);
     setMessagesLoading(true);
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/question/get_thread_messages/${threadId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         console.log('Loaded messages for thread:', threadId, data.messages);
-        
+
         // Convert server format to client format
         const clientMessages = [];
         if (data.messages && data.messages.length > 0) {
@@ -198,7 +198,7 @@ export default function Home() {
             });
           });
         }
-        
+
         setMessages(clientMessages);
         // Still backup to localStorage for offline access
         saveMsgs(threadId, clientMessages);
@@ -292,22 +292,22 @@ export default function Home() {
 
   const removeThread = async (id) => {
     const threadId = String(id);
-    
+
     if (!window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？")) {
       return;
     }
-    
+
     if (!token) {
       setErrorMessage(t?.errorLogin || "ログインが必要です");
       return;
     }
-    
+
     try {
       const response = await fetch(`${API_BASE_URL}/question/delete_thread/${threadId}`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${token}` }
       });
-      
+
       if (response.ok) {
         // サーバーから正常に削除された場合、ローカル状態を更新
         const idx = threads.findIndex(t => String(t.thread_id || t.id) === threadId);
@@ -315,7 +315,7 @@ export default function Home() {
         setThreads(updated);
         saveThreads(updated);
         localStorage.removeItem(LS_MSGS_PREFIX + threadId);
-        
+
         // 削除されたスレッドが現在選択中の場合、別のスレッドに切り替え
         if (threadId === String(currentThreadId)) {
           if (updated.length > 0) {
@@ -329,11 +329,27 @@ export default function Home() {
             localStorage.removeItem(LS_CUR_THREAD_KEY);
           }
         }
-        
+
         console.log('Thread deleted successfully:', threadId);
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || "スレッドの削除に失敗しました");
+        let errorMessage = "スレッドの削除に失敗しました";
+        try {
+          const errorData = await response.json();
+          if (errorData.detail) {
+            errorMessage = errorData.detail;
+          } else if (errorData.message) {
+            errorMessage = errorData.message;
+          } else if (typeof errorData === 'string') {
+            errorMessage = errorData;
+          } else if (errorData && typeof errorData === 'object') {
+            // オブジェクトの場合は詳細情報を表示
+            errorMessage = JSON.stringify(errorData, null, 2);
+          }
+        } catch (parseError) {
+          // JSON解析に失敗した場合は、ステータステキストを使用
+          errorMessage = response.statusText || `HTTP ${response.status} Error`;
+        }
+        throw new Error(errorMessage);
       }
     } catch (error) {
       console.error('Error deleting thread:', error);
@@ -344,7 +360,7 @@ export default function Home() {
       setThreads(updated);
       saveThreads(updated);
       localStorage.removeItem(LS_MSGS_PREFIX + threadId);
-      
+
       if (threadId === String(currentThreadId)) {
         if (updated.length > 0) {
           const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
@@ -396,8 +412,30 @@ export default function Home() {
         body: JSON.stringify({ thread_id: threadId, text })
       });
       if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err.detail || t.failtogetanswer || "Failed to get answer");
+        let errorMessage = t.failtogetanswer || "Failed to get answer";
+        try {
+          const err = await res.json();
+          console.log('Error response:', err); // デバッグ用ログ
+          console.log('Error response type:', typeof err); // デバッグ用ログ
+          console.log('Error response keys:', Object.keys(err || {})); // デバッグ用ログ
+          
+          if (err && err.detail) {
+            errorMessage = err.detail;
+          } else if (err && err.message) {
+            errorMessage = err.message;
+          } else if (typeof err === 'string') {
+            errorMessage = err;
+          } else if (err && typeof err === 'object') {
+            // オブジェクトの場合は詳細情報を表示
+            errorMessage = JSON.stringify(err, null, 2);
+          }
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError); // デバッグ用ログ
+          // JSON解析に失敗した場合は、ステータステキストを使用
+          errorMessage = res.statusText || `HTTP ${res.status} Error`;
+        }
+        console.log('Final error message:', errorMessage); // デバッグ用ログ
+        throw new Error(errorMessage);
       }
       const data = await res.json();
 
@@ -443,14 +481,14 @@ export default function Home() {
     <div className="home-container">
       {/* Drawer Overlay */}
       {isDrawerOpen && <div className="drawer-overlay" onClick={() => setIsDrawerOpen(false)}></div>}
-      
+
       {/* Sidebar: Threads Drawer */}
       <aside className={`chat-sidebar drawer ${isDrawerOpen ? "open" : ""}`}>
         <div className="sidebar-header">
           <h3 className="sidebar-title">{t?.threads || "スレッド"}</h3>
           <div className="header-buttons">
             <button className="button" style={{ padding: "6px 10px" }} onClick={createThread}>{t?.newChat || "新規"}</button>
-            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>閉じる</button>
+            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>×</button>
           </div>
         </div>
         {threadsLoading && (
@@ -469,155 +507,167 @@ export default function Home() {
                 <div className="thread-title">{th.title}</div>
                 <div className="thread-time">{new Date(th.last_updated || th.lastUpdated).toLocaleString()}</div>
               </div>
-              <button className="button thread-button" onClick={(e) => {
+              <button className="button thread-button thread-edit-btn" onClick={(e) => {
                 e.stopPropagation();
                 const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
                 if (title !== null && title.trim()) renameThread(th.thread_id || th.id, title.trim());
-              }}>編集</button>
+              }}>
+                <img src="./pencil.png" alt="編集" className="button-icon" />
+              </button>
               <button className="button thread-button thread-delete-btn" onClick={(e) => {
                 e.stopPropagation();
                 removeThread(th.thread_id || th.id);
-              }}>削除</button>
+              }}>
+                <img src="./trash.png" alt="削除" className="button-icon" />
+              </button>
             </li>
           ))}
         </ul>
       </aside>
 
 
-        {/* Main Content Area: Header + Chat */}
-        <div className="main-content">
-          <div className="chat-frame">
-            <header className="header">
-              <div className="header-left">
-                <div className="language-wrapper">
-                  <img src="./globe.png" alt="言語" className="globe-icon" />
-                  <select className="languageSelector" onChange={handleLanguageChange} value={language}>
-                    <option value="ja">日本語</option>
-                    <option value="en">English</option>
-                    <option value="zh">中文</option>
-                    <option value="vi">Tiếng Việt</option>
-                    <option value="ko">한국어</option>
-                  </select>
-                </div>
+      {/* Main Content Area: Header + Chat */}
+      <div className="main-content">
+        <div className="chat-frame">
+          <header className="header">
+            <div className="header-left">
+              <div className="language-wrapper">
+                <img src="./globe.png" alt="言語" className="globe-icon" />
+                <select className="languageSelector" onChange={handleLanguageChange} value={language}>
+                  <option value="ja">日本語</option>
+                  <option value="en">English</option>
+                  <option value="zh">中文</option>
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="ko">한국어</option>
+                </select>
               </div>
-              <h1>Shiga Chat</h1>
-              <div className="user-notification-wrapper">
-                <div className={`notification-container ${showPopup ? "show" : ""}`}>
-                  <button className="notification-button" onClick={onNotificationClick}>
-                    <img src="./bell.png" alt="通知" className="notification-icon" />
-                    {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-                  </button>
-                  {showPopup && (
-                    <div className="notification-popup" ref={popupRef}>
-                      <div className="tabs">
-                        <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                          {t.personal}
-                        </button>
-                        <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                          {t.global}
-                        </button>
-                      </div>
-                      <div className="notifications-list">
-                        {activeTab === "personal" && (
-                          notifications.length > 0 ? (
-                            notifications.map((n) => (
-                              <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
-                                {n.message}
-                                <span className="time">{new Date(n.time).toLocaleString()}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <p>{t.noNotifications}</p>
-                          )
-                        )}
-                        {activeTab === "global" && (
-                          globalNotifications.length > 0 ? (
-                            globalNotifications.map((n) => (
-                              <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
-                                {n.message}
-                                <span className="time">{new Date(n.time).toLocaleString()}</span>
-                              </div>
-                            ))
-                          ) : (
-                            <p>{t.noNotifications}</p>
-                          )
-                        )}
-                      </div>
+            </div>
+            <h1>Shiga Chat</h1>
+            <div className="user-notification-wrapper">
+              <div className={`notification-container ${showPopup ? "show" : ""}`}>
+                <button className="notification-button" onClick={onNotificationClick}>
+                  <img src="./bell.png" alt="通知" className="notification-icon" />
+                  {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+                </button>
+                {showPopup && (
+                  <div className="notification-popup" ref={popupRef}>
+                    <div className="tabs">
+                      <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
+                        {t.personal}
+                      </button>
+                      <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
+                        {t.global}
+                      </button>
                     </div>
-                  )}
-                </div>
-                <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
-              </div>
-            </header>
-
-            {/* Chat area */}
-            <main className="chat-main">
-              <button className="hamburger-btn chat-hamburger" onClick={() => setIsDrawerOpen(true)}>
-                <img src="./threads.png" alt="スレッド一覧" className="threads-icon" />
-              </button>
-              <div className="chat-messages">
-                {messagesLoading && currentThreadId && (
-                  <div className="empty-chat-message">
-                    <p className="empty-chat-title">メッセージを読み込み中...</p>
-                  </div>
-                )}
-                {!messagesLoading && (!currentThreadId || messages.length === 0) && (
-                  <div className="empty-chat-message">
-                    <p className="empty-chat-title">{t?.askQuestion || "質問を入力してください"}</p>
-                  </div>
-                )}
-
-                {!messagesLoading && messages.length > 0 && messages.map((m) => (
-                  <div key={m.id} className={`message-container ${m.role}`}>
-                    <div className={`message-bubble ${m.role}`}>
-                      <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
-                      <div className="message-content">{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
-
-                      {/* Related (rag_qa) */}
-                      {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
-                        <details className="rag-details">
-                          <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
-                          <ul className="rag-list">
-                            {m.rag_qa.map((q, idx) => (
-                              <li key={idx} className="rag-item">
-                                <div className="rag-question">{q.question}</div>
-                                <div className="rag-answer">{q.answer}</div>
-                                {q.retrieved_at && (
-                                  <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
-                                )}
-                              </li>
-                            ))}
-                          </ul>
-                        </details>
+                    <div className="notifications-list">
+                      {activeTab === "personal" && (
+                        notifications.length > 0 ? (
+                          notifications.map((n) => (
+                            <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
+                              {n.message}
+                              <span className="time">{new Date(n.time).toLocaleString()}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p>{t.noNotifications}</p>
+                        )
+                      )}
+                      {activeTab === "global" && (
+                        globalNotifications.length > 0 ? (
+                          globalNotifications.map((n) => (
+                            <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
+                              {n.message}
+                              <span className="time">{new Date(n.time).toLocaleString()}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <p>{t.noNotifications}</p>
+                        )
                       )}
                     </div>
                   </div>
-                ))}
-              </div>
-
-              {/* Composer */}
-              <div className="composer-area">
-                {errorMessage && (
-                  <div className="error-message">{errorMessage}</div>
                 )}
-                <div className="composer-input">
-                  <textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={t.placeholder}
-                    className="textArea composer-textarea"
-                  />
-                  <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
-                    {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
-                  </button>
-                </div>
-                <div className="composer-help">⌘/Ctrl + Enter で送信</div>
               </div>
-            </main>
-          </div>
+              <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
+            </div>
+          </header>
+
+          {/* Chat area */}
+          <main className="chat-main">
+            <div className="chat-controls">
+              <button className="hamburger-btn chat-hamburger" onClick={() => setIsDrawerOpen(true)}>
+                <img src="./threads.png" alt="スレッド一覧" className="threads-icon" />
+              </button>
+              <button className="new-chat-btn" onClick={createThread}>
+                <svg className="new-chat-icon" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
+                </svg>
+                {t?.newChat || "新規チャット"}
+              </button>
+            </div>
+            <div className="chat-messages">
+              {messagesLoading && currentThreadId && (
+                <div className="empty-chat-message">
+                  <p className="empty-chat-title">メッセージを読み込み中...</p>
+                </div>
+              )}
+              {!messagesLoading && (!currentThreadId || messages.length === 0) && (
+                <div className="empty-chat-message">
+                  <p className="empty-chat-title">{t?.askQuestion || "質問を入力してください"}</p>
+                </div>
+              )}
+
+              {!messagesLoading && messages.length > 0 && messages.map((m) => (
+                <div key={m.id} className={`message-container ${m.role}`}>
+                  <div className={`message-bubble ${m.role}`}>
+                    <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
+                    <div className="message-content">{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
+
+                    {/* Related (rag_qa) */}
+                    {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
+                      <details className="rag-details">
+                        <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
+                        <ul className="rag-list">
+                          {m.rag_qa.map((q, idx) => (
+                            <li key={idx} className="rag-item">
+                              <div className="rag-question">{q.question}</div>
+                              <div className="rag-answer">{q.answer}</div>
+                              {q.retrieved_at && (
+                                <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Composer */}
+            <div className="composer-area">
+              {errorMessage && (
+                <div className="error-message">{errorMessage}</div>
+              )}
+              <div className="composer-input">
+                <textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={t.placeholder}
+                  className="textArea composer-textarea"
+                />
+                <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
+                  {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
+                </button>
+              </div>
+              <div className="composer-help">⌘/Ctrl + Enter で送信</div>
+            </div>
+          </main>
         </div>
       </div>
+    </div>
   );
 }
 
