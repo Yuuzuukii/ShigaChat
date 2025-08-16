@@ -567,6 +567,8 @@ html, body, #root {
   box-shadow: 0 8px 24px rgba(0,0,0,.18);
   padding: 12px;
   z-index: 1000;
+  max-height: 60vh; /* 高さ上限 */
+  overflow-y: auto; /* 縦スクロール */
 }
 
 .tabs {

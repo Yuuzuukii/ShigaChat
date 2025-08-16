@@ -114,6 +114,8 @@
   margin-top: -50px;
   right: 0;
   z-index: 1000;
+  max-height: 60vh; /* 高さ上限 */
+  overflow-y: auto; /* 縦スクロール */
 }
 
 /* 通知タイトル */

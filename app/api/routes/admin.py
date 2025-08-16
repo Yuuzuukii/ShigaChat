@@ -8,6 +8,56 @@ from api.utils.translator import translate
 from models.schemas import QuestionRequest, moveCategoryRequest, RegisterQuestionRequest
 router = APIRouter()
 
+# Ensure notifications table has question_id column
+def _ensure_notifications_question_id(conn: sqlite3.Connection):
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(notifications)")
+        cols = [row[1] for row in cur.fetchall()]
+        if "question_id" not in cols:
+            cur.execute("ALTER TABLE notifications ADD COLUMN question_id INTEGER")
+            conn.commit()
+            # mark last editor for this question due to answer edit
+            try:
+                _ensure_question_editor_columns(conn)
+                cursor.execute(
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
+            # mark last editor to operator for this question
+            try:
+                _ensure_question_editor_columns(conn)
+                cursor.execute(
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+# Ensure question table has last editor fields
+def _ensure_question_editor_columns(conn: sqlite3.Connection):
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(question)")
+        cols = [row[1] for row in cur.fetchall()]
+        changed = False
+        if "last_editor_id" not in cols:
+            cur.execute("ALTER TABLE question ADD COLUMN last_editor_id INTEGER")
+            changed = True
+        if "last_edited_at" not in cols:
+            cur.execute("ALTER TABLE question ADD COLUMN last_edited_at DATETIME")
+            changed = True
+        if changed:
+            conn.commit()
+    except Exception:
+        pass
+
 @router.post("/answer_edit")
 def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
     """ 回答を編集し、翻訳データを更新 + 通知を作成 """
@@ -91,33 +141,36 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
 
             conn.commit()
 
-            # 📢 【通知の登録】投稿者以外が編集した場合のみ
-            if operator_id != question_owner_id:
-                notification_message = (
-                    f"あなたの回答（ID: {answer_id}）が管理者により編集されました。"
-                )
-
-                # 🔹 `notifications` に通知を追加
+            # 🔖 最終編集者を更新（回答編集時）
+            try:
+                _ensure_question_editor_columns(conn)
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time) VALUES (?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
+
+            # 📢 【通知の登録】投稿者以外が編集した場合のみ（質問者に個人通知）
+            if operator_id != question_owner_id:
+                # 🔹 `notifications` に通知を追加
+                _ensure_notifications_question_id(conn)
+                cursor.execute(
+                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
 
-                cursor.execute(
-                    """SELECT questtion_id from QA 
-                    WHERE answer_id = ?""",(answer_id,)
-                )
-                question_id = cursor.fetchone()
-
                 # 🔹 `notifications_translation` に翻訳を追加
+                editor_name = current_user.get("name", "user")
                 translations = {
-                    "日本語": f"あなたの回答が管理者により編集されました。（ID: {question_id}）",
-                    "English": f"Your answer has been edited by the administrator.（ID: {question_id}）",
-                    "Tiếng Việt": f"Câu trả lời của bạn đã được quản trị viên chỉnh sửa.（ID: {question_id}）",
-                    "中文": f"您的回答已被管理员编辑。（ID: {question_id}）",
-                    "한국어": f"귀하의 답변 이 관리자에 의해 편집되었습니다.（ID: {question_id}）"
+                    "日本語": f"あなたの質問への回答が {editor_name} により編集されました。",
+                    "English": f"The answer to your question was edited by {editor_name}.",
+                    "Tiếng Việt": f"Câu trả lời cho câu hỏi của bạn đã được {editor_name} chỉnh sửa.",
+                    "中文": f"您的问题的回答已被 {editor_name} 编辑。",
+                    "한국어": f"귀하의 질문에 대한 답변이 {editor_name} 님에 의해 수정되었습니다."
                 }
 
                 # 各言語の翻訳を `notifications_translation` に追加
@@ -170,6 +223,16 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
             # 🔄 title を更新
             cursor.execute("""UPDATE question SET title=? WHERE question_id=?""", (new_title, question_id))
             conn.commit()
+            # mark last editor
+            try:
+                _ensure_question_editor_columns(conn)
+                cursor.execute(
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
 
             # 📢 【通知の登録】投稿者以外が変更した場合のみ
             if operator_id != question_owner_id:
@@ -178,9 +241,10 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
                 )
 
                 # 🔹 `notifications` に通知を追加
+                _ensure_notifications_question_id(conn)
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time) VALUES (?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -260,9 +324,10 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
                 notification_message = f"あなたの質問（ID: {question_id}）が管理者({operator_id})により削除されました。"
 
                 # 🔹 `notifications` に通知を追加
+                _ensure_notifications_question_id(conn)
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time) VALUES (?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -327,13 +392,24 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
             # 🔄 category_id を更新
             cursor.execute("UPDATE question SET category_id = ? WHERE question_id = ?", (new_category_id, question_id))
             conn.commit()
+            # mark last editor
+            try:
+                _ensure_question_editor_columns(conn)
+                cursor.execute(
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
 
             # 📢 【通知の登録】投稿者以外がカテゴリを変更した場合のみ
             if operator_id != question_owner_id:
                 # 🔹 `notifications` に通知を追加
+                _ensure_notifications_question_id(conn)
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time) VALUES (?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -396,13 +472,24 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
             # 🔄 public 状態を更新
             cursor.execute("UPDATE question SET public = ? WHERE question_id = ?", (new_status, question_id))
             conn.commit()
+            # mark last editor
+            try:
+                _ensure_question_editor_columns(conn)
+                cursor.execute(
+                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
+                )
+                conn.commit()
+            except Exception:
+                pass
 
             # 📢 【通知の登録】投稿者以外が公開設定を変更した場合のみ
             if operator_id != question_owner_id:
-                  # 🔹 `notifications` に通知を追加
+                # 🔹 `notifications` に通知を追加
+                _ensure_notifications_question_id(conn)
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time) VALUES (?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S")),
+                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -467,6 +554,16 @@ async def register_question(
         )
 
         conn.commit()  # 質問挿入後にコミット
+        # initialize last editor as creator at creation time
+        try:
+            _ensure_question_editor_columns(conn)
+            cursor.execute(
+                "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                (user_id, japan_time, question_id)
+            )
+            conn.commit()
+        except Exception:
+            pass
 
         # 各言語に翻訳
         cursor.execute("SELECT id FROM language")
@@ -521,25 +618,34 @@ async def register_question(
         
         conn.commit()
 
-        # 📌 **"新しい質問" の翻訳リスト**
+        # 📌 通知の先頭メッセージ（言語別）
         new_question_translations = {
-            "日本語": "新しい質問が登録されました。",
-            "English": "New question has been registered.",
-            "Tiếng Việt": "Câu hỏi mới đã được đăng ký.",
-            "中文": "新问题已注册。",
-            "한국어": "새로운 질문 등록되었습니다."
+            "日本語": "新しい質問が登録されました",
+            "English": "New question has been registered",
+            "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
+            "中文": "新问题已注册",
+            "한국어": "새로운 질문이 등록되었습니다"
+        }
+        # 📌 投稿者（ニックネーム）の表記（言語別）
+        by_user_translations = {
+            "日本語": "登録者",
+            "English": "by",
+            "Tiếng Việt": "bởi",
+            "中文": "由",
+            "한국어": "등록자"
         }
 
         # 📌 **質問内容のスニペットを通知に追加**
         snippet_length = 50  # スニペットの最大長
         
-        # `notifications` に通知を追加
+        # `notifications` に通知を追加（全体通知 + question_id）
+        _ensure_notifications_question_id(conn)
         cursor.execute(
             """
-            INSERT INTO notifications (user_id, is_read, time, global_read_users)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (-1, False, datetime.now(), '[]')
+            (-1, False, datetime.now(), '[]', question_id)
         )
         notification_id = cursor.lastrowid  # 挿入された通知のID
         conn.commit()
@@ -555,8 +661,14 @@ async def register_question(
         # 🔹 各言語のスニペットを `notifications_translation` に格納
         for lang_id, text in translations:
             snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
-            translated_message = f"{new_question_translations[next(key for key, val in language_mapping.items() if val == lang_id)]}: {snippet} （ID: {question_id}）"
-            
+            # 言語名を取得（"日本語" など）
+            lang_name = next(key for key, val in language_mapping.items() if val == lang_id)
+            # メッセージ例: "新しい質問が登録されました（登録者: ニックネーム）: スニペット"
+            prefix = new_question_translations.get(lang_name, "New question has been registered")
+            by_label = by_user_translations.get(lang_name, "by")
+            nickname = current_user.get("name", "user")
+            translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
+
             cursor.execute(
                 """
                 INSERT INTO notifications_translation (notification_id, language_id, messages)

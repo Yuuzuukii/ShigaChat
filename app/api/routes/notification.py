@@ -7,6 +7,17 @@ from models.schemas import NotificationRequest
 
 router = APIRouter()
 
+def _ensure_notifications_question_id(conn: sqlite3.Connection):
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(notifications)")
+        cols = [row[1] for row in cur.fetchall()]
+        if "question_id" not in cols:
+            cur.execute("ALTER TABLE notifications ADD COLUMN question_id INTEGER")
+            conn.commit()
+    except Exception:
+        pass
+
 @router.get("/notifications")
 def get_notifications(current_user: dict = Depends(current_user_info)):
     user_id = current_user["id"]
@@ -21,6 +32,7 @@ def get_notifications(current_user: dict = Depends(current_user_info)):
     try:
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
+            _ensure_notifications_question_id(conn)
 
             # 🔍 指定ユーザーの未読通知を取得（`notifications_translation` から翻訳を取得）
             cursor.execute("""
@@ -28,7 +40,8 @@ def get_notifications(current_user: dict = Depends(current_user_info)):
                        COALESCE(nt.messages, (SELECT messages FROM notifications_translation 
                                               WHERE notification_id = n.id AND language_id = 2)) AS message, 
                        n.is_read, 
-                       n.time
+                       n.time,
+                       n.question_id
                 FROM notifications n
                 LEFT JOIN notifications_translation nt 
                 ON n.id = nt.notification_id AND nt.language_id = ?
@@ -47,7 +60,8 @@ def get_notifications(current_user: dict = Depends(current_user_info)):
                     "id": row[0],
                     "message": row[1],  # 翻訳されたメッセージ
                     "is_read": bool(row[2]),
-                    "time": row[3]
+                    "time": row[3],
+                    "question_id": row[4]
                 }
                 for row in notifications
             ]
@@ -91,13 +105,15 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
 
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
+    _ensure_notifications_question_id(conn)
 
     cursor.execute("""
         SELECT n.id, 
                COALESCE(nt.messages, (SELECT messages FROM notifications_translation 
                                       WHERE notification_id = n.id AND language_id = 2)) AS message, 
                n.global_read_users,
-               n.time
+               n.time,
+               n.question_id
         FROM notifications n
         LEFT JOIN notifications_translation nt 
         ON n.id = nt.notification_id AND nt.language_id = ?
@@ -107,7 +123,7 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
     notifications = []
     
     for row in cursor.fetchall():
-        notification_id, message, global_read_users, time = row
+        notification_id, message, global_read_users, time, question_id = row
 
         # `NULL` の場合は空のリストに変換
         read_users = json.loads(global_read_users) if global_read_users else []
@@ -116,7 +132,8 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
             "id": notification_id,
             "message": message,  # 翻訳されたメッセージ
             "read_users": read_users,  # 既読ユーザーのリストをそのまま渡す
-            "time": time
+            "time": time,
+            "question_id": question_id
         })
 
     conn.close()

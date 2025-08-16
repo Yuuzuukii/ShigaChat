@@ -115,6 +115,16 @@ def get_category_questions_admin(
     
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
+        # Ensure optional editor columns exist to avoid SELECT errors
+        try:
+            cursor.execute("PRAGMA table_info(question)")
+            cols = [row[1] for row in cursor.fetchall()]
+            if "last_editor_id" not in cols:
+                cursor.execute("ALTER TABLE question ADD COLUMN last_editor_id INTEGER")
+            if "last_edited_at" not in cols:
+                cursor.execute("ALTER TABLE question ADD COLUMN last_edited_at DATETIME")
+        except Exception:
+            pass
 
         # カテゴリ名を取得
         cursor.execute("SELECT description FROM category WHERE id = ?", (category_id,))
@@ -135,13 +145,15 @@ def get_category_questions_admin(
                 question.public AS public,
                 question.category_id AS category_id,
                 question.time AS time,
-                user.name AS user_name  -- 質問者の名前を取得
+                user.name AS user_name,  -- 質問者の名前を取得
+                editor.name AS editor_name  -- 最終編集者の名前
             FROM QA
             JOIN question ON QA.question_id = question.question_id
             JOIN answer ON QA.answer_id = answer.id
             JOIN question_translation ON question.question_id = question_translation.question_id
             JOIN answer_translation ON answer.id = answer_translation.answer_id
             JOIN user ON question.user_id = user.id  -- 質問者の情報を結合
+            LEFT JOIN user AS editor ON question.last_editor_id = editor.id  -- 最終編集者
             WHERE question.category_id = ? AND 
             question_translation.language_id = ? AND 
             answer_translation.language_id = ? 
@@ -164,7 +176,8 @@ def get_category_questions_admin(
                 "public": qa[5],        # 公開状態
                 "category_id": qa[6],
                 "time": qa[7],
-                "user_name": qa[8]      # 質問者の名前を追加
+                "user_name": qa[8],     # 質問者の名前
+                "editor_name": qa[9]    # 最終編集者の名前
             }
             for qa in qa_list
         ]

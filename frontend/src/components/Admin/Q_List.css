@@ -114,6 +114,8 @@
   margin-top: -50px;
   right: 0;
   z-index: 1000;
+  max-height: 60vh; /* 高さ上限 */
+  overflow-y: auto; /* 縦スクロール */
 }
 
 /* 通知タイトル */
@@ -243,6 +245,18 @@
   cursor: pointer;
   transition: all 0.2s ease-in-out;
   /* 🔄 滑らかなアニメーション */
+}
+
+/* 通知から遷移したときの強調表示 */
+.admin-question-item.target-highlight {
+  animation: targetPulse 1.8s ease;
+}
+
+@keyframes targetPulse {
+  0% { box-shadow: 0 0 0 rgba(255, 193, 7, 0); background-color: #fffbe6; }
+  35% { box-shadow: 0 0 0 6px rgba(255, 193, 7, 0.35); }
+  70% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+  100% { background-color: #f9f9f9; }
 }
 
 .admin-question-item:hover {

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import axios from "axios";
 import { UserContext } from "../../UserContext"; // ユーザー情報を取得
 import { updateUserLanguage } from "../../utils/language";
@@ -20,6 +20,8 @@ import "./Q_List.css"; // 統一されたCSSを利用
 
 const Q_List = () => {
     const { categoryId } = useParams();
+    const [searchParams] = useSearchParams();
+    const targetQuestionId = Number(searchParams.get('id')) || null;
     const [questions, setQuestions] = useState([]);
     const [categoryName, setCategoryName] = useState("");
     const [visibleAnswerId, setVisibleAnswerId] = useState(null);
@@ -112,6 +114,23 @@ const Q_List = () => {
               );
             }
           }, [categoryId, language, user, token]);    
+
+    // Scroll to target question if specified by query param
+    useEffect(() => {
+        if (!targetQuestionId || !questions || questions.length === 0) return;
+        const el = document.getElementById(`admin-question-${targetQuestionId}`);
+        if (el) {
+            const container = document.querySelector('.admin-question-history-container');
+            if (container) {
+                const offset = el.offsetTop - container.offsetTop - 80; // header margin
+                container.scrollTo({ top: Math.max(0, offset), behavior: 'smooth' });
+            } else {
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            el.classList.add('target-highlight');
+            setTimeout(() => el.classList.remove('target-highlight'), 2000);
+        }
+    }, [targetQuestionId, questions]);
 
     const handleClickOutside = (event) => {
         if (popupRef.current && !popupRef.current.contains(event.target)) {
@@ -253,7 +272,7 @@ const Q_List = () => {
             const result = await response.json();
             //console.log("Updated by user ID:", result.editor_id);
             
-            // 即座にUIを更新 - 編集された回答をローカル状態で更新
+            // 即座にUIを更新 - 編集された回答と編集者をローカル状態で更新
             setQuestions(prevQuestions => 
                 prevQuestions.map(question => {
                     // answerIdでマッチするか、questionIdでマッチするかをチェック
@@ -264,7 +283,8 @@ const Q_List = () => {
                     if (isTargetQuestion) {
                         return {
                             ...question,
-                            回答: editText.trim() // 編集されたテキストで回答を更新
+                            回答: editText.trim(), // 編集されたテキストで回答を更新
+                            editor_name: (user && user.nickname) ? user.nickname : question.editor_name
                         };
                     }
                     return question;
@@ -275,10 +295,19 @@ const Q_List = () => {
             setEditText(""); // 編集テキストもクリア
             window.alert(t.answerupdated);
             
-            // バックグラウンドで最新データを取得（オプション）
-            if (typeof fetchQuestions === "function") {
-                fetchQuestions().catch(console.error); // エラーが発生してもUIの更新は既に完了している
-            }
+            // バックグラウンドで最新データを取得
+            try {
+                await fetchQuestions(
+                    categoryId,
+                    user,
+                    token,
+                    t,
+                    setLanguage,
+                    setCategoryName,
+                    setQuestions,
+                    navigate
+                );
+            } catch (e) { console.warn(e); }
 
         } catch (error) {
             console.error("Error updating answer:", error);
@@ -412,7 +441,9 @@ const Q_List = () => {
             // questions も更新
             setQuestions((prevQuestions) =>
                 prevQuestions.map((question) =>
-                    question.question_id === questionId ? { ...question, public: response.data.public } : question
+                    question.question_id === questionId 
+                        ? { ...question, public: response.data.public, editor_name: (user && user.nickname) ? user.nickname : question.editor_name }
+                        : question
                 )
             );
         } catch (error) {
@@ -532,6 +563,7 @@ const Q_List = () => {
                     questions.map((question) => (
                         <div
                             className="admin-question-item"
+                            id={`admin-question-${question.question_id}`}
                             key={question.question_id}
                             style={{ cursor: "pointer" }}
                         >
@@ -539,7 +571,7 @@ const Q_List = () => {
                                 <div className="admin-question-headline">
                                     <div className="admin-question-text">{question.質問}</div>
                                     <div className="admin-question-meta">
-                                        <div className="admin-question-user">{t.editor}: {question.user_name || "—"}</div>
+                                    <div className="admin-question-user">{t.editor}: {question.editor_name || question.user_name || "—"}</div>
                                         <div className="admin-question-date">
                                             {t.questionDate}{new Date(question.time).toLocaleString()}
                                         </div>
@@ -635,4 +667,3 @@ const Q_List = () => {
 };
 
 export default Q_List;
-

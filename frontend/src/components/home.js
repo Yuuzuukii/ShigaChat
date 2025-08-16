@@ -60,6 +60,20 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  // Guard to avoid wiping optimistic messages when creating first thread
+  const skipNextThreadLoad = useRef(false);
+  // Normalize + merge helpers for thread objects
+  const toClientThreads = (arr = []) => (arr || []).map(th => ({
+    id: String(th.thread_id ?? th.id),
+    title: th.title,
+    lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
+  }));
+  const mergeThreads = (serverList = [], localList = []) => {
+    const map = new Map();
+    toClientThreads(serverList).forEach(th => map.set(String(th.id), th));
+    toClientThreads(localList).forEach(th => { if (!map.has(String(th.id))) map.set(String(th.id), th); });
+    return Array.from(map.values()).sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated));
+  };
   const [chatWidth, setChatWidth] = useState(() => localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px");
   const [chatSize, setChatSize] = useState(() => {
     const saved = localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px";
@@ -109,14 +123,15 @@ export default function Home() {
 
         if (response.ok) {
           const data = await response.json();
-          setThreads(data.threads || []);
+          const merged = mergeThreads(data.threads || [], loadThreads());
+          setThreads(merged);
+          saveThreads(merged);
 
           // Auto-load the most recent thread if available
-          if (data.threads && data.threads.length > 0) {
-            const mostRecentThread = data.threads[0];
+          if (merged && merged.length > 0) {
+            const mostRecentThread = merged[0];
             console.log('Auto-loading most recent thread:', mostRecentThread);
-            setCurrentThreadId(mostRecentThread.thread_id);
-            // loadThreadMessages will be called by useEffect when currentThreadId changes
+            setCurrentThreadId(String(mostRecentThread.id));
           }
         } else {
           console.error('Failed to load threads from server');
@@ -242,7 +257,12 @@ export default function Home() {
   useEffect(() => {
     if (currentThreadId) {
       console.log('Switching to thread:', currentThreadId);
-      loadThreadMessages(currentThreadId);
+      if (skipNextThreadLoad.current) {
+        // Skip one automatic load to preserve optimistic UI
+        skipNextThreadLoad.current = false;
+      } else {
+        loadThreadMessages(currentThreadId);
+      }
       localStorage.setItem(LS_CUR_THREAD_KEY, currentThreadId);
     } else {
       // Clear messages when no thread is selected
@@ -307,7 +327,7 @@ export default function Home() {
   };
 
   const renameThread = (id, title) => {
-    const updated = threads.map(th => th.id === id ? { ...th, title } : th);
+    const updated = threads.map(th => String(th.id) === String(id) ? { ...th, title } : th);
     setThreads(updated);
     saveThreads(updated);
   };
@@ -332,8 +352,8 @@ export default function Home() {
 
       if (response.ok) {
         // サーバーから正常に削除された場合、ローカル状態を更新
-        const idx = threads.findIndex(t => String(t.thread_id || t.id) === threadId);
-        const updated = threads.filter(t => String(t.thread_id || t.id) !== threadId);
+        const idx = threads.findIndex(t => String(t.id) === threadId);
+        const updated = threads.filter(t => String(t.id) !== threadId);
         setThreads(updated);
         saveThreads(updated);
         localStorage.removeItem(LS_MSGS_PREFIX + threadId);
@@ -343,7 +363,7 @@ export default function Home() {
           if (updated.length > 0) {
             // 残っているスレッドの中から最新のものを選択
             const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
-            setCurrentThreadId(String(nextThread.thread_id || nextThread.id));
+            setCurrentThreadId(String(nextThread.id));
           } else {
             // スレッドがなくなった場合
             setCurrentThreadId(null);
@@ -377,8 +397,8 @@ export default function Home() {
       console.error('Error deleting thread:', error);
       setErrorMessage(error.message);
       // エラー時はローカルのみ削除（フォールバック）
-      const idx = threads.findIndex(t => String(t.thread_id || t.id) === threadId);
-      const updated = threads.filter(t => String(t.thread_id || t.id) !== threadId);
+      const idx = threads.findIndex(t => String(t.id) === threadId);
+      const updated = threads.filter(t => String(t.id) !== threadId);
       setThreads(updated);
       saveThreads(updated);
       localStorage.removeItem(LS_MSGS_PREFIX + threadId);
@@ -386,7 +406,7 @@ export default function Home() {
       if (threadId === String(currentThreadId)) {
         if (updated.length > 0) {
           const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
-          setCurrentThreadId(String(nextThread.thread_id || nextThread.id));
+          setCurrentThreadId(String(nextThread.id));
         } else {
           setCurrentThreadId(null);
           setMessages([]);
@@ -413,6 +433,8 @@ export default function Home() {
       const newThreads = [{ id, title: text.slice(0, 24) || (t?.newChat || "新しいチャット"), lastUpdated: new Date().toISOString() }, ...threads];
       setThreads(newThreads);
       saveThreads(newThreads);
+      // Avoid immediate server fetch wiping optimistic messages
+      skipNextThreadLoad.current = true;
       setCurrentThreadId(id);
       threadId = id;
       setMessages([]);
@@ -481,9 +503,19 @@ export default function Home() {
       });
 
       // update thread time
-      const updated = threads.map(th => th.id === threadId ? { ...th, lastUpdated: new Date().toISOString() } : th);
+      const updated = threads.map(th => String(th.id) === String(threadId) ? { ...th, lastUpdated: new Date().toISOString() } : th);
       setThreads(updated);
       saveThreads(updated);
+      // Optionally refresh from server to ensure sidebar sync
+      try {
+        const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
+        if (resp.ok) {
+          const data2 = await resp.json();
+          const merged = mergeThreads(data2.threads || [], loadThreads());
+          setThreads(merged);
+          saveThreads(merged);
+        }
+      } catch {}
     } catch (e) {
       setMessages(prev => prev.filter(m => m.id !== "typing"));
       setErrorMessage(e.message);

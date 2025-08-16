@@ -66,8 +66,11 @@ export const handleNotificationClick = ({
  */
 export const handleNotificationMove = async (notification, navigate, token, fetchNotifications) => {
   try {
-    const questionIdMatch = notification.message.match(/ID:\s*(\d+)/);
-    const questionId = questionIdMatch ? parseInt(questionIdMatch[1], 10) : null;
+    // Prefer structured question_id from API; fallback to legacy message parsing
+    const questionId = notification.question_id ?? (() => {
+      const m = notification.message && notification.message.match(/ID:\s*(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    })();
     if (!questionId) return;
 
     const requestData = { id: notification.id };
@@ -83,8 +86,17 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
 
     if (!response.ok) throw new Error("通知の既読処理に失敗しました");
 
+    // Navigate to Question Management (admin list by category)
+    const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (!categoryRes.ok) throw new Error("カテゴリの取得に失敗しました");
+    const categoryData = await categoryRes.json();
+    const categoryId = categoryData.category_id;
     await fetchNotifications();
-    navigate(`/Shitsumonnrireki?id=${questionId}`);
+    if (categoryId) {
+      navigate(`/admin/category/${categoryId}?id=${questionId}`);
+    }
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
   }
@@ -95,8 +107,10 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
  */
 export const handleGlobalNotificationMove = async (notification, navigate, token, fetchNotifications) => {
   try {
-    const questionIdMatch = notification.message.match(/ID:\s*(\d+)/);
-    const questionId = questionIdMatch ? parseInt(questionIdMatch[1], 10) : null;
+    const questionId = notification.question_id ?? (() => {
+      const m = notification.message && notification.message.match(/ID:\s*(\d+)/);
+      return m ? parseInt(m[1], 10) : null;
+    })();
     if (!questionId) return;
 
     const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
@@ -124,7 +138,7 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
     if (!response.ok) throw new Error("通知の既読処理に失敗しました");
 
     await fetchNotifications();
-    navigate(`/category/${categoryId}?id=${questionId}`);
+    navigate(`/admin/category/${categoryId}?id=${questionId}`);
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
   }
