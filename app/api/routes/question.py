@@ -27,6 +27,22 @@ from api.utils.RAG import (
 
 router = APIRouter()
 
+# --- Helpers ---------------------------------------------------------------
+def _ensure_thread_qa_has_rag_column(conn: sqlite3.Connection) -> None:
+    """Ensure thread_qa table has a rag_qa TEXT column to store JSON.
+    Safe to call often; adds the column only if missing.
+    """
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(thread_qa)")
+        cols = [row[1] for row in cur.fetchall()]  # row[1] = name
+        if "rag_qa" not in cols:
+            cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
+            conn.commit()
+    except Exception:
+        # Don't crash API path if migration fails; let main ops proceed.
+        pass
+
 @router.get("/get_translated_question")
 def get_translated_question(question_id: int, language_id: int, current_user: dict = Depends(current_user_info)):
     """
@@ -151,16 +167,24 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             history_qa=history_qa
         )
 
-        # 🔹 新しいQAペアを保存
+        # 🔹 新しいQAペアを保存（rag_qaもJSONで保存）
+        import json
         with sqlite3.connect(DATABASE) as conn:
+            _ensure_thread_qa_has_rag_column(conn)
             cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO thread_qa (thread_id, question, answer)
-                VALUES (?, ?, ?)
-            """, (thread_id, question_text, generated_answer))
-            cursor.execute("""
+            cursor.execute(
+                """
+                INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
+                VALUES (?, ?, ?, ?)
+                """,
+                (thread_id, question_text, generated_answer, json.dumps(rag_qa, ensure_ascii=False)),
+            )
+            cursor.execute(
+                """
                 UPDATE threads SET last_updated = ? WHERE id = ?
-            """, (datetime.now(), thread_id))
+                """,
+                (datetime.now(), thread_id),
+            )
             conn.commit()
 
         return {
@@ -574,8 +598,10 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
     user_id = current_user["id"]
     
     try:
+        import json
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
+            _ensure_thread_qa_has_rag_column(conn)
             
             # スレッドの所有者確認
             cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
@@ -587,20 +613,30 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
             if thread_data[0] != user_id:
                 raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
             
-            # メッセージ履歴を取得
-            cursor.execute("""
-                SELECT question, answer, created_at FROM thread_qa
+            # メッセージ履歴を取得（rag_qa も返す）
+            cursor.execute(
+                """
+                SELECT question, answer, created_at, rag_qa FROM thread_qa
                 WHERE thread_id = ?
                 ORDER BY created_at ASC
-            """, (thread_id,))
+                """,
+                (thread_id,),
+            )
             messages_data = cursor.fetchall()
             
             messages = []
-            for question, answer, created_at in messages_data:
+            for question, answer, created_at, rag_qa_text in messages_data:
+                rag_val = None
+                if rag_qa_text:
+                    try:
+                        rag_val = json.loads(rag_qa_text)
+                    except Exception:
+                        rag_val = None
                 messages.append({
                     "question": question,
                     "answer": answer,
-                    "created_at": created_at
+                    "created_at": created_at,
+                    "rag_qa": rag_val,
                 })
             
             return {"messages": messages}

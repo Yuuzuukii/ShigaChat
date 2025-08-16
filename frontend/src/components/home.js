@@ -194,7 +194,8 @@ export default function Home() {
               id: crypto.randomUUID(),
               role: "assistant",
               content: msg.answer,
-              time: msg.created_at
+              time: msg.created_at,
+              rag_qa: msg.rag_qa || []
             });
           });
         }
@@ -670,4 +671,3 @@ export default function Home() {
     </div>
   );
 }
-
