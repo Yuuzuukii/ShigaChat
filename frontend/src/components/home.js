@@ -16,22 +16,26 @@ import {
 } from "../utils/notifications";
 import "./Home.css";
 
-// --- Local persistence keys (per-browser) ---
+// --- Local persistence keys (per-browser, per-user scoped) ---
 const LS_THREADS_KEY = "chat_threads";             // array of {id, title, lastUpdated}
 const LS_CUR_THREAD_KEY = "chat_current_thread";   // string
 const LS_MSGS_PREFIX = "chat_msgs_";               // per-thread messages
 const LS_CHAT_WIDTH_KEY = "chat_width";            // chat area width preference
 
 function loadThreads() {
+  // Deprecated: kept for backward-compat; use per-user variants below
   try { return JSON.parse(localStorage.getItem(LS_THREADS_KEY)) || []; } catch { return []; }
 }
 function saveThreads(threads) {
+  // Deprecated: kept for backward-compat; use per-user variants below
   localStorage.setItem(LS_THREADS_KEY, JSON.stringify(threads));
 }
 function loadMsgs(threadId) {
+  // Deprecated: kept for backward-compat; use per-user variants below
   try { return JSON.parse(localStorage.getItem(LS_MSGS_PREFIX + threadId)) || []; } catch { return []; }
 }
 function saveMsgs(threadId, msgs) {
+  // Deprecated: kept for backward-compat; use per-user variants below
   localStorage.setItem(LS_MSGS_PREFIX + threadId, JSON.stringify(msgs));
 }
 
@@ -43,6 +47,23 @@ export default function Home() {
 
   // Notifications (existing)
   const userId = user?.id;
+  // Per-user localStorage helpers
+  const scopedKey = (base) => `${base}_${userId ?? 'nouser'}`;
+  const loadThreadsLS = () => {
+    try { return JSON.parse(localStorage.getItem(scopedKey(LS_THREADS_KEY))) || []; } catch { return []; }
+  };
+  const saveThreadsLS = (threadsArr) => {
+    localStorage.setItem(scopedKey(LS_THREADS_KEY), JSON.stringify(threadsArr));
+  };
+  const loadMsgsLS = (threadId) => {
+    try { return JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${threadId}`)) || []; } catch { return []; }
+  };
+  const saveMsgsLS = (threadId, msgsArr) => {
+    localStorage.setItem(`${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${threadId}`, JSON.stringify(msgsArr));
+  };
+  const getCurrentThreadIdLS = () => localStorage.getItem(scopedKey(LS_CUR_THREAD_KEY));
+  const setCurrentThreadIdLS = (val) => localStorage.setItem(scopedKey(LS_CUR_THREAD_KEY), val);
+  const clearCurrentThreadIdLS = () => localStorage.removeItem(scopedKey(LS_CUR_THREAD_KEY));
   const [notifications, setNotifications] = useState([]);
   const [globalNotifications, setGlobalNotifications] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
@@ -123,9 +144,9 @@ export default function Home() {
 
         if (response.ok) {
           const data = await response.json();
-          const merged = mergeThreads(data.threads || [], loadThreads());
+          const merged = mergeThreads(data.threads || [], loadThreadsLS());
           setThreads(merged);
-          saveThreads(merged);
+          saveThreadsLS(merged);
 
           // Auto-load the most recent thread if available
           if (merged && merged.length > 0) {
@@ -136,21 +157,21 @@ export default function Home() {
         } else {
           console.error('Failed to load threads from server');
           // Fallback to localStorage
-          setThreads(loadThreads());
-          const localThreadId = localStorage.getItem(LS_CUR_THREAD_KEY);
+          setThreads(loadThreadsLS());
+          const localThreadId = getCurrentThreadIdLS();
           if (localThreadId) {
             setCurrentThreadId(localThreadId);
-            setMessages(loadMsgs(localThreadId));
+            setMessages(loadMsgsLS(localThreadId));
           }
         }
       } catch (error) {
         console.error('Error loading threads:', error);
         // Fallback to localStorage
-        setThreads(loadThreads());
-        const localThreadId = localStorage.getItem(LS_CUR_THREAD_KEY);
+        setThreads(loadThreadsLS());
+        const localThreadId = getCurrentThreadIdLS();
         if (localThreadId) {
           setCurrentThreadId(localThreadId);
-          setMessages(loadMsgs(localThreadId));
+          setMessages(loadMsgsLS(localThreadId));
         }
       } finally {
         setThreadsLoading(false);
@@ -236,17 +257,17 @@ export default function Home() {
 
         setMessages(clientMessages);
         // Still backup to localStorage for offline access
-        saveMsgs(threadId, clientMessages);
+        saveMsgsLS(threadId, clientMessages);
       } else {
         console.warn('Failed to load from server, using localStorage');
         // Fallback to localStorage
-        const localMessages = loadMsgs(threadId);
+        const localMessages = loadMsgsLS(threadId);
         setMessages(localMessages);
       }
     } catch (error) {
       console.error('Error loading thread messages:', error);
       // Fallback to localStorage
-      const localMessages = loadMsgs(threadId);
+      const localMessages = loadMsgsLS(threadId);
       setMessages(localMessages);
     } finally {
       setMessagesLoading(false);
@@ -263,17 +284,17 @@ export default function Home() {
       } else {
         loadThreadMessages(currentThreadId);
       }
-      localStorage.setItem(LS_CUR_THREAD_KEY, currentThreadId);
+      setCurrentThreadIdLS(currentThreadId);
     } else {
       // Clear messages when no thread is selected
       setMessages([]);
-      localStorage.removeItem(LS_CUR_THREAD_KEY);
+      clearCurrentThreadIdLS();
     }
   }, [currentThreadId, token]);
 
   // Still persist messages for backup
   useEffect(() => {
-    if (currentThreadId) saveMsgs(currentThreadId, messages);
+    if (currentThreadId) saveMsgsLS(currentThreadId, messages);
   }, [messages, currentThreadId]);
 
   // Notification handlers
@@ -314,10 +335,10 @@ export default function Home() {
     const title = t?.newChat || "新しいチャット";
     const newThreads = [{ id, title, lastUpdated: new Date().toISOString() }, ...threads];
     setThreads(newThreads);
-    saveThreads(newThreads);
+    saveThreadsLS(newThreads);
     setCurrentThreadId(id);
     setMessages([]);
-    localStorage.setItem(LS_CUR_THREAD_KEY, id);
+    setCurrentThreadIdLS(id);
   };
 
   const selectThread = (id) => {
@@ -329,7 +350,7 @@ export default function Home() {
   const renameThread = (id, title) => {
     const updated = threads.map(th => String(th.id) === String(id) ? { ...th, title } : th);
     setThreads(updated);
-    saveThreads(updated);
+    saveThreadsLS(updated);
   };
 
   const removeThread = async (id) => {
@@ -355,8 +376,8 @@ export default function Home() {
         const idx = threads.findIndex(t => String(t.id) === threadId);
         const updated = threads.filter(t => String(t.id) !== threadId);
         setThreads(updated);
-        saveThreads(updated);
-        localStorage.removeItem(LS_MSGS_PREFIX + threadId);
+        saveThreadsLS(updated);
+        localStorage.removeItem(`${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${threadId}`);
 
         // 削除されたスレッドが現在選択中の場合、別のスレッドに切り替え
         if (threadId === String(currentThreadId)) {
@@ -368,7 +389,7 @@ export default function Home() {
             // スレッドがなくなった場合
             setCurrentThreadId(null);
             setMessages([]);
-            localStorage.removeItem(LS_CUR_THREAD_KEY);
+            clearCurrentThreadIdLS();
           }
         }
 
@@ -400,8 +421,8 @@ export default function Home() {
       const idx = threads.findIndex(t => String(t.id) === threadId);
       const updated = threads.filter(t => String(t.id) !== threadId);
       setThreads(updated);
-      saveThreads(updated);
-      localStorage.removeItem(LS_MSGS_PREFIX + threadId);
+      saveThreadsLS(updated);
+      localStorage.removeItem(`${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${threadId}`);
 
       if (threadId === String(currentThreadId)) {
         if (updated.length > 0) {
@@ -410,7 +431,7 @@ export default function Home() {
         } else {
           setCurrentThreadId(null);
           setMessages([]);
-          localStorage.removeItem(LS_CUR_THREAD_KEY);
+          clearCurrentThreadIdLS();
         }
       }
     }
@@ -432,13 +453,13 @@ export default function Home() {
       const id = Date.now().toString();
       const newThreads = [{ id, title: text.slice(0, 24) || (t?.newChat || "新しいチャット"), lastUpdated: new Date().toISOString() }, ...threads];
       setThreads(newThreads);
-      saveThreads(newThreads);
+      saveThreadsLS(newThreads);
       // Avoid immediate server fetch wiping optimistic messages
       skipNextThreadLoad.current = true;
       setCurrentThreadId(id);
       threadId = id;
       setMessages([]);
-      localStorage.setItem(LS_CUR_THREAD_KEY, id);
+      setCurrentThreadIdLS(id);
     }
 
     // optimistic UI
@@ -505,15 +526,15 @@ export default function Home() {
       // update thread time
       const updated = threads.map(th => String(th.id) === String(threadId) ? { ...th, lastUpdated: new Date().toISOString() } : th);
       setThreads(updated);
-      saveThreads(updated);
+      saveThreadsLS(updated);
       // Optionally refresh from server to ensure sidebar sync
       try {
         const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
         if (resp.ok) {
           const data2 = await resp.json();
-          const merged = mergeThreads(data2.threads || [], loadThreads());
+          const merged = mergeThreads(data2.threads || [], loadThreadsLS());
           setThreads(merged);
-          saveThreads(merged);
+          saveThreadsLS(merged);
         }
       } catch {}
     } catch (e) {
