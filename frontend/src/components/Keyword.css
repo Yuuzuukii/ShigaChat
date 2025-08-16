@@ -347,6 +347,14 @@
   color: #333;
 }
 
+/* 改行やスペースを保持して可読性向上 */
+.answer-section p {
+  white-space: pre-wrap;
+  line-height: 1.7;
+  margin: 6px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .situmon-header{
   justify-content: center; /* 水平方向の中央揃え */
   align-items: center; /* 垂直方向の中央揃え */

@@ -214,7 +214,10 @@ function Keyword() {
 
   const highlightMatchedWords = (text) => {
     if (!text) return "";
-    return text.replace(/<strong>(.*?)<\/strong>/g, '<span class="highlighted">$1</span>');
+    // 強調タグはspanに置換し、改行は<br>に変換して可読性を確保
+    return text
+      .replace(/<strong>(.*?)<\/strong>/g, '<span class="highlighted">$1</span>')
+      .replace(/\n/g, '<br/>');
   };
 
   const userData = localStorage.getItem("user");

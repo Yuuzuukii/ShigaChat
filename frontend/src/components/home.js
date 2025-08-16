@@ -20,6 +20,7 @@ import "./Home.css";
 const LS_THREADS_KEY = "chat_threads";             // array of {id, title, lastUpdated}
 const LS_CUR_THREAD_KEY = "chat_current_thread";   // string
 const LS_MSGS_PREFIX = "chat_msgs_";               // per-thread messages
+const LS_CHAT_WIDTH_KEY = "chat_width";            // chat area width preference
 
 function loadThreads() {
   try { return JSON.parse(localStorage.getItem(LS_THREADS_KEY)) || []; } catch { return []; }
@@ -59,6 +60,13 @@ export default function Home() {
   const [errorMessage, setErrorMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const [chatWidth, setChatWidth] = useState(() => localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px");
+  const [chatSize, setChatSize] = useState(() => {
+    const saved = localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px";
+    if (saved === "1200px") return "medium";
+    if (saved === "1400px" || saved === "100%") return "large";
+    return "small";
+  });
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -76,6 +84,17 @@ export default function Home() {
       if (code) setLanguage(code); else setLanguage("ja");
     }
   }, [user]);
+
+  // Apply chat width on mount and when changed
+  useEffect(() => {
+    try {
+      const sizeToWidth = { small: "900px", medium: "1200px", large: "1400px" };
+      const width = sizeToWidth[chatSize] || chatWidth || "900px";
+      document.documentElement.style.setProperty("--chat-width", width);
+      localStorage.setItem(LS_CHAT_WIDTH_KEY, width);
+      setChatWidth(width);
+    } catch {}
+  }, [chatSize]);
 
   // Server-side thread loading on mount
   useEffect(() => {
@@ -266,6 +285,8 @@ export default function Home() {
     setLanguage(newLanguage);
     await updateUserLanguage(newLanguage, setUser);
   };
+
+  const handleSetSize = (size) => () => setChatSize(size);
 
   // --- Thread ops ---
   const createThread = () => {
@@ -605,6 +626,14 @@ export default function Home() {
                 </svg>
                 {t?.newChat || "新規チャット"}
               </button>
+            </div>
+            <div className="chat-widthbar" aria-label="画面サイズ設定">
+              <span className="widthLabel">画面サイズ</span>
+              <div className="widthToggle" role="group" aria-label="画面サイズ">
+                <button className={`widthBtn ${chatSize === 'small' ? 'active' : ''}`} onClick={handleSetSize('small')}>小</button>
+                <button className={`widthBtn ${chatSize === 'medium' ? 'active' : ''}`} onClick={handleSetSize('medium')}>中</button>
+                <button className={`widthBtn ${chatSize === 'large' ? 'active' : ''}`} onClick={handleSetSize('large')}>大</button>
+              </div>
             </div>
             <div className="chat-messages">
               {messagesLoading && currentThreadId && (
