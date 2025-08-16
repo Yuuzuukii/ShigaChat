@@ -630,12 +630,14 @@ export default function Home() {
                         <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
                         <ul className="rag-list">
                           {m.rag_qa.map((q, idx) => (
-                            <li key={idx} className="rag-item">
-                              <div className="rag-question">{q.question}</div>
-                              <div className="rag-answer">{q.answer}</div>
-                              {q.retrieved_at && (
-                                <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
-                              )}
+                            <li key={idx}>
+                              <details className="rag-item">
+                                <summary className="rag-q-summary">{q.question}</summary>
+                                <div className="rag-answer">{q.answer}</div>
+                                {q.retrieved_at && (
+                                  <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
+                                )}
+                              </details>
                             </li>
                           ))}
                         </ul>
