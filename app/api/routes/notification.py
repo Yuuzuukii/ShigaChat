@@ -118,6 +118,7 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
         LEFT JOIN notifications_translation nt 
         ON n.id = nt.notification_id AND nt.language_id = ?
         WHERE n.user_id = -1
+        ORDER BY n.time DESC
     """, (language_id,))
     
     notifications = []

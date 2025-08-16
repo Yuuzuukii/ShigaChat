@@ -54,12 +54,16 @@ function New() {
       const userData = userResponse.data;
       //console.log("ログイン成功: ユーザーデータ", userData);  // ✅ ユーザー情報を確認
 
-      setUser({
+      const mappedUser = {
         id: userData.id,
-        nickname: userData.nickname,
+        nickname: userData.name, // APIは name を返すため nickname にマップ
         spokenLanguage: userData.spoken_language,
         isAdmin: userData.isAdmin === 1,
-      })
+      };
+      setUser(mappedUser);
+      try {
+        localStorage.setItem("user", JSON.stringify(mappedUser));
+      } catch {}
 
       navigate("/home");  // ホーム画面にリダイレクト
     } catch (error) {

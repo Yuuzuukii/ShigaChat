@@ -112,33 +112,28 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
       return m ? parseInt(m[1], 10) : null;
     })();
     if (!questionId) return;
-
-    const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
+    // 先に既読化しておく（対象が消えていても通知を閉じるため）
+    const markReadReq = fetch(`${API_BASE_URL}/notification/notifications/global/read`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+      body: JSON.stringify({ id: notification.id }),
     });
 
+    // カテゴリ取得（存在しない場合はスキップして通知だけ閉じる）
+    const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    });
+
+    await markReadReq.catch(() => {});
+
+    if (!categoryRes.ok) {
+      await fetchNotifications();
+      return; // 削除済みなど。通知だけ消す
+    }
     const categoryData = await categoryRes.json();
     const categoryId = categoryData.category_id;
-    if (!categoryId) return;
-
-    const requestData = { id: notification.id };
-
-    const response = await fetch(`${API_BASE_URL}/notification/notifications/global/read`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify(requestData),
-    });
-
-    if (!response.ok) throw new Error("通知の既読処理に失敗しました");
-
     await fetchNotifications();
-    navigate(`/admin/category/${categoryId}?id=${questionId}`);
+    if (categoryId) navigate(`/admin/category/${categoryId}?id=${questionId}`);
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
   }

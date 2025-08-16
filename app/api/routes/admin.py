@@ -81,13 +81,14 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
 
             question_id = row[0]
 
-            # 🔍 `question` テーブルから `user_id` を取得（質問の投稿者）
-            cursor.execute("SELECT user_id FROM question WHERE question_id = ?", (question_id,))
+            # 🔍 `question` テーブルから 投稿者 と 直近編集者 を取得
+            _ensure_question_editor_columns(conn)
+            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
             row = cursor.fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} の投稿者が見つかりません")
-
-            question_owner_id = row[0]  # 回答の元の質問の投稿者
+            question_owner_id = row[0]
+            prev_editor_id = row[1]
 
             # 🔄 `answer_translation` テーブルを更新
             cursor.execute("""
@@ -152,13 +153,13 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             except Exception:
                 pass
 
-            # 📢 【通知の登録】投稿者以外が編集した場合のみ（質問者に個人通知）
-            if operator_id != question_owner_id:
+            # 📢 【通知の登録】直近編集者に個人通知（自分以外）
+            if prev_editor_id and operator_id != prev_editor_id:
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id(conn)
                 cursor.execute(
                     "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
+                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -211,14 +212,16 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
 
-            # 🔍 質問の投稿者 (`question_owner_id`) を取得
-            cursor.execute("SELECT user_id FROM question WHERE question_id = ?", (question_id,))
+            # 🔍 投稿者と直近編集者を取得
+            _ensure_question_editor_columns(conn)
+            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
             question_owner_id = row[0]
+            prev_editor_id = row[1]
 
             # 🔄 title を更新
             cursor.execute("""UPDATE question SET title=? WHERE question_id=?""", (new_title, question_id))
@@ -234,8 +237,8 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
             except Exception:
                 pass
 
-            # 📢 【通知の登録】投稿者以外が変更した場合のみ
-            if operator_id != question_owner_id:
+            # 📢 【通知の登録】直近編集者に通知（自分以外）
+            if prev_editor_id and operator_id != prev_editor_id:
                 notification_message = (
                     f"あなたの質問（ID: {question_id}）が管理者により「{new_title}」に変更されました。"
                 )
@@ -244,7 +247,7 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
                 _ensure_notifications_question_id(conn)
                 cursor.execute(
                     "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
+                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
@@ -292,14 +295,16 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
 
-            # 🔍 質問の投稿者 (`user_id`) を取得
-            cursor.execute("SELECT user_id FROM question WHERE question_id = ?", (question_id,))
+            # 🔍 質問の投稿者・直近編集者を取得
+            _ensure_question_editor_columns(conn)
+            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
             question_owner_id = row[0]
+            prev_editor_id = row[1]
 
             # 🔹 `QA` から `answer_id` を取得
             cursor.execute("SELECT answer_id FROM QA WHERE question_id = ?", (question_id,))
@@ -319,26 +324,39 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
 
             conn.commit()  # すべての削除を確定
 
-            # 📢 【通知の登録】投稿者以外が質問を削除した場合のみ
-            if operator_id != question_owner_id:
+            # 🔥 関連する既存通知をクリーンアップ（削除通知を新規作成する前に）
+            try:
+                _ensure_notifications_question_id(conn)
+                cursor.execute("SELECT id FROM notifications WHERE question_id = ?", (question_id,))
+                old_notifs = [row[0] for row in cursor.fetchall()]
+                if old_notifs:
+                    cursor.executemany("DELETE FROM notifications_translation WHERE notification_id = ?", [(nid,) for nid in old_notifs])
+                    cursor.execute("DELETE FROM notifications WHERE question_id = ?", (question_id,))
+                    conn.commit()
+            except Exception:
+                pass
+
+            # 📢 【通知の登録】直近編集者に通知（自分以外）
+            if prev_editor_id and operator_id != prev_editor_id:
                 notification_message = f"あなたの質問（ID: {question_id}）が管理者({operator_id})により削除されました。"
 
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id(conn)
                 cursor.execute(
                     "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
+                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
                 
-                # 🔹 `notifications_translation` に翻訳を追加
+                # 🔹 `notifications_translation` に翻訳を追加（編集者名を含める）
+                editor_name = current_user.get("name", "user")
                 translations = {
-                    "日本語": f"あなたの質問が管理者により削除されました。（ID: {question_id}）",
-                    "English": f"Your question has been deleted by the administrator .（ID: {question_id}）",
-                    "Tiếng Việt": f"Câu hỏi của bạn đã bị quản trị viên  xóa.（ID: {question_id}）",
-                    "中文": f"您的问题已被管理员删除。（ID: {question_id}）",
-                    "한국어": f"귀하의 질문 이 관리자 에 의해 삭제되었습니다.（ID: {question_id}）"
+                    "日本語": f"あなたの質問が {editor_name} により削除されました。（ID: {question_id}）",
+                    "English": f"Your question has been deleted by {editor_name}. (ID: {question_id})",
+                    "Tiếng Việt": f"Câu hỏi của bạn đã bị {editor_name} xóa. (ID: {question_id})",
+                    "中文": f"您的问题已被 {editor_name} 删除。(ID: {question_id})",
+                    "한국어": f"귀하의 질문이 {editor_name} 님에 의해 삭제되었습니다. (ID: {question_id})"
                 }
                 
                 # 各言語の翻訳を `notifications_translation` に追加
@@ -373,14 +391,15 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
 
-            # 🔍 質問の投稿者 (`user_id`) と元のカテゴリIDを取得
-            cursor.execute("SELECT user_id, category_id FROM question WHERE question_id = ?", (question_id,))
+            # 🔍 質問の投稿者・直近編集者 と 元のカテゴリIDを取得
+            _ensure_question_editor_columns(conn)
+            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id), category_id FROM question WHERE question_id = ?", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
-            question_owner_id, original_category_id = row
+            question_owner_id, prev_editor_id, original_category_id = row
 
             # 📌 各言語でカテゴリ名を取得（`category_translation` テーブルから）
             cursor.execute("SELECT language_id, description FROM category_translation WHERE category_id = ?", (original_category_id,))
@@ -403,24 +422,25 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
             except Exception:
                 pass
 
-            # 📢 【通知の登録】投稿者以外がカテゴリを変更した場合のみ
-            if operator_id != question_owner_id:
+            # 📢 【通知の登録】直近編集者に通知（自分以外）
+            if prev_editor_id and operator_id != prev_editor_id:
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id(conn)
                 cursor.execute(
                     "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
+                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
 
-                # 🔹 各言語の翻訳を `notifications_translation` に追加
+                # 🔹 各言語の翻訳を `notifications_translation` に追加（編集者名を含める）
+                editor_name = current_user.get("name", "user")
                 translations = {
-                    1: f"あなたの質問が管理者により「{original_category_translations.get(1, 'Unknown')}」から「{new_category_translations.get(1, 'Unknown')}」に移動されました。（ID: {question_id}）",
-                    2: f"Your question has been moved from \"{original_category_translations.get(2, 'Unknown')}\" to \"{new_category_translations.get(2, 'Unknown')}\" by the administrator.（ID: {question_id}）",
-                    3: f"Câu hỏi của bạn đã được quản trị viên chuyển từ \"{original_category_translations.get(3, 'Unknown')}\" sang \"{new_category_translations.get(3, 'Unknown')}\".（ID: {question_id}）",
-                    4: f"您的问题已被管理员从 \"{original_category_translations.get(4, 'Unknown')}\" 移动到 \"{new_category_translations.get(4, 'Unknown')}\"。（ID: {question_id}）",
-                    5: f"귀하의 질문 이 관리자에 의해 \"{original_category_translations.get(5, 'Unknown')}\"에서 \"{new_category_translations.get(5, 'Unknown')}\"(으)로 이동되었습니다.（ID: {question_id}）"
+                    1: f"あなたの質問が {editor_name} により「{original_category_translations.get(1, 'Unknown')}」から「{new_category_translations.get(1, 'Unknown')}」に移動されました。（ID: {question_id}）",
+                    2: f"Your question has been moved by {editor_name} from \"{original_category_translations.get(2, 'Unknown')}\" to \"{new_category_translations.get(2, 'Unknown')}\". (ID: {question_id})",
+                    3: f"Câu hỏi của bạn đã được {editor_name} chuyển từ \"{original_category_translations.get(3, 'Unknown')}\" sang \"{new_category_translations.get(3, 'Unknown')}\". (ID: {question_id})",
+                    4: f"您的问题已被 {editor_name} 从 \"{original_category_translations.get(4, 'Unknown')}\" 移动到 \"{new_category_translations.get(4, 'Unknown')}\"。(ID: {question_id})",
+                    5: f"귀하의 질문이 {editor_name} 님에 의해 \"{original_category_translations.get(5, 'Unknown')}\"에서 \"{new_category_translations.get(5, 'Unknown')}\"(으)로 이동되었습니다. (ID: {question_id})"
                 }
 
                 for lang_id, message in translations.items():
@@ -453,14 +473,15 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
 
-            # 🔍 質問の現在の状態と、投稿者の user_id を取得
-            cursor.execute("SELECT public, user_id FROM question WHERE question_id = ?", (question_id,))
+            # 🔍 質問の現在の状態と、投稿者・直近編集者を取得
+            _ensure_question_editor_columns(conn)
+            cursor.execute("SELECT public, user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail="指定された質問が見つかりません")
 
-            current_status, question_owner_id = row
+            current_status, question_owner_id, prev_editor_id = row
 
             # 公開状態を反転
             new_status = 1 if current_status == 0 else 0
@@ -483,13 +504,13 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
             except Exception:
                 pass
 
-            # 📢 【通知の登録】投稿者以外が公開設定を変更した場合のみ
-            if operator_id != question_owner_id:
+            # 📢 【通知の登録】直近編集者に通知（自分以外）
+            if prev_editor_id and operator_id != prev_editor_id:
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id(conn)
                 cursor.execute(
                     "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (question_owner_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
+                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
                 conn.commit()
