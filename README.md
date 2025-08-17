@@ -21,16 +21,29 @@ URL: https://www.s-i-a.or.jp/qa
 
 ## 動作手順
 
-# 🌱 環境変数の設定
+1. 🌱 環境変数の設定
 
-このプロジェクトでは、APIキーや秘密情報を `.env` ファイルに記述しています。
+	このプロジェクトでは、APIキーや秘密情報を `.env` ファイルに記述しています。
+	
+	.envファイルを作成し、以下の記述を行なってください。（実際のキーを入力してください。）
+	
+	```.env
+	OPENAI_API_KEY=your_openai_api_key_here
+	
+	SECRET_KEY=your_secret_key_here
+	
+	DATABASE=your_database_file_here
+	```
+ 
+  2. dockerセットアップ
 
-.envファイルを作成し、以下の記述を行なってください。（実際のキーを入力してください。）
+		このプロジェクトはdockerを用いた仮想環境を構築することで動作します。docker desktopがインストールされているか確認してから、以下のコマンドをターミナル上で実行してください。
+	 
+		```
+	 	docker compose build
+		
+	 	docker compose up -d
+		```
+	 
+		以上を実行するとuwsgi（アプリケーション）とnginx（フロントエンド）がマシン上で仮想的に構築されます。フロントエンド側（nginx）のポートをブラウザで開いてください。
 
-```.env
-OPENAI_API_KEY=your_openai_api_key_here
-
-SECRET_KEY=your_secret_key_here
-
-DATABASE=your_database_file_here
-```
