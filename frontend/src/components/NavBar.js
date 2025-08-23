@@ -146,6 +146,9 @@ const NavBar = () => {
                 <Link to="/keyword" onClick={closeMenu}>{t.keyword}</Link>
               </li>
               <li>
+                <Link to="/category" onClick={closeMenu}>{t.category}</Link>
+              </li>
+              <li>
                   <Link to="/Admin/QuestionAdmin" onClick={closeMenu}>{t.questionAdmin}</Link>
                 </li>
             

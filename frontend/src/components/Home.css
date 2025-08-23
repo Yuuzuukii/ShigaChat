@@ -85,6 +85,11 @@ html, body, #root {
   transition: all 0.15s ease;
   font-weight: bold;
   line-height: 1;
+  /* 右上固定配置 */
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1001; /* ドロワー内で最前面に */
 }
 
 .close-drawer-btn:hover {

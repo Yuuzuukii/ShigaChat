@@ -14,7 +14,7 @@ import {
     handleNotificationMove,
     handleGlobalNotificationMove
 } from "../utils/notifications";
-import "./Category.css";
+import "./CategoryDetail.css";
 
 function CategoryDetail() {
     const { categoryId } = useParams();
