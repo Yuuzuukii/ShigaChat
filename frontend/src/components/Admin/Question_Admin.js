@@ -198,7 +198,7 @@ const Question_Admin = () => {
     <div className="admin-container-kategori">
       <header className="header">
         <div className="language-wrapper">
-          <img src="/globe.png" alt="言語" className="globe-icon" />
+          <img src="./../globe.png" alt="言語" className="globe-icon" />
           <select className="languageSelector" onChange={handleLanguageChange} value={language}>
             <option value="ja">日本語</option>
             <option value="en">English</option>
@@ -212,7 +212,7 @@ const Question_Admin = () => {
         <div className="user-notification-wrapper">
           <div className={`notification-container ${showPopup ? "show" : ""}`}>
             <button className="notification-button" onClick={onNotificationClick}>
-              <img src="/bell.png" alt="通知" className="notification-icon" />
+              <img src="./../bell.png" alt="通知" className="notification-icon" />
               {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
             </button>
 

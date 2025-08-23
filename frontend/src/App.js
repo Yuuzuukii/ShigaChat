@@ -9,6 +9,7 @@ import CategoryDetail from "./components/CategoryDetail"; // 新しいカテゴ�
 import Question_Admin from "./components/Admin/Question_Admin";
 import Q_List from "./components/Admin/Q_List";
 import { UserContext } from "./UserContext";
+import {BASE_PATH} from "./config/constants"
 
 
 function App() {
@@ -17,7 +18,7 @@ function App() {
 
 
   return (
-    <Router>
+    <Router basename = {BASE_PATH}>
       <div>
         <NavBar />
         <Routes>

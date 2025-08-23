@@ -12,11 +12,13 @@
     "react-dom": "^18.3.1",
     "react-router-dom": "^7.0.2",
     "react-scripts": "^5.0.1",
-    "web-vitals": "^2.1.4"
+    "web-vitals": "^2.1.4",
+    "env-cmd": "^10.1.0"
   },
   "scripts": {
     "start": "react-scripts start",
-    "build": "react-scripts build",
+    "build": "env-cmd -f .env.local react-scripts build",
+    "build:deploy": "env-cmd -f .env.deploy react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

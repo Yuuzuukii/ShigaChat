@@ -1,5 +1,5 @@
 # 環境変数ファイル
-.env
+.env*
 __pycache__/
 *.pyc
 nginx/log/
