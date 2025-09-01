@@ -137,10 +137,11 @@ def generate_and_save_vectors():
     print("全ベクトル保存完了")
 
 # RAG検索（ここで言語例外を投げる）
-def rag(question: str) -> Dict[int, List[Union[str, float]]]:
+def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, List[Union[str, float]]]:
     """
     言語検出に失敗/未対応の場合は例外を投げる
     成功時は rank-> [answer, question, time, similarity] を返す。
+    similarity_threshold以下のスコアの結果は除外される。
     """
     # 言語検出（Linguaのみ、未対応/検出不可は例外）
     lang = detect_lang(question)  # 'ja' / 'en' / 'vi' / 'zh' / 'ko'
@@ -167,13 +168,24 @@ def rag(question: str) -> Dict[int, List[Union[str, float]]]:
 
     query_vec = np.array(get_embedding(question)).astype("float32").reshape(1, -1)
     faiss.normalize_L2(query_vec)
-    D, I = index.search(query_vec, 5)
+    D, I = index.search(query_vec, 10)  # より多く取得して閾値でフィルタリング
 
     results: Dict[int, List[Union[str, float]]] = {}
     ranked = sorted(zip(I[0], D[0]), key=lambda x: x[1], reverse=True)
-    for rank, (idx, similarity) in enumerate(ranked):
-        question_text, answer_text, time_val = texts[idx]
-        results[rank + 1] = [answer_text, question_text, time_val, float(similarity)]
+    
+    rank = 1
+    for idx, similarity in ranked:
+        # 類似度が閾値以上の場合のみ結果に含める
+        if similarity >= similarity_threshold:
+            question_text, answer_text, time_val = texts[idx]
+            results[rank] = [answer_text, question_text, time_val, float(similarity)]
+            rank += 1
+            
+            # 最大5件まで
+            if rank > 5:
+                break
+    
+    print(f"類似度閾値 {similarity_threshold} 以上の結果: {len(results)}件")
     return results
 
 # LLMによる回答生成
