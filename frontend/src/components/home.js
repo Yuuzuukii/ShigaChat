@@ -707,22 +707,28 @@ export default function Home() {
                     <div className="message-content">{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
 
                     {/* Related (rag_qa) */}
-                    {!m.typing && m.rag_qa && m.rag_qa.length > 0 && (
+                    {!m.typing && m.role === "assistant" && (
                       <details className="rag-details">
                         <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
-                        <ul className="rag-list">
-                          {m.rag_qa.map((q, idx) => (
-                            <li key={idx}>
-                              <details className="rag-item">
-                                <summary className="rag-q-summary">{q.question}</summary>
-                                <div className="rag-answer">{q.answer}</div>
-                                {q.retrieved_at && (
-                                  <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
-                                )}
-                              </details>
-                            </li>
-                          ))}
-                        </ul>
+                        {m.rag_qa && m.rag_qa.length > 0 ? (
+                          <ul className="rag-list">
+                            {m.rag_qa.map((q, idx) => (
+                              <li key={idx}>
+                                <details className="rag-item">
+                                  <summary className="rag-q-summary">{q.question}</summary>
+                                  <div className="rag-answer">{q.answer}</div>
+                                  {q.retrieved_at && (
+                                    <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
+                                  )}
+                                </details>
+                              </li>
+                            ))}
+                          </ul>
+                        ) : (
+                          <div className="rag-empty" style={{ padding: "10px 12px" }}>
+                            {t?.noSimilarWarning || "類似質問はありません。回答は正確でない可能性があります。"}
+                          </div>
+                        )}
                       </details>
                     )}
                   </div>
