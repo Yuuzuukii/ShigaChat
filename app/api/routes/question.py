@@ -138,14 +138,15 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         # 🔹 整形
         raw_rag_qa = []
         for rank in rag_result:
-            answer, question, retrieved_at, distance = rag_result[rank]
-            score = round(1 / (1 + distance), 4)  # スコア化（高いほど関連度高）
+            # rag() の第4要素は実質的な類似度（高いほど関連性が高い）
+            answer, question, retrieved_at, similarity = rag_result[rank]
             raw_rag_qa.append({
                 "question": question,
                 "answer": answer,
                 "retrieved_at": retrieved_at,
-                "score": score
+                "score": float(similarity),
             })
+        # 類似度の降順（高いものを先頭に）
         rag_qa = sorted(raw_rag_qa, key=lambda x: x["score"], reverse=True)
 
         # 🔹 過去履歴の取得（最新5件を時系列順に）
