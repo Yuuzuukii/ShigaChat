@@ -24,7 +24,6 @@ from api.utils.RAG import (
     UnsupportedLanguageError,
 )
 
-
 router = APIRouter()
 
 # --- Helpers ---------------------------------------------------------------
@@ -117,19 +116,31 @@ def load_data_from_database():
 @router.post("/get_answer")
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
     question_text = request.text
-    thread_id = request.thread_id
+    req_thread_id = request.thread_id
     user_id = current_user["id"]
 
     try:
-        # スレッドが存在しなければ作成
+        # 既存スレッドの検証 or 新規作成（AUTOINCREMENT）
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
-            cursor.execute("SELECT id FROM threads WHERE id = ?", (thread_id,))
-            if not cursor.fetchone():
+            assigned_thread_id = None
+
+            if req_thread_id is not None:
+                # Provided: ensure it exists and belongs to user; otherwise ignore and create new
+                cursor.execute("SELECT id, user_id FROM threads WHERE id = ?", (req_thread_id,))
+                row = cursor.fetchone()
+                if row:
+                    if row[1] != user_id:
+                        raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
+                    assigned_thread_id = req_thread_id
+
+            if assigned_thread_id is None:
+                # Create new thread with server-managed autoincrement ID
                 cursor.execute(
-                    "INSERT INTO threads (id, user_id, last_updated) VALUES (?, ?, ?)",
-                    (thread_id, user_id, datetime.now())
+                    "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
+                    (user_id, datetime.now()),
                 )
+                assigned_thread_id = cursor.lastrowid
                 conn.commit()
 
         # 🔹 RAG結果取得（言語判定エラーはここで例外→下のexceptへ）
@@ -157,7 +168,7 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 WHERE thread_id = ?
                 ORDER BY created_at DESC
                 LIMIT 5
-            """, (thread_id,))
+            """, (assigned_thread_id,))
             past_qa_rows = cursor.fetchall()
         history_qa = list(reversed(past_qa_rows))
 
@@ -178,18 +189,18 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
                 VALUES (?, ?, ?, ?)
                 """,
-                (thread_id, question_text, generated_answer, json.dumps(rag_qa, ensure_ascii=False)),
+                (assigned_thread_id, question_text, generated_answer, json.dumps(rag_qa, ensure_ascii=False)),
             )
             cursor.execute(
                 """
                 UPDATE threads SET last_updated = ? WHERE id = ?
                 """,
-                (datetime.now(), thread_id),
+                (datetime.now(), assigned_thread_id),
             )
             conn.commit()
 
         return {
-            "thread_id": thread_id,
+            "thread_id": assigned_thread_id,
             "question": question_text,
             "answer": generated_answer,
             "rag_qa": rag_qa
@@ -218,182 +229,6 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         error_detail = f"内部エラー: {str(e)}"
         print(f"❌ {error_detail}")  # ログに出力
         raise HTTPException(status_code=500, detail=error_detail)
-"""
-@router.post("/get_answer")
-async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
-    question_text = request.text
-
-    try:
-        # 🔹 質問情報を取得
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("
-                SELECT q.content, c.description AS category_name, q.title, q.time
-                FROM question q
-                LEFT JOIN category c ON q.category_id = c.id
-                WHERE q.question_id = ? 
-            ", (question_id,))
-            question_data = cursor.fetchone()
-
-        if not question_data:
-            raise HTTPException(status_code=404, detail="質問が見つかりません")
-
-        question_content, category_name, question_title, question_time = question_data
-
-        # 🔹 `question_time` を datetime に変換
-        if question_time:
-            try:
-                question_time = datetime.strptime(question_time, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                question_time = datetime.strptime(question_time, "%Y-%m-%d %H:%M:%S.%f")
-
-        # 🔹 `QA` テーブルから `answer_id` を取得
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT answer_id FROM QA WHERE question_id = ?", (question_id,))
-            answer_id_row = cursor.fetchone()
-
-        answer_id = answer_id_row[0] if answer_id_row else None
-
-        # 🔹 RAG をセットアップ
-        data = load_data_from_database()
-        chunks = split_data_into_chunks(data)
-        vector_store = build_faiss_index(chunks)
-        rag_chain = setup_rag_chain(vector_store)
-
-        # 🔹 RAG で関連ドキュメントを取得
-        result = rag_chain({"query": question_content})
-        source_documents = result["source_documents"]
-
-        if not source_documents:
-            raise HTTPException(status_code=404, detail="関連する質問が見つかりません")
-
-        # 🔹 `answer_id` が存在しない場合、新しい回答を生成
-        if not answer_id:
-            print(f"質問 {question_id} に対応する回答がないため、新規作成します")
-
-            # RAG から最も関連のある `QA` を抽出
-            context = "\n".join([doc.page_content for doc in source_documents])
-
-            # LLM を使用して回答を生成
-            prompt = f"
-            あなたは滋賀県に住む外国人向けの専門家です。
-            以下の参考情報を元に、ユーザーの質問に適切に回答してください。
-
-            【参考情報】
-            {context}
-
-            【質問】
-            {question_content}
-
-            【回答】
-            "
-
-            llm = ChatOpenAI(model="gpt-3.5-turbo", temperature=0, openai_api_key=OPENAI_API_KEY)
-            response = llm.invoke(prompt)
-            generated_answer_text = response.content.strip()
-
-            # 🔹 `answer` をデータベースに保存
-            with sqlite3.connect(DATABASE) as conn:
-                cursor = conn.cursor()
-                cursor.execute("INSERT INTO answer (language_id, time) VALUES (?, ?)", (language_id, datetime.now()))
-                conn.commit()
-                answer_id = cursor.lastrowid  # `answer_id` は `AUTO_INCREMENT`
-
-                # 🔹 `QA` に `question_id` と `answer_id` を登録
-                cursor.execute("INSERT INTO QA (question_id, answer_id) VALUES (?, ?)", (question_id, answer_id))
-
-                # 🔹 `answer_translation` に元の言語の回答を保存
-                cursor.execute("INSERT INTO answer_translation (answer_id, language_id, texts) VALUES (?, ?, ?)",
-                               (answer_id, language_id, generated_answer_text))
-                conn.commit()
-
-            print(f"新しい回答が作成されました: answer_id={answer_id}")
-
-        # 🔹 `answer_translation` に全5言語があるか確認し、不足分を翻訳
-        required_languages = [1, 2, 3, 4, 5]  # JA, EN, VI, ZH, KO
-        existing_languages = set()
-
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("
-                SELECT language_id FROM answer_translation WHERE answer_id = ?
-            ", (answer_id,))
-            existing_languages = {row[0] for row in cursor.fetchall()}
-
-        missing_languages = set(required_languages) - existing_languages
-
-        # 🔹 不足している言語を翻訳して格納
-        for missing_language in missing_languages:
-            print(f"翻訳が存在しないため、answer_translate を実行: answer_id={answer_id}, language_id={missing_language}")
-            translation_response = answer_translate(answer_id, missing_language, current_user)
-
-        # 🔹 `answer_translation` からすべての翻訳データを取得
-        all_translations = {}
-
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("
-                SELECT language_id, texts FROM answer_translation WHERE answer_id = ?
-            ", (answer_id,))
-            for row in cursor.fetchall():
-                all_translations[row[0]] = row[1]  # {language_id: translation}
-        answer = all_translations.get(language_id, "回答が見つかりません")
-
-        # 🔹 `source_documents` を `question_id` ベースのデータに変換
-        formatted_source_documents = []
-        for doc in source_documents:
-            doc_question_id = doc.metadata.get("question_id", "unknown")
-
-            with sqlite3.connect(DATABASE) as conn:
-                cursor = conn.cursor()
-                cursor.execute("
-                    SELECT q.content, c.description AS category_name, q.title, q.time, qa.answer_id, at.texts
-                    FROM question q
-                    LEFT JOIN category c ON q.category_id = c.id
-                    LEFT JOIN QA qa ON q.question_id = qa.question_id
-                    LEFT JOIN answer_translation at ON qa.answer_id = at.answer_id AND at.language_id = ?
-                    WHERE q.question_id = ?
-                ", (language_id, doc_question_id))
-                doc_data = cursor.fetchone()
-
-            if doc_data:
-                doc_content, doc_category, doc_title, doc_time, doc_answer_id, doc_answer_text = doc_data
-
-                if doc_time:
-                    try:
-                        doc_time = datetime.strptime(doc_time, "%Y-%m-%d %H:%M:%S")
-                    except ValueError:
-                        doc_time = datetime.strptime(doc_time, "%Y-%m-%d %H:%M:%S.%f")
-
-                formatted_source_documents.append({
-                    "question_id": doc_question_id,
-                    "content": doc_content,
-                    "answer_id": doc_answer_id if doc_answer_id else None,
-                    "answer": doc_answer_text if doc_answer_text else "回答が見つかりません",
-                    "time": doc_time.isoformat() if doc_time else "日時不明",
-                    "title": doc_title or "不明なタイトル"
-                })
-
-        return {
-            "question_id": question_id,
-            "content": question_content,
-            "answer_id": answer_id,
-            "answer": answer,
-            "time": question_time.isoformat() if question_time else "日時不明",
-            "title": question_title,
-            "source_documents": formatted_source_documents
-        }
-
-    except sqlite3.Error as e:
-        error_detail = f"データベースエラー: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
-        raise HTTPException(status_code=500, detail=error_detail)
-    except Exception as e:
-        error_detail = f"エラーが発生しました: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
-        raise HTTPException(status_code=500, detail=error_detail)
-"""
 
 @router.get("/get_translated_answer")
 def get_translated_answer(

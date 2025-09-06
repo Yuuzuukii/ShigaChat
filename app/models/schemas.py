@@ -35,7 +35,8 @@ class QuestionRequest(BaseModel):
     question_id: int
 
 class Question(BaseModel):
-    thread_id: int
+    # thread_id is optional: omit to start a new thread (server will autoincrement)
+    thread_id: Optional[int] = None
     text: str
 
 class AnswerEditRequest(BaseModel):
@@ -61,4 +62,3 @@ class RegisterQuestionRequest(BaseModel):
     
 class NotificationRequest(BaseModel):
     id: int
-
