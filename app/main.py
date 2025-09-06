@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 from api.routes import user, question, category, keyword, notification, history, admin
+from api.routes import chat
 
 # ログ設定を改善
 logging.basicConfig(
@@ -35,4 +36,4 @@ app.include_router(keyword.router, prefix="/keyword")
 app.include_router(notification.router, prefix="/notification")
 app.include_router(history.router, prefix="/history")
 app.include_router(admin.router, prefix="/admin")
-
+app.include_router(chat.router, prefix="/chat")
