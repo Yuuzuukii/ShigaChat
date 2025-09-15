@@ -360,13 +360,16 @@
 
 .admin-answer-textarea {
   width: 100%;
-  min-height: 60px;
-  padding: 10px;
-  border: 1px solid #ccc;
-  border-radius: 5px;
+  min-height: 220px; /* 以前: 60px → 大きく */
+  max-height: 60vh;  /* 画面高に応じて制限 */
+  padding: 12px;
+  border: 1px solid #bbb;
+  border-radius: 8px;
   font-size: 16px;
+  line-height: 1.6;
   font-family: inherit;
   resize: vertical;
+  box-sizing: border-box;
 }
 
 .admin-edit-actions {

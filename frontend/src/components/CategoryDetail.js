@@ -15,6 +15,8 @@ import {
     handleGlobalNotificationMove
 } from "../utils/notifications";
 import "./CategoryDetail.css";
+import { redirectToLogin } from "../utils/auth";
+import RichText from "./common/RichText";
 
 function CategoryDetail() {
     const { categoryId } = useParams();
@@ -70,7 +72,7 @@ function CategoryDetail() {
 
     useEffect(() => {
         if (user === null) {
-            navigate("/new");
+            redirectToLogin(navigate);
         }
         const handleTokenUpdate = () => {
             const latestToken = localStorage.getItem("token");
@@ -166,7 +168,7 @@ function CategoryDetail() {
     const fetchQuestions = async (categoryId, user, token, t, setLanguage, setCategoryName, setQuestions, navigate) => {
         if (!token || !user) {
             console.error("ユーザー情報またはトークンがありません。");
-            navigate("/new");
+            redirectToLogin(navigate);
             return;
         }
 
@@ -195,7 +197,7 @@ function CategoryDetail() {
 
             if (response.status === 401) {
                 console.warn("トークンが期限切れです。ログインページへ移動します。");
-                navigate("/new");
+                redirectToLogin(navigate);
                 return;
             }
 
@@ -345,7 +347,7 @@ function CategoryDetail() {
                             style={{ cursor: "pointer" }}
                         >
                             <div className="question-header">
-                                <div className="question-text">{question.質問}</div>
+                                <div className="question-text"><RichText content={question.質問} /></div>
                                 {question.title === "official" && (
                                     <span className="official-badge">{t.official}</span>
                                 )}
@@ -357,7 +359,7 @@ function CategoryDetail() {
                             {visibleAnswerId === question.question_id && (
                                 <div className="answer-section">
                                     <strong>{t.answer}</strong>
-                                    <p>{question.回答 || t.loading}</p>
+                                    <p><RichText content={question.回答 || t.loading} /></p>
                                 </div>
                             )}
                         </div>

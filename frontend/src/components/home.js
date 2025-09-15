@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect, useRef, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../UserContext";
+import { redirectToLogin } from "../utils/auth";
 import { updateUserLanguage } from "../utils/language";
 import {
   API_BASE_URL,
@@ -15,6 +16,7 @@ import {
   handleGlobalNotificationMove
 } from "../utils/notifications";
 import "./Home.css";
+import RichText from "./common/RichText";
 
 // --- Local persistence keys (per-browser, per-user scoped) ---
 const LS_THREADS_KEY = "chat_threads";             // array of {id, title, lastUpdated}
@@ -179,7 +181,7 @@ export default function Home() {
 
   // Auth guard + token refresh listener
   useEffect(() => {
-    if (user === null) navigate("/new");
+    if (user === null) redirectToLogin(navigate);
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
       if (latestToken) fetchUser(latestToken);
@@ -238,7 +240,9 @@ export default function Home() {
               role: "assistant",
               content: msg.answer,
               time: msg.created_at,
-              rag_qa: msg.rag_qa || []
+              rag_qa: msg.rag_qa || [],
+              // 互換性: typeが空でも rag_qa があれば rag とみなす
+              type: msg.type || ((msg.rag_qa && msg.rag_qa.length > 0) ? "rag" : "")
             });
           });
         }
@@ -421,7 +425,7 @@ export default function Home() {
   const sendMessage = async () => {
     if (!token) {
       setErrorMessage(t.errorLogin);
-      navigate("/new");
+      redirectToLogin(navigate);
       return;
     }
     const text = input.trim();
@@ -515,7 +519,8 @@ export default function Home() {
         role: "assistant",
         content: data.answer,
         time: new Date().toISOString(),
-        rag_qa: data.rag_qa || []
+        rag_qa: (data.meta && Array.isArray(data.meta.references)) ? data.meta.references : [],
+        type: data.type || ""
       };
 
       setMessages(prev => {
@@ -701,10 +706,16 @@ export default function Home() {
                 <div key={m.id} className={`message-container ${m.role}`}>
                   <div className={`message-bubble ${m.role}`}>
                     <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
-                    <div className="message-content">{m.typing ? (t?.generatingAnswer || "回答を生成中…") : m.content}</div>
+                    <div className="message-content">
+                      {m.typing
+                        ? (t?.generatingAnswer || "回答を生成中…")
+                        : (m.role === "assistant"
+                            ? <RichText content={m.content} />
+                            : m.content)}
+                    </div>
 
                     {/* Related (rag_qa) */}
-                    {!m.typing && m.role === "assistant" && (
+                    {!m.typing && m.role === "assistant" && ((m.type === "rag") || (m.rag_qa && m.rag_qa.length > 0)) && (
                       <details className="rag-details">
                         <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
                         {m.rag_qa && m.rag_qa.length > 0 ? (
@@ -712,8 +723,8 @@ export default function Home() {
                             {m.rag_qa.map((q, idx) => (
                               <li key={idx}>
                                 <details className="rag-item">
-                                  <summary className="rag-q-summary">{q.question}</summary>
-                                  <div className="rag-answer">{q.answer}</div>
+                                  <summary className="rag-q-summary"><RichText content={q.question} /></summary>
+                                  <div className="rag-answer"><RichText content={q.answer} /></div>
                                   {q.retrieved_at && (
                                     <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
                                   )}

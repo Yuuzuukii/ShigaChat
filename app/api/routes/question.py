@@ -22,7 +22,10 @@ from api.utils.RAG import (
     rag,
     LanguageDetectionError,
     UnsupportedLanguageError,
+    orchestrate,
+    detect_lang,
 )
+import json
 
 router = APIRouter()
 
@@ -40,6 +43,18 @@ def _ensure_thread_qa_has_rag_column(conn: sqlite3.Connection) -> None:
             conn.commit()
     except Exception:
         # Don't crash API path if migration fails; let main ops proceed.
+        pass
+
+def _ensure_thread_qa_has_type_column(conn: sqlite3.Connection) -> None:
+    """Ensure thread_qa table has a type TEXT column to store action type (e.g., 'rag')."""
+    try:
+        cur = conn.cursor()
+        cur.execute("PRAGMA table_info(thread_qa)")
+        cols = [row[1] for row in cur.fetchall()]  # row[1] = name
+        if "type" not in cols:
+            cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
+            conn.commit()
+    except Exception:
         pass
 
 @router.get("/get_translated_question")
@@ -120,13 +135,12 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
     user_id = current_user["id"]
 
     try:
-        # 既存スレッドの検証 or 新規作成（AUTOINCREMENT）
+        # ---- 既存スレッドの検証 or 新規作成（AUTOINCREMENT） --------------------
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
             assigned_thread_id = None
 
             if req_thread_id is not None:
-                # Provided: ensure it exists and belongs to user; otherwise ignore and create new
                 cursor.execute("SELECT id, user_id FROM threads WHERE id = ?", (req_thread_id,))
                 row = cursor.fetchone()
                 if row:
@@ -135,7 +149,6 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                     assigned_thread_id = req_thread_id
 
             if assigned_thread_id is None:
-                # Create new thread with server-managed autoincrement ID
                 cursor.execute(
                     "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
                     (user_id, datetime.now()),
@@ -143,91 +156,110 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
                 assigned_thread_id = cursor.lastrowid
                 conn.commit()
 
-        # 🔹 RAG結果取得（言語判定エラーはここで例外→下のexceptへ）
-        rag_result = rag(question_text)
-
-        # 🔹 整形
-        raw_rag_qa = []
-        for rank in rag_result:
-            # rag() の第4要素は実質的な類似度（高いほど関連性が高い）
-            answer, question, retrieved_at, similarity = rag_result[rank]
-            raw_rag_qa.append({
-                "question": question,
-                "answer": answer,
-                "retrieved_at": retrieved_at,
-                "score": float(similarity),
-            })
-        # 類似度の降順（高いものを先頭に）
-        rag_qa = sorted(raw_rag_qa, key=lambda x: x["score"], reverse=True)
-
-        # 🔹 過去履歴の取得（最新5件を時系列順に）
+        # ---- 履歴の取得（逐次フローの reactive で参照するので先に取る） ----------
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 SELECT question, answer FROM thread_qa
                 WHERE thread_id = ?
                 ORDER BY created_at DESC
-                LIMIT 5
+                LIMIT 6
             """, (assigned_thread_id,))
             past_qa_rows = cursor.fetchall()
-        history_qa = list(reversed(past_qa_rows))
+        history_qa = list(reversed(past_qa_rows))  # [(user, bot), ...] の昇順に
 
-        # 🔹 回答生成
-        generated_answer = generate_answer_with_llm(
+        # ---- 逐次フロー実行： reactive →（必要時のみ）RAG -----------------------
+        # 既定の出力言語（reactive用）を入力言語から推定
+        try:
+            reactive_lang = detect_lang(question_text)
+        except Exception:
+            reactive_lang = "ja"
+
+        resp = orchestrate(
             question_text=question_text,
-            rag_qa=rag_qa,
-            history_qa=history_qa
+            history_qa=history_qa,
+            similarity_threshold=0.3,       # 運用に合わせて調整可
+            max_history_in_prompt=6,
+            model="gpt-4.1-mini",           # 最終回答用のやや強めモデル
+            reactive_default_lang=reactive_lang,
         )
+        # resp["type"] ∈ {"translate","summarize","rewrite","rag","error"}
+        if resp.get("type") == "error":
+            # 統一エラーハンドリング（例外で返す）
+            meta = resp.get("meta", {}) or {}
+            raise HTTPException(status_code=400, detail=resp.get("text", "処理に失敗しました。"))
 
-        # 🔹 新しいQAペアを保存（rag_qaもJSONで保存）
-        import json
+        answer_text = resp.get("text", "").strip()
+        meta = resp.get("meta", {}) or {}
+        references = meta.get("references", []) if isinstance(meta, dict) else []
+        action_type = resp.get("type")  # "translate" | "summarize" | "rewrite" | "rag"
+
+        # ---- 保存用に rag_qa を JSON 化（汎用タスク時は空配列） ------------------
+        rag_qa = []
+        if action_type == "rag" and isinstance(references, list):
+            # 既に orchestrate で UI 向け dict リストに整形済み
+            rag_qa = references
+
+        # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
         with sqlite3.connect(DATABASE) as conn:
-            _ensure_thread_qa_has_rag_column(conn)
+            _ensure_thread_qa_has_rag_column(conn)  # 既存のマイグレーションヘルパ
+            _ensure_thread_qa_has_type_column(conn) # 新規：type列
+            # 必要なら「type」カラムを追加しても良い（下記コメント参照）
             cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    """
+                    INSERT INTO thread_qa (thread_id, question, answer, rag_qa, type)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (assigned_thread_id, question_text, answer_text, json.dumps(rag_qa, ensure_ascii=False), action_type),
+                )
+            except sqlite3.OperationalError:
+                # 互換性: type列がない古い環境
+                cursor.execute(
+                    """
+                    INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (assigned_thread_id, question_text, answer_text, json.dumps(rag_qa, ensure_ascii=False)),
+                )
             cursor.execute(
-                """
-                INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
-                VALUES (?, ?, ?, ?)
-                """,
-                (assigned_thread_id, question_text, generated_answer, json.dumps(rag_qa, ensure_ascii=False)),
-            )
-            cursor.execute(
-                """
-                UPDATE threads SET last_updated = ? WHERE id = ?
-                """,
+                "UPDATE threads SET last_updated = ? WHERE id = ?",
                 (datetime.now(), assigned_thread_id),
             )
             conn.commit()
 
+        # ---- レスポンス -----------------------------------------------------------
         return {
             "thread_id": assigned_thread_id,
             "question": question_text,
-            "answer": generated_answer,
-            "rag_qa": rag_qa
+            "answer": answer_text,
+            "type": action_type,          # 追加：UI が出し分けできるように
+            "meta": meta,                 # 追加：lang / references / threshold など
         }
 
+    # ---- 例外ハンドリング（運用時に応じて整理） -----------------------------------
     except UnsupportedLanguageError as e:
-        # 許可外 → 400 Bad Request
         error_detail = f"Unsupported language detected: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
+        print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
     except LanguageDetectionError as e:
-        # 検出不可 → 400 Bad Request
         error_detail = f"Language detection failed: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
+        print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
     except sqlite3.Error as e:
         error_detail = f"DBエラー: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
+        print(f"❌ {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
     except RuntimeError as e:
-        # ベクトル未生成などの運用エラーは 500
         error_detail = str(e)
-        print(f"❌ Runtime error: {error_detail}")  # ログに出力
+        print(f"❌ Runtime error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
+    except HTTPException:
+        raise
     except Exception as e:
         error_detail = f"内部エラー: {str(e)}"
-        print(f"❌ {error_detail}")  # ログに出力
+        print(f"❌ {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
 
 @router.get("/get_translated_answer")
@@ -438,6 +470,7 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
         with sqlite3.connect(DATABASE) as conn:
             cursor = conn.cursor()
             _ensure_thread_qa_has_rag_column(conn)
+            _ensure_thread_qa_has_type_column(conn)
             
             # スレッドの所有者確認
             cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
@@ -452,7 +485,8 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
             # メッセージ履歴を取得（rag_qa も返す）
             cursor.execute(
                 """
-                SELECT question, answer, created_at, rag_qa FROM thread_qa
+                SELECT question, answer, created_at, rag_qa, COALESCE(type, '') as type
+                FROM thread_qa
                 WHERE thread_id = ?
                 ORDER BY created_at ASC
                 """,
@@ -461,7 +495,13 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
             messages_data = cursor.fetchall()
             
             messages = []
-            for question, answer, created_at, rag_qa_text in messages_data:
+            for row in messages_data:
+                # Support both with and without type column
+                if len(row) >= 5:
+                    question, answer, created_at, rag_qa_text, msg_type = row
+                else:
+                    question, answer, created_at, rag_qa_text = row
+                    msg_type = ""
                 rag_val = None
                 if rag_qa_text:
                     try:
@@ -473,6 +513,7 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
                     "answer": answer,
                     "created_at": created_at,
                     "rag_qa": rag_val,
+                    "type": msg_type,
                 })
             
             return {"messages": messages}

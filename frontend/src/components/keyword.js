@@ -15,6 +15,8 @@ import {
   handleGlobalNotificationMove
 } from "../utils/notifications";
 import "./Keyword.css";
+import { redirectToLogin } from "../utils/auth";
+import RichText from "./common/RichText";
 
 function Keyword() {
   const [keyword, setKeyword] = useState(""); // キーワードの状態を管理
@@ -71,7 +73,7 @@ function Keyword() {
   useEffect(() => {
       //console.log("UserContext 更新後のユーザー情報:", user);
       if (user === null) {
-        navigate("/new");
+        redirectToLogin(navigate);
       }
       const handleTokenUpdate = () => {
         const latestToken = localStorage.getItem("token");
@@ -136,7 +138,7 @@ function Keyword() {
   const handleSearch = async () => {
     if (!token) {
       setErrorMessage(t.errorLogin);
-      navigate("/new");
+      redirectToLogin(navigate);
       return;
     }
     if (!keyword.trim()) {
@@ -148,6 +150,7 @@ function Keyword() {
       const token = localStorage.getItem("token");
       if (!token) {
         alert(t.errorLogin);
+        redirectToLogin(navigate);
         return;
       }
 
@@ -330,7 +333,7 @@ function Keyword() {
             >
               <div className="question-header">
                 <div className="question-text">
-                  <p dangerouslySetInnerHTML={{ __html: highlightMatchedWords(question.question_text) || t.loading }} />
+                  <p><RichText content={question.question_text || t.loading} /></p>
                 </div>
                 {question?.title === "official" && (
                   <span className="official-badge">{t.official}</span>
@@ -352,7 +355,7 @@ function Keyword() {
               {visibleAnswerId === question.question_id && (
                 <div className="answer-section">
                   <strong>{t.answer}</strong>
-                  <p dangerouslySetInnerHTML={{ __html: highlightMatchedWords(question.answer_text) || t.loading }} />
+                  <p><RichText content={question.answer_text || t.loading} /></p>
                 </div>
               )}
             </div>

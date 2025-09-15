@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { redirectToLogin } from "../utils/auth";
 import { UserContext } from "../UserContext";
 import "./NavBar.css";
 
@@ -97,7 +98,11 @@ const NavBar = () => {
   const handleLogout = () => {
     logout();
     setIsOpen(false);
-    navigate("/new"); // HashRouter対応リダイレクト
+    try {
+      const path = window.location?.pathname + window.location?.search;
+      if (path && path !== "/new") localStorage.setItem("redirectAfterLogin", path);
+    } catch {}
+    redirectToLogin(navigate);
     setLanguage("en");
   };
 
@@ -224,5 +229,4 @@ export default NavBar;
 // };
 
 // export default NavBar;
-
 

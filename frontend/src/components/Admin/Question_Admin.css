@@ -637,6 +637,12 @@
     transition: background-color 0.3s ease;
     transform: translateY(-3px); /* ホバー時に少し浮き上がる */
   }
+  .register-container .register:disabled{
+    background: #bbb;
+    color: #eee;
+    cursor: not-allowed;
+    transform: none;
+  }
   
   .register-container .close{
     background: #ccc;
@@ -650,5 +656,17 @@
   }
   .register-container .close:hover{
     background: #999;
+  }
+  .register-container .close:disabled{
+    background: #ddd;
+    color: #888;
+    cursor: not-allowed;
+  }
+
+  .register-container .category-button:disabled{
+    background-color: #9dbcf0 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    opacity: 0.8;
   }
   

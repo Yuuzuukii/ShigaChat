@@ -6,6 +6,7 @@ from api.utils.translator import question_translate, answer_translate
 from config import DATABASE, language_mapping
 from api.utils.translator import translate
 from models.schemas import QuestionRequest, moveCategoryRequest, RegisterQuestionRequest
+from api.utils.RAG import append_qa_to_vector_index, add_qa_id_to_ignore, ignore_current_vectors_for_qa
 router = APIRouter()
 
 # Ensure notifications table has question_id column
@@ -90,6 +91,12 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             question_owner_id = row[0]
             prev_editor_id = row[1]
 
+            # 先に現行のベクトルを無効化（各言語のハッシュを記録）
+            try:
+                ignore_current_vectors_for_qa(question_id, answer_id)
+            except Exception:
+                pass
+
             # 🔄 `answer_translation` テーブルを更新
             cursor.execute("""
                 UPDATE answer_translation
@@ -150,6 +157,12 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                     (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
                 )
                 conn.commit()
+            except Exception:
+                pass
+
+            # 変更後の内容でベクトルを差分追加（全言語）
+            try:
+                append_qa_to_vector_index(question_id, answer_id)
             except Exception:
                 pass
 
@@ -306,14 +319,20 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
             question_owner_id = row[0]
             prev_editor_id = row[1]
 
-            # 🔹 `QA` から `answer_id` を取得
-            cursor.execute("SELECT answer_id FROM QA WHERE question_id = ?", (question_id,))
-            answer_id_row = cursor.fetchone()
+            # 🔹 `QA` から `id` と `answer_id` を取得
+            cursor.execute("SELECT id, answer_id FROM QA WHERE question_id = ?", (question_id,))
+            qa_row = cursor.fetchone()
 
-            if not answer_id_row:
+            if not qa_row:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} に対応する回答が見つかりません")
 
-            answer_id = answer_id_row[0]
+            qa_id, answer_id = qa_row
+
+            # 🧹 ベクトルをグローバルに無効化（QA IDベース）
+            try:
+                add_qa_id_to_ignore(qa_id)
+            except Exception:
+                pass
 
             # 🔹 データ削除処理（トランザクション処理を使用）
             cursor.execute("DELETE FROM question WHERE question_id = ?", (question_id,))
@@ -699,7 +718,15 @@ async def register_question(
             )
 
         conn.commit()  # 翻訳の挿入を確定
-        
+
+        # ベクトルインデックスへ差分追加（全言語分）
+        try:
+            appended = append_qa_to_vector_index(question_id, answer_id)
+            # optional: could log appended count if a logger is present
+        except Exception:
+            # ベクトル更新失敗は致命ではないため処理を続行
+            pass
+
     return {
         "question_id": question_id,
         "question_text": request.content,

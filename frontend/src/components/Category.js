@@ -15,6 +15,7 @@ import {
   handleGlobalNotificationMove
 } from "../utils/notifications";
 import "./Category.css";
+import { redirectToLogin } from "../utils/auth";
 
 const Kategori = () => {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ const Kategori = () => {
   useEffect(() => {
     //console.log("UserContext 更新後のユーザー情報:", user);
     if (user === null) {
-      navigate("/new");
+      redirectToLogin(navigate);
     }
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");

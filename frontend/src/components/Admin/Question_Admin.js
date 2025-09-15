@@ -1,6 +1,7 @@
 // src/components/Admin/Question_Admin.jsx
 import React, { useState, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { redirectToLogin } from "../../utils/auth";
 import { UserContext } from "../../UserContext";
 import { updateUserLanguage } from "../../utils/language";
 import {
@@ -51,7 +52,7 @@ const Question_Admin = () => {
   }, [user]);
 
   useEffect(() => {
-    if (user === null) navigate("/new");
+  if (user === null) redirectToLogin(navigate);
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
       if (latestToken) fetchUser(latestToken);
@@ -292,7 +293,7 @@ const Question_Admin = () => {
         </div>
       </div>
 
-      <button className="reg" onClick={openRegisterModal}>
+      <button className="reg" onClick={openRegisterModal} disabled={isSubmitting}>
         {t.registerquestion}
       </button>
 
@@ -305,7 +306,7 @@ const Question_Admin = () => {
             <label>
               {t.category}: {selectedCategoryName || t.notSelected || "—"}
             </label>
-            <button className="category-button" onClick={openCategoryModal}>
+            <button className="category-button" onClick={openCategoryModal} disabled={isSubmitting}>
               {t.selectcategory}
             </button>
 
@@ -320,7 +321,7 @@ const Question_Admin = () => {
             <button className="register" onClick={handleRegisterQuestion} disabled={isSubmitting}>
               {isSubmitting ? (t.loading || "Loading...") : t.register_question}
             </button>
-            <button className="close" onClick={closeRegisterModal}>
+            <button className="close" onClick={closeRegisterModal} disabled={isSubmitting}>
               {t.close || "Close"}
             </button>
           </div>

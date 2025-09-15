@@ -95,7 +95,7 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
     const categoryId = categoryData.category_id;
     await fetchNotifications();
     if (categoryId) {
-      navigate(`/admin/category/${categoryId}?id=${questionId}`);
+      navigate(`/category/${categoryId}?id=${questionId}`);
     }
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
@@ -133,7 +133,7 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
     const categoryData = await categoryRes.json();
     const categoryId = categoryData.category_id;
     await fetchNotifications();
-    if (categoryId) navigate(`/admin/category/${categoryId}?id=${questionId}`);
+    if (categoryId) navigate(`/category/${categoryId}?id=${questionId}`);
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
   }

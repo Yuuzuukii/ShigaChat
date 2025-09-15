@@ -25,7 +25,7 @@ function New() {
     if (user) {
       const redirectPath = localStorage.getItem("redirectAfterLogin") || "/home";
       localStorage.removeItem("redirectAfterLogin"); // クリア
-      navigate(redirectPath);
+      if (redirectPath) navigate(redirectPath);
     }
   }, [user, navigate]);
 
@@ -65,7 +65,10 @@ function New() {
         localStorage.setItem("user", JSON.stringify(mappedUser));
       } catch {}
 
-      navigate("/home");  // ホーム画面にリダイレクト
+      // Redirect to originally requested path if available
+      const redirectPath = localStorage.getItem("redirectAfterLogin") || "/home";
+      localStorage.removeItem("redirectAfterLogin");
+      navigate(redirectPath);
     } catch (error) {
       if (error.response?.status === 401) {
         setErrorMessage(t.errorInvalidLogin);

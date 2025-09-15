@@ -860,7 +860,8 @@ html, body, #root {
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   background: #f9fafb;
-  overflow: hidden;
+  /* 横スクロールやはみ出しを防ぐため、隠さずに中で折り返す */
+  overflow: visible;
 }
 
 .rag-details[open] {
@@ -923,6 +924,9 @@ html, body, #root {
   line-height: 1.5;
   color: #111827;
   white-space: pre-wrap;
+  /* 長いURLや連続文字の折り返しを許可 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .rag-q-summary {
@@ -972,4 +976,13 @@ html, body, #root {
 @media (max-width: 768px) {
   .rag-summary { font-size: 13px; padding: 9px 10px; }
   .rag-q-summary, .rag-answer { padding-left: 26px; }
+  /* 小画面では吹き出しの幅制限を緩める */
+  .message-bubble { max-width: 100%; }
+}
+
+/* リンク内テキストも折り返し可能に */
+.rag-q-summary a,
+.rag-answer a {
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
