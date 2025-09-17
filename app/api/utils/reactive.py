@@ -15,13 +15,85 @@ TRANSLATE_PATTERNS = [
 ]
 
 SUMMARIZE_PATTERNS = [
-    r"要約して", r"まとめて", r"短くして", r"要旨", r"箇条書きに", r"bullet",
-    r"\bsummari[sz]e\b", r"\btl;dr\b",
+    r"要約して", r"要約してください", r"要約して下さい", r"要約", r"要約を",
+    r"まとめて", r"まとめてください", r"短くして", r"短く", r"要旨",
+    r"箇条書きに", r"bullet", r"\bsummari[sz]e\b", r"\btl;dr\b",
 ]
 
 REWRITE_PATTERNS = [
     r"言い換え", r"書き換え", r"丁寧に", r"自然な表現に", r"校正", r"文法を直して", r"整形",
     r"\brewrite\b", r"\brephrase\b", r"\bpolish\b", r"\bproofread\b", r"\bformat\b",
+]
+
+# ---- Additional generic task patterns -----------------------------------
+
+SIMPLIFY_PATTERNS = [
+    r"やさしい日本語", r"やさしく説明して", r"噛み砕いて", r"平易に", r"中学生向け", r"小学生向け",
+    r"\bsimplify\b", r"\bsimple terms\b", r"\bexplain like\b",
+]
+
+EXPAND_PATTERNS = [
+    r"詳しく", r"詳述", r"長くして", r"例を?足して", r"補足して", r"背景も", r"詳細に",
+    r"\bexpand\b", r"\belaborate\b", r"\bmore detail\b",
+]
+
+SHORTEN_PATTERNS = [
+    r"短く", r"短くして", r"端的に", r"要点だけ", r"一言で",
+    r"\bshorten\b", r"\bconcise\b",
+]
+
+BULLETS_PATTERNS = [
+    r"箇条書きに", r"箇条書きで", r"リストに", r"項目で",
+    r"\bbullet\b", r"\blist\b",
+]
+
+OUTLINE_PATTERNS = [
+    r"アウトラインに", r"見出し化", r"章立て", r"構成に",
+    r"\boutline\b", r"\bheadings?\b",
+]
+
+TITLE_PATTERNS = [
+    r"タイトルを?つけて", r"件名(を|に)して", r"題名(を|に)して",
+    r"\btitle\b", r"\bsubject\b",
+]
+
+KEYWORDS_PATTERNS = [
+    r"キーワード抽出", r"キーワードを?", r"タグ(化|付け)", r"ハッシュタグ",
+    r"\bkeywords?\b", r"\btags?\b", r"\bhashtags?\b",
+]
+
+SENTIMENT_PATTERNS = [
+    r"感情分析", r"ポジネガ", r"トーンは", r"雰囲気は",
+    r"\bsentiment\b", r"\btone\b",
+]
+
+FORMAT_PATTERNS = [
+    r"jsonにして", r"csvにして", r"markdown(に|表)にして", r"表にして", r"テーブルにして",
+    r"\bto json\b", r"\bto csv\b", r"\bto markdown\b", r"\btable\b",
+]
+
+PROOFREAD_STRICT_PATTERNS = [
+    r"誤字(だけ)?直して", r"文法(だけ)?直して", r"typo",
+    r"\bproofread only\b", r"\bfix grammar only\b",
+]
+
+STYLE_PATTERNS = [
+    r"丁寧(に|語で)", r"カジュアル(に|で)", r"ビジネス(に|で)", r"学術風(に|で)", r"敬語(に|で)",
+    r"\bpolite\b", r"\bcasual\b", r"\bbusiness\b", r"\bacademic\b",
+]
+
+ENTITIES_PATTERNS = [
+    r"(日付|日時|金額|人数|場所|固有名詞).*抽出", r"エンティティ抽出",
+    r"\bentities?\b", r"\bner\b",
+]
+
+KEYPOINTS_PATTERNS = [
+    r"要点(だけ|に)", r"結論(だけ|から)", r"結論→理由",
+    r"\bkey points?\b", r"\bhighlights\b",
+]
+
+DETECT_LANG_PATTERNS = [
+    r"何語", r"言語は", r"言語判定", r"language\?", r"detect language",
 ]
 
 # ---- Language hints (target selection) -----------------------------------
@@ -127,15 +199,49 @@ def _extract_answer_block(text: str) -> Tuple[Optional[str], str, bool]:
 # ---- Intent API ----------------------------------------------------------
 
 def classify_intent(question_text: str) -> Optional[Dict[str, str]]:
-    """Return a dict like {type: translate|summarize|rewrite} or None.
-    Be conservative: only return when clearly reactive.
+    """Return a dict like {type: ...} or None. Priority tuned to be intuitive.
     """
-    if _contains_any(question_text, TRANSLATE_PATTERNS):
-        return {"type": "translate"}
-    if _contains_any(question_text, SUMMARIZE_PATTERNS):
+    q = question_text
+    # Format conversion first
+    if _contains_any(q, FORMAT_PATTERNS):
+        return {"type": "format"}
+    # Summaries and list/outline
+    if _contains_any(q, SUMMARIZE_PATTERNS):
         return {"type": "summarize"}
-    if _contains_any(question_text, REWRITE_PATTERNS):
+    if _contains_any(q, BULLETS_PATTERNS):
+        return {"type": "bullets"}
+    if _contains_any(q, OUTLINE_PATTERNS):
+        return {"type": "outline"}
+    # Title/keywords/entities/keypoints
+    if _contains_any(q, TITLE_PATTERNS):
+        return {"type": "title"}
+    if _contains_any(q, KEYWORDS_PATTERNS):
+        return {"type": "keywords"}
+    if _contains_any(q, ENTITIES_PATTERNS):
+        return {"type": "entities"}
+    if _contains_any(q, KEYPOINTS_PATTERNS):
+        return {"type": "keypoints"}
+    # Sentiment
+    if _contains_any(q, SENTIMENT_PATTERNS):
+        return {"type": "sentiment"}
+    # Style/simplify/rewrite/length
+    if _contains_any(q, SIMPLIFY_PATTERNS):
+        return {"type": "simplify"}
+    if _contains_any(q, PROOFREAD_STRICT_PATTERNS):
+        return {"type": "proofread_strict"}
+    if _contains_any(q, REWRITE_PATTERNS):
         return {"type": "rewrite"}
+    if _contains_any(q, STYLE_PATTERNS):
+        return {"type": "style"}
+    if _contains_any(q, SHORTEN_PATTERNS):
+        return {"type": "shorten"}
+    if _contains_any(q, EXPAND_PATTERNS):
+        return {"type": "expand"}
+    # Translation / language detect
+    if _contains_any(q, TRANSLATE_PATTERNS):
+        return {"type": "translate"}
+    if _contains_any(q, DETECT_LANG_PATTERNS):
+        return {"type": "detect_lang"}
     return None
 
 
@@ -228,6 +334,188 @@ def rewrite_text(text: str, output_lang_code: str, style_hint: Optional[str] = N
     resp = _llm().invoke([HumanMessage(content=prompt)])
     return resp.content.strip()
 
+# ---- New helpers ---------------------------------------------------------
+
+def simplify_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Rewrite the text in {lang_name} using simpler words for a general audience.\n"
+        f"- Keep core facts correct.\n- Use short sentences.\n- Add a brief example if it helps.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def _detect_target_length(question_text: str) -> Optional[int]:
+    m = re.search(r"(\d{2,4})\s*(文字|字|chars?|characters?)", question_text, flags=re.IGNORECASE)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+def shorten_text(text: str, output_lang_code: str, question_text: Optional[str] = None) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    target_len = _detect_target_length(question_text or "")
+    hint = f" in about {target_len} characters" if target_len else " concisely"
+    prompt = (
+        f"Summarize the following text in {lang_name}{hint}.\n- Keep key facts.\n- Remove repetitions and tangents.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def expand_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Expand the following text in {lang_name}.\n- Add brief context and a concrete example.\n- Keep the original meaning.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def bullets_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Convert the following into clear bullet points in {lang_name}.\n- Each bullet one idea.\n- Keep key facts and numbers.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def outline_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Create a hierarchical outline with headings in {lang_name}.\n- Use H1/H2/H3 style labels.\n- Keep sections short.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def title_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Generate a single-line, informative title in {lang_name}.\n- ~20 characters if possible.\n- No quotes or prefixes.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def keywords_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Extract 5-10 key terms in {lang_name}.\n- Output as a comma-separated list.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def sentiment_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Classify the sentiment and tone in {lang_name}.\n- Output: label + brief reason (one line).\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def convert_format(text: str, output_lang_code: str, question_text: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    fmt = "json" if re.search(r"json", question_text, re.IGNORECASE) else (
+        "csv" if re.search(r"csv", question_text, re.IGNORECASE) else "markdown"
+    )
+    if fmt == "json":
+        prompt = (
+            f"Convert to well-formed JSON in {lang_name}.\n- Choose reasonable keys.\n- Output only JSON.\n\nText:\n{text}"
+        )
+    elif fmt == "csv":
+        prompt = (
+            f"Convert to CSV in {lang_name}.\n- First line header.\n- Output only CSV.\n\nText:\n{text}"
+        )
+    else:
+        prompt = (
+            f"Convert to a Markdown table in {lang_name}.\n- Include header.\n- Output only the table.\n\nText:\n{text}"
+        )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def proofread_only_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Fix only typos and grammar in {lang_name}.\n- Do not change meaning or style.\n- Output corrected text only.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def restyle_text(text: str, output_lang_code: str, question_text: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    style = "polite" if re.search(r"丁寧|polite", question_text, re.IGNORECASE) else (
+        "casual" if re.search(r"カジュアル|casual", question_text, re.IGNORECASE) else (
+        "business" if re.search(r"ビジネス|business", question_text, re.IGNORECASE) else (
+        "academic" if re.search(r"学術|academic", question_text, re.IGNORECASE) else "polite")))
+    prompt = (
+        f"Rewrite in {lang_name} with a {style} tone.\n- Keep original meaning.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def extract_entities_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"Extract entities (dates, amounts, counts, places, proper nouns) in {lang_name}.\n"
+        f"- Output as bullet list: type: value.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def keypoints_text(text: str, output_lang_code: str) -> str:
+    _q, _a, has_qa = _extract_answer_block(text)
+    if has_qa:
+        text = _a
+    lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    prompt = (
+        f"List 3-5 key points in {lang_name}.\n- If requested, order as conclusion -> reasons.\n\nText:\n{text}"
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
+def detect_language_text(text: str) -> str:
+    prompt = (
+        "Detect the language (ISO-639-1 code and name).\n"
+        "Output: code - name.\n\nText:\n" + text
+    )
+    resp = _llm().invoke([HumanMessage(content=prompt)])
+    return resp.content.strip()
+
 # ---- Public entrypoint ---------------------------------------------------
 
 @dataclass
@@ -269,6 +557,62 @@ def reactive_handle(
     if ttype == "rewrite":
         out = rewrite_text(target_text, target_lang)
         return {"type": "rewrite", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "simplify":
+        out = simplify_text(target_text, target_lang)
+        return {"type": "simplify", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "shorten":
+        out = shorten_text(target_text, target_lang, question_text)
+        return {"type": "shorten", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "expand":
+        out = expand_text(target_text, target_lang)
+        return {"type": "expand", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "bullets":
+        out = bullets_text(target_text, target_lang)
+        return {"type": "bullets", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "outline":
+        out = outline_text(target_text, target_lang)
+        return {"type": "outline", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "title":
+        out = title_text(target_text, target_lang)
+        return {"type": "title", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "keywords":
+        out = keywords_text(target_text, target_lang)
+        return {"type": "keywords", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "entities":
+        out = extract_entities_text(target_text, target_lang)
+        return {"type": "entities", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "keypoints":
+        out = keypoints_text(target_text, target_lang)
+        return {"type": "keypoints", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "sentiment":
+        out = sentiment_text(target_text, target_lang)
+        return {"type": "sentiment", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "format":
+        out = convert_format(target_text, target_lang, question_text)
+        return {"type": "format", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "proofread_strict":
+        out = proofread_only_text(target_text, target_lang)
+        return {"type": "proofread_strict", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "style":
+        out = restyle_text(target_text, target_lang, question_text)
+        return {"type": "style", "text": out, "meta": {"target_lang": target_lang, "source_len": len(target_text)}}
+
+    if ttype == "detect_lang":
+        out = detect_language_text(target_text)
+        return {"type": "detect_lang", "text": out, "meta": {"source_len": len(target_text)}}
 
     # Fallback: route to RAG for anything else
     return {"type": "route_to_rag"}

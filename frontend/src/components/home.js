@@ -79,6 +79,13 @@ export default function Home() {
   const [currentThreadId, setCurrentThreadId] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  // RAG similarity threshold (0.0–1.0), persisted in localStorage
+  const DEFAULT_SIMILARITY = 0.3;
+  const [similarity, setSimilarity] = useState(() => {
+    const v = localStorage.getItem('rag_similarity_threshold');
+    const n = v != null ? parseFloat(v) : DEFAULT_SIMILARITY;
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
+  });
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
@@ -138,7 +145,10 @@ export default function Home() {
         const response = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
           headers: { Authorization: `Bearer ${token}` }
         });
-
+        if (response.status === 401) {
+          redirectToLogin(navigate);
+          return;
+        }
         if (response.ok) {
           const data = await response.json();
           const serverThreads = toClientThreads(data.threads || []);
@@ -175,6 +185,7 @@ export default function Home() {
         setNotifications,
         setGlobalNotifications,
         setUnreadCount,
+        navigate,
       }).finally(() => setIsNotifLoading(false));
     }
   }, [userId, token, language]);
@@ -250,6 +261,9 @@ export default function Home() {
         setMessages(clientMessages);
         // Still backup to localStorage for offline access
         saveMsgsLS(threadId, clientMessages);
+      } else if (response.status === 401) {
+        redirectToLogin(navigate);
+        return;
       } else {
         console.warn('Failed to load from server, using localStorage');
         // Fallback to localStorage
@@ -300,6 +314,7 @@ export default function Home() {
       setNotifications,
       setGlobalNotifications,
       setUnreadCount,
+      navigate,
     });
   };
   const onNotificationMove = (notification) => {
@@ -320,6 +335,17 @@ export default function Home() {
   };
 
   const handleSetSize = (size) => () => setChatSize(size);
+
+  const handleSimilarityChange = (e) => {
+    const n = parseFloat(e.target.value);
+    const clamped = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
+    setSimilarity(clamped);
+    try { localStorage.setItem('rag_similarity_threshold', String(clamped)); } catch {}
+  };
+  const resetSimilarity = () => {
+    setSimilarity(DEFAULT_SIMILARITY);
+    try { localStorage.setItem('rag_similarity_threshold', String(DEFAULT_SIMILARITY)); } catch {}
+  };
 
   // --- Thread ops ---
   const createThread = () => {
@@ -359,11 +385,16 @@ export default function Home() {
         headers: { Authorization: `Bearer ${token}` }
       });
 
-      if (response.ok) {
+      if (response.status === 401) {
+        redirectToLogin(navigate);
+        return;
+      } else if (response.ok) {
         // サーバーから正常に削除された場合、サーバーから一覧を再取得
         try {
           const resp2 = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
-          if (resp2.ok) {
+          if (resp2.status === 401) {
+            redirectToLogin(navigate);
+          } else if (resp2.ok) {
             const data2 = await resp2.json();
             const serverThreads = toClientThreads(data2.threads || []);
             setThreads(serverThreads);
@@ -454,12 +485,19 @@ export default function Home() {
     try {
       // when threadId is temporary, omit thread_id so server creates autoincrement thread
       const isTemp = String(threadId).startsWith('tmp-');
-      const payload = isTemp ? { text } : { thread_id: Number(threadId), text };
+      const base = { text, similarity_threshold: similarity };
+      const payload = isTemp ? base : { thread_id: Number(threadId), ...base };
       const res = await fetch(`${API_BASE_URL}/question/get_answer`, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload)
       });
+      if (res.status === 401) {
+        // Remove typing placeholder before redirect
+        setMessages(prev => prev.filter(m => m.id !== "typing"));
+        redirectToLogin(navigate);
+        return;
+      }
       if (!res.ok) {
         let errorMessage = t.failtogetanswer || "Failed to get answer";
         try {
@@ -533,7 +571,9 @@ export default function Home() {
       // Refresh from server to ensure sidebar sync
       try {
         const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
-        if (resp.ok) {
+        if (resp.status === 401) {
+          redirectToLogin(navigate);
+        } else if (resp.ok) {
           const data2 = await resp.json();
           const serverThreads = toClientThreads(data2.threads || []);
           setThreads(serverThreads);
@@ -619,8 +659,8 @@ export default function Home() {
                 </select>
               </div>
             </div>
-            <h1>Shiga Chat</h1>
-            <div className="user-notification-wrapper">
+          <h1>Shiga Chat</h1>
+          <div className="user-notification-wrapper">
               <div className={`notification-container ${showPopup ? "show" : ""}`}>
                 <button className="notification-button" onClick={onNotificationClick}>
                   <img src="./bell.png" alt="通知" className="notification-icon" />
@@ -670,6 +710,7 @@ export default function Home() {
           </header>
 
           {/* Chat area */}
+
           <main className="chat-main">
             <div className="chat-controls">
               <button className="hamburger-btn chat-hamburger" onClick={() => setIsDrawerOpen(true)}>
@@ -683,12 +724,33 @@ export default function Home() {
               </button>
             </div>
             <div className="chat-widthbar" aria-label="画面サイズ設定">
-              <span className="widthLabel">画面サイズ</span>
+              <span className="widthLabel">{t?.screenSize || '画面サイズ'}</span>
               <div className="widthToggle" role="group" aria-label="画面サイズ">
-                <button className={`widthBtn ${chatSize === 'small' ? 'active' : ''}`} onClick={handleSetSize('small')}>小</button>
-                <button className={`widthBtn ${chatSize === 'medium' ? 'active' : ''}`} onClick={handleSetSize('medium')}>中</button>
-                <button className={`widthBtn ${chatSize === 'large' ? 'active' : ''}`} onClick={handleSetSize('large')}>大</button>
+                <button className={`widthBtn ${chatSize === 'small' ? 'active' : ''}`} onClick={handleSetSize('small')}>{t?.widthSmall || '小'}</button>
+                <button className={`widthBtn ${chatSize === 'medium' ? 'active' : ''}`} onClick={handleSetSize('medium')}>{t?.widthMedium || '中'}</button>
+                <button className={`widthBtn ${chatSize === 'large' ? 'active' : ''}`} onClick={handleSetSize('large')}>{t?.widthLarge || '大'}</button>
               </div>
+            </div>
+            {/* Small threshold control on the right of size controls */}
+            <div className="rag-threshold" aria-label="RAG閾値設定">
+              <span className="simLabel">{t?.similarityLabel || '一致の厳しさ'}</span>
+              <div className="simRangeWrapper">
+                <input
+                  id="similarityRange"
+                  className="simRange"
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.05"
+                  value={similarity}
+                  onChange={handleSimilarityChange}
+                />
+                <div className="simScale">
+                  <span className="simLow">{t?.similarityLow || '弱い'}</span>
+                  <span className="simHigh">{t?.similarityHigh || '強い'}</span>
+                </div>
+              </div>
+              <span className="simValue">{similarity.toFixed(2)}</span>
             </div>
             <div className="chat-messages">
               {messagesLoading && currentThreadId && (

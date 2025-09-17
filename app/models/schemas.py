@@ -38,6 +38,8 @@ class Question(BaseModel):
     # thread_id is optional: omit to start a new thread (server will autoincrement)
     thread_id: Optional[int] = None
     text: str
+    # Optional similarity threshold for RAG retrieval (0.0–1.0). Defaults server-side to 0.3
+    similarity_threshold: Optional[float] = None
 
 class AnswerEditRequest(BaseModel):
     answer_id: int

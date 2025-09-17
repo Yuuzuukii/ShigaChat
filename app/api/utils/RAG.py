@@ -798,10 +798,15 @@ def answer_with_rag(
 
 try:
     # 循環依存を避けるため遅延インポート
-    from reactive import reactive_handle, ReactiveConfig  # your patched reactive.py
+    # 正しいパッケージパスでのインポートを優先
+    from api.utils.reactive import reactive_handle, ReactiveConfig
 except Exception:
-    reactive_handle = None
-    ReactiveConfig = None
+    try:
+        # 互換: 実行パスによっては直下解決できる場合がある
+        from reactive import reactive_handle, ReactiveConfig  # fallback
+    except Exception:
+        reactive_handle = None
+        ReactiveConfig = None
 
 
 def orchestrate(

@@ -175,10 +175,18 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         except Exception:
             reactive_lang = "ja"
 
+        # 受信した similarity_threshold を優先（未指定時は 0.3）
+        sim_th = request.similarity_threshold if (hasattr(request, 'similarity_threshold') and request.similarity_threshold is not None) else 0.3
+        # クランプ（0.0〜1.0の範囲外は丸め）
+        try:
+            sim_th = max(0.0, min(1.0, float(sim_th)))
+        except Exception:
+            sim_th = 0.3
+
         resp = orchestrate(
             question_text=question_text,
             history_qa=history_qa,
-            similarity_threshold=0.3,       # 運用に合わせて調整可
+            similarity_threshold=sim_th,       # UIから指定可能
             max_history_in_prompt=6,
             model="gpt-4.1-mini",           # 最終回答用のやや強めモデル
             reactive_default_lang=reactive_lang,

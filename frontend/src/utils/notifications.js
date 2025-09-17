@@ -1,4 +1,5 @@
 import { API_BASE_URL } from "../config/constants";
+import { redirectToLogin } from "./auth";
 
 export const fetchNotifications = async ({
   language,
@@ -7,12 +8,17 @@ export const fetchNotifications = async ({
   setNotifications,
   setGlobalNotifications,
   setUnreadCount,
+  navigate,
 }) => {
   try {
     // 🔹 個人通知取得
     const personalRes = await fetch(`${API_BASE_URL}/notification/notifications?lang=${language}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (personalRes.status === 401) {
+      if (navigate) redirectToLogin(navigate);
+      return;
+    }
     const personalData = await personalRes.json();
     const unreadPersonal = personalData.notifications.filter((n) => !n.is_read).length;
 
@@ -20,6 +26,10 @@ export const fetchNotifications = async ({
     const globalRes = await fetch(`${API_BASE_URL}/notification/notifications/global?lang=${language}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (globalRes.status === 401) {
+      if (navigate) redirectToLogin(navigate);
+      return;
+    }
     const globalData = await globalRes.json();
     const unreadGlobal = globalData.filter(
       (n) => !Array.isArray(n.read_users) || !n.read_users.includes(userId)
@@ -47,6 +57,7 @@ export const handleNotificationClick = ({
   setNotifications,
   setGlobalNotifications,
   setUnreadCount,
+  navigate,
 }) => {
   setShowPopup((prev) => !prev);
   if (!showPopup) {
@@ -57,6 +68,7 @@ export const handleNotificationClick = ({
       setNotifications,
       setGlobalNotifications,
       setUnreadCount,
+      navigate,
     });
   }
 };
@@ -83,13 +95,20 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
       },
       body: JSON.stringify(requestData),
     });
-
+    if (response.status === 401) {
+      if (navigate) redirectToLogin(navigate);
+      return;
+    }
     if (!response.ok) throw new Error("通知の既読処理に失敗しました");
 
     // Navigate to Question Management (admin list by category)
     const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
+    if (categoryRes.status === 401) {
+      if (navigate) redirectToLogin(navigate);
+      return;
+    }
     if (!categoryRes.ok) {
       // Question deleted or category missing: just refresh notifications (already marked read)
       await fetchNotifications();
@@ -129,6 +148,10 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
     const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     });
+    if (categoryRes.status === 401) {
+      if (navigate) redirectToLogin(navigate);
+      return;
+    }
 
     await markReadReq.catch(() => {});
 
