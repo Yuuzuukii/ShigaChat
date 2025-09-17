@@ -723,7 +723,32 @@ export default function Home() {
                             {m.rag_qa.map((q, idx) => (
                               <li key={idx}>
                                 <details className="rag-item">
-                                  <summary className="rag-q-summary"><RichText content={q.question} /></summary>
+                                  <summary className="rag-q-summary">
+                                    <span className="rag-q-row">
+                                      <span className="rag-q-text"><RichText content={q.question} /></span>
+                                      {formatDateTime(q.answer_time || q.time) && (
+                                        <span className="rag-edit-time">
+                                          {formatDateTime(q.answer_time || q.time)}
+                                        </span>
+                                      )}
+                                      {q.category_id && q.question_id && (
+                                        <button
+                                          className="rag-jump-icon"
+                                          title={t?.openInAdmin || "質問管理で開く"}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            navigate(`/admin/category/${q.category_id}?id=${q.question_id}`);
+                                          }}
+                                        >
+                                          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+                                            <path fill="currentColor" d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z"></path>
+                                            <path fill="currentColor" d="M5 5h7v2H7v10h10v-5h2v7H5z"></path>
+                                          </svg>
+                                        </button>
+                                      )}
+                                    </span>
+                                  </summary>
                                   <div className="rag-answer"><RichText content={q.answer} /></div>
                                   {q.retrieved_at && (
                                     <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
@@ -768,4 +793,19 @@ export default function Home() {
       </div>
     </div>
   );
+  // Cross-browser date formatting (supports 'YYYY-MM-DD HH:mm:ss')
+  function formatDateTime(val) {
+    if (!val) return null;
+    try {
+      const s = String(val);
+      const isoish = (s.includes('T') || s.endsWith('Z')) ? s : s.replace(' ', 'T');
+      const d = new Date(isoish);
+      if (isNaN(d.getTime())) return s;
+      const out = d.toLocaleString();
+      // Some environments may include Japanese middle dot as separator; strip it
+      return out.replace(/\u30fb/g, ' ');
+    } catch (e) {
+      return String(val);
+    }
+  }
 }

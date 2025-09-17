@@ -1,6 +1,6 @@
 import sqlite3
 from datetime import datetime,timedelta
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, Query
 from api.routes.user import current_user_info
 from api.utils.translator import question_translate, answer_translate
 from config import DATABASE, language_mapping
@@ -8,6 +8,29 @@ from api.utils.translator import translate
 from models.schemas import QuestionRequest, moveCategoryRequest, RegisterQuestionRequest
 from api.utils.RAG import append_qa_to_vector_index, add_qa_id_to_ignore, ignore_current_vectors_for_qa
 router = APIRouter()
+
+# ----- Answer history helpers -------------------------------------------------
+def _ensure_answer_translation_history(conn: sqlite3.Connection) -> None:
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS answer_translation_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                answer_id INTEGER NOT NULL,
+                language_id INTEGER NOT NULL,
+                texts TEXT NOT NULL,
+                edited_at DATETIME NOT NULL,
+                editor_user_id INTEGER,
+                editor_name TEXT
+            )
+            """
+        )
+        # Indexes for efficient lookups
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_ath_answer_lang ON answer_translation_history(answer_id, language_id)")
+        conn.commit()
+    except Exception:
+        pass
 
 # Ensure notifications table has question_id column
 def _ensure_notifications_question_id(conn: sqlite3.Connection):
@@ -97,7 +120,35 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             except Exception:
                 pass
 
-            # 🔄 `answer_translation` テーブルを更新
+            # 🔄 `answer_translation` テーブルを更新（履歴保存付き）
+            _ensure_answer_translation_history(conn)
+
+            # まず、編集対象言語の現行テキストを履歴へ保存（差分があるときのみ）
+            try:
+                cursor.execute(
+                    "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+                    (answer_id, language_id),
+                )
+                row_cur = cursor.fetchone()
+                if row_cur and row_cur[0] and row_cur[0] != request.get("new_text"):
+                    cursor.execute(
+                        """
+                        INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
+                        VALUES (?, ?, ?, ?, ?, ?)
+                        """,
+                        (
+                            answer_id,
+                            language_id,
+                            row_cur[0],
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                            operator_id,
+                            current_user.get("name", "user"),
+                        ),
+                    )
+            except Exception:
+                pass
+
+            # 対象言語の現行テキストを更新
             cursor.execute("""
                 UPDATE answer_translation
                 SET texts = ?
@@ -136,6 +187,31 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 exists = cursor.fetchone()
 
                 if exists:
+                    # 履歴の保存（既存テキストがある場合）
+                    try:
+                        cursor.execute(
+                            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+                            (answer_id, target_id),
+                        )
+                        prev = cursor.fetchone()
+                        if prev and prev[0] and prev[0] != translated_text:
+                            cursor.execute(
+                                """
+                                INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
+                                VALUES (?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    answer_id,
+                                    target_id,
+                                    prev[0],
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    operator_id,
+                                    current_user.get("name", "user"),
+                                ),
+                            )
+                    except Exception:
+                        pass
+
                     cursor.execute("""
                         UPDATE answer_translation
                         SET texts = ?
@@ -205,6 +281,57 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
+
+def _code_to_language_id(code: str, conn: sqlite3.Connection) -> int:
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM language WHERE lower(code) = ?", (code.lower(),))
+    row = cur.fetchone()
+    return int(row[0]) if row else None
+
+
+@router.get("/answer_history")
+def get_answer_history(
+    answer_id: int,
+    lang: str = Query(None, description="Optional language code like ja/en/vi/zh/ko"),
+    current_user: dict = Depends(current_user_info),
+):
+    """指定した回答の過去翻訳履歴を取得（ユーザーの使用言語で）。古い→新しいの時系列。"""
+    spoken_language = current_user.get("spoken_language")
+    language_id = None
+
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            _ensure_answer_translation_history(conn)
+            # Resolve language_id: explicit 'lang' param takes precedence
+            if lang:
+                language_id = _code_to_language_id(lang, conn)
+            if not language_id:
+                language_id = language_mapping.get(spoken_language)
+            if not language_id:
+                raise HTTPException(status_code=400, detail="Unsupported spoken language or lang code")
+            cur = conn.cursor()
+            cur.execute(
+                """
+                SELECT texts, edited_at, editor_user_id, COALESCE(editor_name, '')
+                FROM answer_translation_history
+                WHERE answer_id = ? AND language_id = ?
+                ORDER BY edited_at ASC
+                """,
+                (answer_id, language_id),
+            )
+            rows = cur.fetchall() or []
+        history = [
+            {
+                "texts": r[0],
+                "edited_at": r[1],
+                "editor_user_id": r[2],
+                "editor_name": r[3],
+            }
+            for r in rows
+        ]
+        return {"answer_id": answer_id, "language_id": language_id, "history": history}
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
     
 @router.put("/official_question")
 def official_question(request: dict, current_user: dict = Depends(current_user_info)):

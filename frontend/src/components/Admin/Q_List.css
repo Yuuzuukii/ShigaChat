@@ -290,6 +290,80 @@
   color: #333;
 }
 
+/* ---- Answer history ---- */
+.admin-history-toggle {
+  margin-top: 8px;
+}
+.admin-history-button {
+  padding: 6px 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #1e3a8a;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.admin-history-button:hover {
+  background: #e0e7ff;
+}
+.admin-history-list {
+  margin-top: 10px;
+  padding: 10px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+}
+/* Hide bullets in history list */
+.admin-history-list ul { list-style: none; margin: 0; padding-left: 0; }
+.admin-history-list li::marker { content: ""; }
+.admin-history-empty {
+  color: #6b7280;
+  margin: 6px 0;
+}
+.admin-history-item {
+  border-bottom: 1px solid #f1f5f9;
+  padding: 8px 0;
+}
+.admin-history-item:last-child {
+  border-bottom: none;
+}
+.admin-history-meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+.admin-history-time {
+  margin-right: 8px;
+}
+.admin-history-text {
+  white-space: pre-wrap;
+}
+
+.admin-history-diff-toggle {
+  margin-top: 6px;
+}
+.admin-history-diff {
+  margin-top: 8px;
+}
+.admin-history-diff-caption {
+  font-size: 12px;
+  color: #6b7280;
+  margin-bottom: 4px;
+}
+
+/* git-like diff styles */
+.diff-block {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 13px;
+  line-height: 1.45;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.diff-line { padding: 2px 6px; border-left: 3px solid transparent; white-space: pre-wrap; }
+.diff-same { color: #6b7280; background: #f8fafc; }
+.diff-add  { background: #e6ffed; border-left-color: #28a745; }
+.diff-del  { background: #ffeef0; border-left-color: #d73a49; text-decoration: line-through; }
+
 
 .admin-situmon-header {
   margin: 20px auto;
@@ -376,15 +450,42 @@
   display: flex;
   gap: 10px;
   margin-top: 10px;
+  align-items: center;
 }
 
-.admin-edit-button {
+/* Row for edit + history buttons (view mode) */
+.admin-actions-row {
+  display: flex;
+  gap: 10px;
   margin-top: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+/* History button aligned to right end */
+.admin-history-button.inline {
+  padding: 6px 10px;
+  background: #eef2ff;
+  border: 1px solid #c7d2fe;
+  color: #1e3a8a;
+  border-radius: 6px;
+  cursor: pointer;
+  /* next to edit button (no push to right) */
+  margin-left: 0;
+}
+.admin-history-button.inline:hover {
+  background: #e0e7ff;
+}
+
+/* Also push right inside edit-actions row */
+.admin-edit-actions .admin-history-button.inline { margin-left: 0; }
+
+.admin-edit-button {
   background-color: #007bff;
-  color: white;
+  color: #ffffff;
   border: none;
-  padding: 5px 10px;
-  border-radius: 5px;
+  padding: 6px 12px;
+  border-radius: 6px;
   cursor: pointer;
 }
 
@@ -398,6 +499,34 @@
   background-color: #004494;
   transform: scale(0.95);
 }
+
+/* Save / Cancel styled buttons */
+.admin-save-button {
+  background-color: #22c55e; /* green */
+  color: #ffffff;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.admin-save-button:hover { background-color: #16a34a; }
+.admin-save-button:active { background-color: #15803d; }
+.admin-save-button:disabled {
+  background-color: #9ca3af; /* gray */
+  cursor: not-allowed;
+  opacity: 0.8;
+}
+
+.admin-cancel-button {
+  background-color: #e5e7eb; /* gray */
+  color: #374151;
+  border: 1px solid #d1d5db;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.admin-cancel-button:hover { background-color: #dbe1e6; }
 
 .official-button {
   background-color: #48b42a;

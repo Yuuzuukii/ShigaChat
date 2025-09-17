@@ -6,6 +6,7 @@ import hashlib
 from pathlib import Path
 from collections import defaultdict
 from typing import Optional, Iterable, Union, List, Dict, Tuple, Any
+import re
 import dotenv
 import numpy as np
 import faiss
@@ -370,7 +371,7 @@ def generate_and_save_vectors():
 # Retrieval
 # ----------------------------------------------------------------------------
 
-def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, List[Union[str, float]]]:
+def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, Dict[str, Any]]:
     """
     言語検出に失敗/未対応の場合は例外を投げる
     成功時は rank-> [answer, question, time, similarity] を返す。
@@ -407,27 +408,67 @@ def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, List[Unio
     faiss.normalize_L2(query_vec)
     D, I = index.search(query_vec, 10)  # より多く取得して閾値でフィルタリング
 
-    results: Dict[int, List[Union[str, float]]] = {}
+    results: Dict[int, Dict[str, Any]] = {}
     ranked = sorted(zip(I[0], D[0]), key=lambda x: x[1], reverse=True)
 
     rank = 1
+    # DB 接続（category 取得用）
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
     for idx, similarity in ranked:
         # 類似度が閾値以上の場合のみ結果に含める
         if similarity >= similarity_threshold:
             question_text, answer_text, time_val = texts[idx]
             qa_meta = meta[idx] if idx < len(meta) else (None, None)
             qa_id = None
+            qid = None
             try:
                 qa_id = int(qa_meta[0]) if qa_meta and qa_meta[0] is not None else None
+                qid = int(qa_meta[1]) if qa_meta and qa_meta[1] is not None else None
             except Exception:
                 qa_id = None
+                qid = None
 
             # Check ignores
             payload_hash = _payload_hash(f"Q: {question_text}\nA: {answer_text}")
             if (qa_id is not None and qa_id in ignored_qa_ids) or (payload_hash in ignored_hashes):
                 continue
 
-            results[rank] = [answer_text, question_text, time_val, float(similarity)]
+            # category_id 取得（存在しない場合は None）
+            cat_id = None
+            if qid is not None:
+                try:
+                    cur.execute("SELECT category_id FROM question WHERE question_id = ?", (qid,))
+                    row = cur.fetchone()
+                    if row:
+                        cat_id = int(row[0])
+                except Exception:
+                    cat_id = None
+
+            # 回答の最終編集時刻（answer.time）を取得
+            ans_time = None
+            if qa_id is not None:
+                try:
+                    cur.execute("SELECT answer_id FROM QA WHERE id = ?", (qa_id,))
+                    qa_row = cur.fetchone()
+                    if qa_row and qa_row[0] is not None:
+                        ans_id = int(qa_row[0])
+                        cur.execute("SELECT time FROM answer WHERE answer_id = ?", (ans_id,))
+                        arow = cur.fetchone()
+                        if arow:
+                            ans_time = arow[0]
+                except Exception:
+                    ans_time = None
+
+            results[rank] = {
+                "answer": answer_text,
+                "question": question_text,
+                "time": time_val,
+                "similarity": float(similarity),
+                "question_id": qid,
+                "category_id": cat_id,
+                "answer_time": ans_time,
+            }
             rank += 1
 
             # 最大5件まで
@@ -435,6 +476,10 @@ def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, List[Unio
                 break
 
     print(f"類似度閾値 {similarity_threshold} 以上の結果: {len(results)}件")
+    try:
+        conn.close()
+    except Exception:
+        pass
     return results
 
 # ----------------------------------------------------------------------------
@@ -442,72 +487,128 @@ def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, List[Unio
 # ----------------------------------------------------------------------------
 
 def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
-    prompt = "あなたは滋賀県に住む外国人に情報を提供する専門家です。\n"
-    prompt += "以下は参考情報です:\n\n"
-    prompt += "【RAGから抽出されたQA】\n"
-    for i, qa in enumerate(rag_qa, 1):
-        prompt += f"Q{i}: {qa['question']}\nA{i}: {qa['answer']}\n"
+    # rag_qa の各要素は {sid:"S#", question, answer} を想定
+    prompt = (
+        "あなたは根拠付きで回答するアシスタントです。与えられたQ&Aコンテキスト以外の情報は使わず、"
+        "回答の各文を必ず出典IDで根拠づけてください。出力は指示したJSONのみ。思考過程は出力しないでください。\n\n"
+    )
+    prompt += "【コンテキスト（出典候補）】\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
     prompt += "\n【これまでの会話履歴】\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"User{i}: {q}\nBot{i}: {a}\n"
-    prompt += f"\n【現在の質問】\n{question_text}\n"
-    prompt += "\n上記の参考情報と会話履歴を踏まえて、簡潔かつ正確に回答してください。"
+    prompt += f"\n【現在の質問】\n{question_text}\n\n"
+    prompt += (
+        "要件:\n"
+        "- 回答は与えたコンテキストのみから作成。\n"
+        "- 各文に少なくとも1つの出典ID [S#] を付与。\n"
+        "- 実際に使った出典だけを used_source_ids に列挙（未使用は含めない）。\n"
+        "- 可能なら根拠箇所を evidence.quotes に原文抜粋として含める（任意）。\n"
+        "- 根拠が不足する場合は『十分な根拠がありません』と述べる。\n"
+        "- 出力は次のJSONに厳密準拠し、これ以外は何も出力しない:\n"
+        "{\n  \"answer\": \"文末ごとに [S1] のように出典IDを付与\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文抜粋\"]} ]\n}\n"
+    )
     return prompt
 
 
 def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
-    prompt = "You are a local information specialist for foreigners living in Shiga Prefecture.\n"
-    prompt += "Use the following as reference information:\n\n"
-    prompt += "[RAG Retrieved Q&A]\n"
-    for i, qa in enumerate(rag_qa, 1):
-        prompt += f"Q{i}: {qa['question']}\nA{i}: {qa['answer']}\n"
+    prompt = (
+        "You answer with citations only from the provided Q&A context."
+        " Every sentence must include at least one source ID. Output ONLY the JSON specified; do not reveal chain-of-thought.\n\n"
+    )
+    prompt += "[Context (source candidates)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
     prompt += "\n[Conversation History]\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"User{i}: {q}\nBot{i}: {a}\n"
-    prompt += f"\n[Current Question]\n{question_text}\n"
-    prompt += "\nPlease answer concisely and accurately in English, using the references and history."
+    prompt += f"\n[Current Question]\n{question_text}\n\n"
+    prompt += (
+        "Requirements:\n"
+        "- Use ONLY the given context.\n"
+        "- Add at least one source ID [S#] to each sentence.\n"
+        "- List only actually used sources in used_source_ids.\n"
+        "- Optionally include exact quotes in evidence.quotes.\n"
+        "- If insufficient evidence, state 'Insufficient evidence.'.\n"
+        "- Output exactly this JSON and nothing else:\n"
+        "{\n  \"answer\": \"Sentences with [S1] style citations\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"verbatim quote\"]} ]\n}\n"
+    )
     return prompt
 
 
 def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
-    prompt = "Bạn là chuyên gia cung cấp thông tin địa phương cho người nước ngoài sống tại tỉnh Shiga.\n"
-    prompt += "Hãy sử dụng các thông tin tham khảo sau:\n\n"
-    prompt += "[Q&A được truy xuất từ RAG]\n"
-    for i, qa in enumerate(rag_qa, 1):
-        prompt += f"H{i}: {qa['question']}\nĐ{i}: {qa['answer']}\n"
+    prompt = (
+        "Bạn phải trả lời kèm trích dẫn chỉ từ ngữ cảnh Q&A đã cung cấp."
+        " Mỗi câu phải có ít nhất một mã nguồn [S#]. Chỉ xuất JSON theo mẫu, không tiết lộ quá trình suy nghĩ.\n\n"
+    )
+    prompt += "[Ngữ cảnh (nguồn tham khảo)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
     prompt += "\n[Lịch sử hội thoại]\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"Người dùng{i}: {q}\nBot{i}: {a}\n"
-    prompt += f"\n[Câu hỏi hiện tại]\n{question_text}\n"
-    prompt += "\nVui lòng trả lời ngắn gọn và chính xác bằng tiếng Việt, dựa trên thông tin tham khảo và lịch sử."
+    prompt += f"\n[Câu hỏi hiện tại]\n{question_text}\n\n"
+    prompt += (
+        "Yêu cầu:\n"
+        "- Chỉ dùng ngữ cảnh đã cho.\n"
+        "- Thêm [S#] vào mỗi câu.\n"
+        "- Chỉ liệt kê nguồn đã dùng trong used_source_ids.\n"
+        "- Tùy chọn: evidence.quotes trích nguyên văn.\n"
+        "- Nếu thiếu bằng chứng, nêu rõ 'Thiếu bằng chứng.'.\n"
+        "- Chỉ xuất đúng JSON sau:\n"
+        "{\n  \"answer\": \"Mỗi câu có trích dẫn [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn\"]} ]\n}\n"
+    )
     return prompt
 
 
 def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
-    prompt = "你是一位为居住在滋贺县的外国人提供信息的本地专家。\n"
-    prompt += "请参考以下信息：\n\n"
-    prompt += "【RAG 检索到的问答】\n"
-    for i, qa in enumerate(rag_qa, 1):
-        prompt += f"问{i}: {qa['question']}\n答{i}: {qa['answer']}\n"
+    prompt = (
+        "你必须仅使用提供的Q&A作为依据作答。每句话都必须附上至少一个来源ID [S#]。"
+        " 只输出指定的JSON，不要输出思考过程。\n\n"
+    )
+    prompt += "【上下文（候选来源）】\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
     prompt += "\n【对话历史】\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"用户{i}: {q}\n机器人{i}: {a}\n"
-    prompt += f"\n【当前问题】\n{question_text}\n"
-    prompt += "\n请基于以上参考信息和对话历史，用简体中文简洁且准确地作答。"
+    prompt += f"\n【当前问题】\n{question_text}\n\n"
+    prompt += (
+        "要求：\n"
+        "- 仅使用提供的上下文。\n"
+        "- 每句话后附 [S#]。\n"
+        "- used_source_ids 仅列出实际使用的来源。\n"
+        "- 可选：在 evidence.quotes 中加入原文引文。\n"
+        "- 若证据不足，请说明‘证据不足。’\n"
+        "- 只输出如下 JSON：\n"
+        "{\n  \"answer\": \"每句含 [S1] 引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
+    )
     return prompt
 
 
 def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
-    prompt = "당신은 시가현에 거주하는 외국인을 위해 정보를 제공하는 지역 전문가입니다.\n"
-    prompt += "다음 정보를 참고하세요:\n\n"
-    prompt += "[RAG로 검색된 Q&A]\n"
-    for i, qa in enumerate(rag_qa, 1):
-        prompt += f"문{i}: {qa['question']}\n답{i}: {qa['answer']}\n"
+    prompt = (
+        "당신은 근거를 명시해 답변하는 어시스턴트입니다. 제공된 Q&A 외 정보는 사용하지 말고,"
+        " 각 문장 끝에 최소 1개의 출처 ID를 붙이세요. 출력은 지정된 JSON만 허용됩니다.\n\n"
+    )
+    prompt += "[컨텍스트(출처 후보)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
     prompt += "\n[대화 기록]\n"
     for i, (q, a) in enumerate(history_qa, 1):
         prompt += f"사용자{i}: {q}\n봇{i}: {a}\n"
-    prompt += f"\n[현재 질문]\n{question_text}\n"
-    prompt += "\n위의 참고 정보와 대화 기록을 바탕으로, 한국어로 간결하고 정확하게 답변하세요."
+    prompt += f"\n[현재 질문]\n{question_text}\n\n"
+    prompt += (
+        "요건:\n"
+        "- 제공된 컨텍スト만 사용.\n"
+        "- 각 문장에 [S#] 추가.\n"
+        "- 실제 사용한 출처만 used_source_ids에 나열.\n"
+        "- evidence.quotes에 원문 인용(선택).\n"
+        "- 증거가 부족하면 ‘증거가 충분하지 않습니다’ 명시.\n"
+        "- 다음 JSON만 출력:\n"
+        "{\n  \"answer\": \"문장마다 [S1] 참고 표시\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"원문 인용\"]} ]\n}\n"
+    )
     return prompt
 
 # 検出言語ごとのビルダーマップ
@@ -542,20 +643,37 @@ def generate_answer_with_llm(
     lang: Optional[str] = None,
     model: str = "gpt-4.1-mini",
     max_history_in_prompt: int = 6,
-) -> str:
-    """RAGで集めた参照(rag_qa)と会話履歴から最終回答を生成する。"""
+) -> Dict[str, Any]:
+    """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
     if not lang:
         try:
             lang = detect_lang(question_text)
         except Exception:
             lang = "ja"  # フォールバック
 
+    # rag_qa へ sid を付与（S1..Sn）
+    rag_with_sid: List[Dict[str, Any]] = []
+    for i, qa in enumerate(rag_qa, 1):
+        qa_copy = dict(qa)
+        qa_copy["sid"] = f"S{i}"
+        rag_with_sid.append(qa_copy)
+
     builder = _PROMPT_BUILDERS.get(lang, _PROMPT_BUILDERS["ja"])
     clipped_hist = _clip_history(history_qa, max_history_in_prompt)
 
-    prompt = builder(question_text, rag_qa, clipped_hist)
+    prompt = builder(question_text, rag_with_sid, clipped_hist)
     resp = _llm(model=model).invoke([HumanMessage(content=prompt)])
-    return resp.content.strip()
+    content = (resp.content or "").strip()
+
+    try:
+        data = json.loads(content)
+        answer_text = str(data.get("answer", "")).strip()
+        used_ids = [str(x) for x in (data.get("used_source_ids") or [])]
+        evidence = data.get("evidence") or []
+        return {"answer": answer_text, "used_source_ids": used_ids, "evidence": evidence}
+    except Exception:
+        # フォールバック: そのままテキストを返し、全ての出典を使用扱い
+        return {"answer": content, "used_source_ids": [x["sid"] for x in rag_with_sid], "evidence": []}
 
 
 def answer_with_rag(
@@ -576,16 +694,31 @@ def answer_with_rag(
     # 検索
     results = rag(question_text, similarity_threshold=similarity_threshold)
 
-    # 整形（UIで使いやすいよう辞書リスト化）
+    # 整形（UIで使いやすいよう辞書リスト化）。sid を振る
     references = []
-    for rank, (ans, que, t, sim) in results.items():
-        references.append({
-            "rank": rank,
-            "question": que,
-            "answer": ans,
-            "time": t,
-            "similarity": sim,
-        })
+    for i, (rank, item) in enumerate(results.items(), 1):
+        if isinstance(item, dict):
+            references.append({
+                "sid": f"S{i}",
+                "rank": rank,
+                "question": item.get("question"),
+                "answer": item.get("answer"),
+                "time": item.get("time"),
+                "similarity": item.get("similarity"),
+                "question_id": item.get("question_id"),
+                "category_id": item.get("category_id"),
+                "answer_time": item.get("answer_time"),
+            })
+        else:
+            ans, que, t, sim = item
+            references.append({
+                "sid": f"S{i}",
+                "rank": rank,
+                "question": que,
+                "answer": ans,
+                "time": t,
+                "similarity": sim,
+            })
 
     # 参照ゼロ → フォールバック応答（推測は避ける指示）
     if not references:
@@ -629,7 +762,7 @@ def answer_with_rag(
             },
         }
 
-    text = generate_answer_with_llm(
+    gen = generate_answer_with_llm(
         question_text,
         references,
         history_qa,
@@ -638,12 +771,23 @@ def answer_with_rag(
         max_history_in_prompt=max_history_in_prompt,
     )
 
+    answer_text = gen.get("answer", "").strip()
+    used_ids = set(gen.get("used_source_ids", []))
+    evidence = gen.get("evidence", [])
+    used_references = [r for r in references if r.get("sid") in used_ids] if used_ids else references
+
+    # Strip inline citation tags like [S1], [S2] from the displayed answer
+    clean_text = re.sub(r"\s*\[S\d+\]", "", answer_text)
+    clean_text = re.sub(r"\s{2,}", " ", clean_text).strip()
+
     return {
         "type": "rag",
-        "text": text,
+        "text": clean_text,
         "meta": {
             "lang": lang,
-            "references": references,
+            "references": used_references,
+            "used_source_ids": list(used_ids) if used_ids else [r.get("sid") for r in references],
+            "evidence": evidence,
             "similarity_threshold": similarity_threshold,
         },
     }

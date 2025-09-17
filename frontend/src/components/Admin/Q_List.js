@@ -32,6 +32,9 @@ const Q_List = () => {
   const [language, setLanguage] = useState("ja");
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [historyOpenId, setHistoryOpenId] = useState(null);
+  const [historyMap, setHistoryMap] = useState({}); // {answer_id: [{texts, edited_at, editor_name}, ...]}
+  const [historyDiffOpenMap, setHistoryDiffOpenMap] = useState({}); // {`${answerId}:${idx}`: true}
   const [postedHistory, setPostedHistory] = useState([]);
   const [errorMessage, setErrorMessage] = useState("");
   const [selectedQuestionId, setSelectedQuestionId] = useState(null);
@@ -50,6 +53,15 @@ const Q_List = () => {
 
   const { user, setUser, token, setToken, fetchUser } = useContext(UserContext);
   const t = translations[language];
+
+  const fmtTime = (s) => {
+    try {
+      if (!s) return '';
+      const isoish = String(s).replace(' ', 'T');
+      const out = new Date(isoish).toLocaleString();
+      return out.replace(/\u30fb/g, ' ');
+    } catch { return String(s || ''); }
+  };
 
   // spokenLanguage → UI言語
   useEffect(() => {
@@ -290,6 +302,24 @@ const Q_List = () => {
 
       setEditingAnswerId(null);
       setEditText("");
+      // 即時に履歴を更新（該当回答の履歴パネルが開いている場合）
+      try {
+        if (historyOpenId === answerId) {
+          const key = `${answerId}:${language}`;
+          const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(answerId)}&lang=${encodeURIComponent(language)}`, {
+            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setHistoryMap(prev => ({ ...prev, [key]: data.history || [] }));
+          } else {
+            // invalidate cache to force reload next toggle
+            setHistoryMap(prev => ({ ...prev, [key]: [] }));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to refresh history immediately:', e);
+      }
       window.alert(t.answerupdated);
 
       try {
@@ -324,6 +354,71 @@ const Q_List = () => {
       setEditText(answerText || "");
       setIsSaving(false);
     }
+  };
+
+  const toggleHistory = async (answerId) => {
+    setHistoryOpenId(prev => (prev === answerId ? null : answerId));
+    if (!answerId) return;
+    const key = `${answerId}:${language}`;
+    if (historyMap[key]) return; // already loaded for this language
+    try {
+      const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(answerId)}&lang=${encodeURIComponent(language)}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!res.ok) throw new Error('failed');
+      const data = await res.json();
+      setHistoryMap(prev => ({ ...prev, [key]: data.history || [] }));
+    } catch (e) {
+      console.error('Failed to load answer history', e);
+      setHistoryMap(prev => ({ ...prev, [key]: [] }));
+    }
+  };
+
+  // --- Simple git-like diff (line-based LCS) ---
+  const lcsMatrix = (a, b) => {
+    const n = a.length, m = b.length;
+    const dp = Array(n + 1).fill(null).map(() => Array(m + 1).fill(0));
+    for (let i = n - 1; i >= 0; i--) {
+      for (let j = m - 1; j >= 0; j--) {
+        if (a[i] === b[j]) dp[i][j] = dp[i + 1][j + 1] + 1;
+        else dp[i][j] = Math.max(dp[i + 1][j], dp[i][j + 1]);
+      }
+    }
+    return dp;
+  };
+
+  const diffLines = (oldText = "", newText = "") => {
+    const A = String(oldText).split(/\r?\n/);
+    const B = String(newText).split(/\r?\n/);
+    const dp = lcsMatrix(A, B);
+    const parts = [];
+    let i = 0, j = 0;
+    while (i < A.length && j < B.length) {
+      if (A[i] === B[j]) {
+        parts.push({ type: 'same', text: A[i] });
+        i++; j++;
+      } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+        parts.push({ type: 'del', text: A[i] });
+        i++;
+      } else {
+        parts.push({ type: 'add', text: B[j] });
+        j++;
+      }
+    }
+    while (i < A.length) { parts.push({ type: 'del', text: A[i++] }); }
+    while (j < B.length) { parts.push({ type: 'add', text: B[j++] }); }
+    return parts;
+  };
+
+  const renderDiff = (oldText, newText) => {
+    const segs = diffLines(oldText, newText);
+    return (
+      <div className="diff-block">
+        {segs.map((p, idx) => (
+          <div key={idx} className={`diff-line diff-${p.type}`}>{p.text || '\u00A0'}</div>
+        ))}
+      </div>
+    );
   };
 
   const deleteQuestion = async (questionId) => {
@@ -615,34 +710,102 @@ const Q_List = () => {
 
                   {editingAnswerId === question.question_id ? (
                     <div className="admin-edit-actions">
+                      {(() => {
+                        const unchanged = String(editText ?? "").trim() === String(question.回答 ?? "").trim();
+                        return (
+                          <>
+                            <button
+                              className="admin-save-button"
+                              onClick={() =>
+                                handleSaveEdit(question.answer_id, question.question_id)
+                              }
+                              disabled={isSaving || unchanged}
+                              title={unchanged ? (t?.noChanges || '変更はありません') : ''}
+                            >
+                              {isSaving ? "保存中..." : t.save}
+                            </button>
+                            <button
+                              className="admin-cancel-button"
+                              onClick={() => handleEditClick(question.question_id)}
+                              disabled={isSaving}
+                            >
+                              {t.cancel}
+                            </button>
+                          </>
+                        );
+                      })()}
                       <button
-                        onClick={() =>
-                          handleSaveEdit(question.answer_id, question.question_id)
-                        }
+                        className="admin-history-button inline"
+                        onClick={() => toggleHistory(question.answer_id)}
                         disabled={isSaving}
                       >
-                        {isSaving ? "保存中..." : t.save}
-                      </button>
-                      <button
-                        onClick={() => handleEditClick(question.question_id)}
-                        disabled={isSaving}
-                      >
-                        {t.cancel}
+                        {historyOpenId === question.answer_id ? (t?.historyClose || '閉じる') : (t?.historyOpen || '過去の回答を見る')}
                       </button>
                     </div>
                   ) : (
-                    <button
-                      className="admin-edit-button"
-                      onClick={() =>
-                        handleEditClick(
-                          question.question_id,
-                          question.answer_id,
-                          question.回答
-                        )
-                      }
-                    >
-                      {t.edit}
-                    </button>
+                    <div className="admin-actions-row">
+                      <button
+                        className="admin-edit-button"
+                        onClick={() =>
+                          handleEditClick(
+                            question.question_id,
+                            question.answer_id,
+                            question.回答
+                          )
+                        }
+                      >
+                        {t.edit}
+                      </button>
+                      <button
+                        className="admin-history-button inline"
+                        onClick={() => toggleHistory(question.answer_id)}
+                      >
+                        {historyOpenId === question.answer_id ? (t?.historyClose || '閉じる') : (t?.historyOpen || '過去の回答を見る')}
+                      </button>
+                    </div>
+                  )}
+
+                  {historyOpenId === question.answer_id && (
+                    <div className="admin-history-list">
+                      {(() => {
+                        const historyKey = `${question.answer_id}:${language}`;
+                        const list = historyMap[historyKey] || [];
+                        return list.length === 0 ? (
+                        <p className="admin-history-empty">{t?.historyEmpty || '履歴はありません。'}</p>
+                      ) : (
+                        <ul>
+                          {list.map((h, i) => {
+                            const localKey = `${question.answer_id}:${language}:${i}`;
+                            const baseText = (i < (list.length - 1))
+                              ? (list[i + 1].texts || '')
+                              : (question.回答 || '');
+                            return (
+                            <li key={i} className="admin-history-item">
+                              <div className="admin-history-meta">
+                                <span className="admin-history-time">{fmtTime(h.edited_at)}</span>
+                                {h.editor_name && <span className="admin-history-editor">by {h.editor_name}</span>}
+                              </div>
+                              <div className="admin-history-text"><RichText content={h.texts} /></div>
+                              <div className="admin-history-diff-toggle">
+                                <button
+                                  className="admin-history-button"
+                                  onClick={() => setHistoryDiffOpenMap(prev => ({ ...prev, [localKey]: !prev[localKey] }))}
+                                >
+                                  {historyDiffOpenMap[localKey] ? (t?.diffHide || '差分を隠す') : (t?.diffShow || '差分を表示')}
+                                </button>
+                              </div>
+                              {historyDiffOpenMap[localKey] && (
+                                <div className="admin-history-diff">
+                                  <div className="admin-history-diff-caption">{t?.diffCaption || 'この版 → 次の版との差分'}</div>
+                                  {renderDiff(h.texts || '', baseText)}
+                                </div>
+                              )}
+                            </li>
+                          )})}
+                        </ul>
+                      )
+                      })()}
+                    </div>
                   )}
                 </div>
               )}
