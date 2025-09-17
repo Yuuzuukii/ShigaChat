@@ -90,7 +90,11 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
     const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (!categoryRes.ok) throw new Error("カテゴリの取得に失敗しました");
+    if (!categoryRes.ok) {
+      // Question deleted or category missing: just refresh notifications (already marked read)
+      await fetchNotifications();
+      return;
+    }
     const categoryData = await categoryRes.json();
     const categoryId = categoryData.category_id;
     await fetchNotifications();
@@ -99,6 +103,8 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
     }
   } catch (error) {
     console.error("通知の既読処理エラー:", error);
+    // Best-effort: refresh list so the read state reflects immediately
+    try { await fetchNotifications(); } catch {}
   }
 };
 

@@ -663,7 +663,7 @@ const Q_List = () => {
                     </div>
                     <div className="admin-question-date">
                       {t.questionDate}
-                      {new Date(question.time).toLocaleString()}
+                      {new Date((question.last_edited_at || question.time).replace(' ', 'T')).toLocaleString()}
                     </div>
                   </div>
                 </div>

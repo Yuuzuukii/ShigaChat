@@ -155,6 +155,15 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 WHERE answer_id = ? AND language_id = ?
             """, (request.get("new_text"), answer_id, language_id))
 
+            # 回答本体の更新時刻を更新（最終編集日時として利用）
+            try:
+                cursor.execute(
+                    "UPDATE answer SET time = ? WHERE id = ?",
+                    (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), answer_id),
+                )
+            except Exception:
+                pass
+
             # 4. 翻訳対象の言語を取得（元の言語を除外）
             cursor.execute("SELECT id, code FROM language WHERE id != ?", (language_id,))
             target_languages = cursor.fetchall()

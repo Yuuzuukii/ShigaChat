@@ -145,6 +145,7 @@ def get_category_questions_admin(
                 question.public AS public,
                 question.category_id AS category_id,
                 question.time AS time,
+                COALESCE(question.last_edited_at, question.time) AS last_edited_at,
                 user.name AS user_name,  -- 質問者の名前を取得
                 editor.name AS editor_name  -- 最終編集者の名前
             FROM QA
@@ -176,8 +177,9 @@ def get_category_questions_admin(
                 "public": qa[5],        # 公開状態
                 "category_id": qa[6],
                 "time": qa[7],
-                "user_name": qa[8],     # 質問者の名前
-                "editor_name": qa[9]    # 最終編集者の名前
+                "last_edited_at": qa[8],
+                "user_name": qa[9],     # 質問者の名前
+                "editor_name": qa[10]    # 最終編集者の名前
             }
             for qa in qa_list
         ]
