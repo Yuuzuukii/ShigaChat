@@ -1,8 +1,7 @@
 import React, { createContext, useState, useEffect } from "react";
+import { API_BASE_URL } from "./config/constants";
 
 export const UserContext = createContext();
-
-const API_BASE_URL = "http://localhost:8000";
 
 
 export const UserProvider = ({ children }) => {
