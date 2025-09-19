@@ -42,7 +42,7 @@ function saveMsgs(threadId, msgs) {
 }
 
 export default function Home() {
-  const { user, setUser, token, fetchUser } = useContext(UserContext);
+  const { user, setUser, token, fetchUser, setToken } = useContext(UserContext);
   const [language, setLanguage] = useState("ja");
   const t = translations[language];
   const navigate = useNavigate();
@@ -330,8 +330,9 @@ export default function Home() {
 
   const handleLanguageChange = async (event) => {
     const newLanguage = event.target.value;
+    // 先にトークン更新、その後にUI言語反映
+    await updateUserLanguage(newLanguage, setUser, setToken);
     setLanguage(newLanguage);
-    await updateUserLanguage(newLanguage, setUser);
   };
 
   const handleSetSize = (size) => () => setChatSize(size);

@@ -123,8 +123,8 @@ const Kategori = () => {
 
   const handleLanguageChange = async (event) => {
     const newLanguage = event.target.value;
-    setLanguage(newLanguage); // ローカルの言語設定を変更
-    await updateUserLanguage(newLanguage, setUser); // サーバー側の言語設定を更新
+    await updateUserLanguage(newLanguage, setUser, setToken); // サーバー側の言語設定とトークン更新
+    setLanguage(newLanguage); // ローカルの言語設定を最後に変更（401回避）
   };
 
   const userData = localStorage.getItem("user");

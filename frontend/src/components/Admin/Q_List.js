@@ -189,10 +189,10 @@ const Q_List = () => {
     });
   };
 
-  const handleLanguageChange = (event) => {
+  const handleLanguageChange = async (event) => {
     const newLanguage = event.target.value;
+    await updateUserLanguage(newLanguage, setUser, setToken);
     setLanguage(newLanguage);
-    updateUserLanguage(newLanguage, setUser);
   };
 
   async function fetchQuestions(

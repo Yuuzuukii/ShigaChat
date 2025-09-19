@@ -20,7 +20,7 @@ import "./Question_Admin.css";
 
 const Question_Admin = () => {
   const navigate = useNavigate();
-  const { user, token, fetchUser } = useContext(UserContext);
+  const { user, token, fetchUser, setUser, setToken } = useContext(UserContext);
 
   const [isRegisterModalOpen, setIsRegisterModalOpen] = useState(false);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
@@ -123,10 +123,10 @@ const Question_Admin = () => {
     });
   };
 
-  const handleLanguageChange = (e) => {
+  const handleLanguageChange = async (e) => {
     const newLang = e.target.value;
+    await updateUserLanguage(newLang, setUser, setToken);
     setLanguage(newLang);
-    updateUserLanguage(newLang);
   };
 
   const handleCategoryClick = (id) => {

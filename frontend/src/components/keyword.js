@@ -129,10 +129,11 @@ function Keyword() {
 
   const handleLanguageChange = async (event) => {
     const newLanguage = event.target.value;
+    // 先にトークンを更新してからUI言語反映（更新直後の401回避）
+    await updateUserLanguage(newLanguage, setUser, setToken);
     setLanguage(newLanguage); // ローカルの言語設定を変更
     setKeyword(""); // キーワードをクリア
     setResults([]); // 検索結果をクリア
-    await updateUserLanguage(newLanguage, setUser); // サーバー側の言語設定を更新
   };
 
   const handleSearch = async () => {
