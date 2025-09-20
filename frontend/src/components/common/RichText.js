@@ -10,13 +10,14 @@ export default function RichText({ content }) {
   const text = content || "";
 
   // Helper: render plain text with support for <strong>..</strong>,
-  // <span class="highlighted">..</span>, and <br/> as actual line breaks.
+  // <span class="highlighted">..</span>, line breaks (\n), and <br/> as actual line breaks.
   const renderHighlightAndBreaks = (seg, keyPrefix = "h") => {
     if (!seg) return [];
-    // Normalize span.highlighted to strong
+    // Normalize span.highlighted to strong and convert \n to <br/>
     let s = String(seg)
       .replace(/<span[^>]*class=["']highlighted["'][^>]*>/gi, "<strong>")
-      .replace(/<\/span>/gi, "</strong>");
+      .replace(/<\/span>/gi, "</strong>")
+      .replace(/\n/g, "<br/>");
     const nodes = [];
     const brSplit = s.split(/(<br\s*\/?\s*>)/i);
     let globalIndex = 0;
@@ -92,6 +93,7 @@ export default function RichText({ content }) {
           target="_blank"
           rel="noopener noreferrer"
           onClick={(e) => e.stopPropagation()}
+          className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
         >
           {renderHighlightAndBreaks(p.text, `mdlbl-${i}`)}
         </a>
@@ -116,6 +118,7 @@ export default function RichText({ content }) {
             target="_blank"
             rel="noopener noreferrer"
             onClick={(e) => e.stopPropagation()}
+            className="text-blue-600 hover:text-blue-800 hover:underline transition-colors"
           >
             {url}
           </a>

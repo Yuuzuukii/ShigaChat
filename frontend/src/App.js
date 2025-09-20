@@ -1,7 +1,7 @@
 import React, { useContext } from "react";
 import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import Shinki from "./components/Shinki";
-import NavBar from "./components/NavBar";
+import Navbar from "./components/NavBar";
 import New from "./components/New";
 import Home from "./components/home";
 import Keyword from "./components/keyword";
@@ -20,21 +20,21 @@ function App() {
 
   return (
     <Router basename = {BASE_PATH}>
-      <div>
-        <NavBar />
-        <Routes>
-          <Route path="" element={<Navigate to="/new" />} /> {/* デフォルトリダイレクト */}
-          <Route path="/shinki" element={<Shinki />} />
-          <Route path="/new" element={<New />} />
+      <Routes>
+        <Route path="" element={<Navigate to="/new" />} />
+        {/* Auth pages are outside Layout */}
+        <Route path="/shinki" element={<Shinki />} />
+        <Route path="/new" element={<New />} />
+        {/* App pages wrapped by Navbar (header+sidebar) */}
+        <Route element={<Navbar />}>
           <Route path="/home" element={<Home />} />
           <Route path="/keyword" element={<Keyword />} />
           <Route path="/category" element={<Category />} />
-          <Route path="/category/:categoryId" element={<CategoryDetail />} /> {/* 動的ルート */}
+          <Route path="/category/:categoryId" element={<CategoryDetail />} />
           <Route path="/admin/QuestionAdmin" element={<Question_Admin />} />
           <Route path="/admin/category/:categoryId" element={<Q_List />} />
-
-        </Routes>
-      </div>
+        </Route>
+      </Routes>
     </Router>
   );
 }

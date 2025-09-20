@@ -16,31 +16,30 @@ import {
   handleNotificationMove,
   handleGlobalNotificationMove
 } from "../utils/notifications";
-import "./Home.css";
 import RichText from "./common/RichText";
+import { Button } from "./ui/button";
+import { Card, CardContent } from "./ui/card";
+import { motion, AnimatePresence } from "framer-motion";
+import { 
+  MessageCircle, 
+  Lightbulb, 
+  Clock, 
+  ExternalLink, 
+  ChevronDown, 
+  ChevronRight,
+  FileText,
+  AlertTriangle,
+  Loader2,
+  Send,
+  Languages,
+  FileBarChart,
+  Sparkles
+} from "lucide-react";
 
 // --- Local persistence keys (per-browser, per-user scoped) ---
 const LS_THREADS_KEY = "chat_threads";             // array of {id, title, lastUpdated}
 const LS_CUR_THREAD_KEY = "chat_current_thread";   // string
 const LS_MSGS_PREFIX = "chat_msgs_";               // per-thread messages
-const LS_CHAT_WIDTH_KEY = "chat_width";            // chat area width preference
-
-function loadThreads() {
-  // Deprecated: kept for backward-compat; use per-user variants below
-  try { return JSON.parse(localStorage.getItem(LS_THREADS_KEY)) || []; } catch { return []; }
-}
-function saveThreads(threads) {
-  // Deprecated: kept for backward-compat; use per-user variants below
-  localStorage.setItem(LS_THREADS_KEY, JSON.stringify(threads));
-}
-function loadMsgs(threadId) {
-  // Deprecated: kept for backward-compat; use per-user variants below
-  try { return JSON.parse(localStorage.getItem(LS_MSGS_PREFIX + threadId)) || []; } catch { return []; }
-}
-function saveMsgs(threadId, msgs) {
-  // Deprecated: kept for backward-compat; use per-user variants below
-  localStorage.setItem(LS_MSGS_PREFIX + threadId, JSON.stringify(msgs));
-}
 
 export default function Home() {
   const { user, setUser, token, fetchUser, setToken } = useContext(UserContext);
@@ -81,7 +80,7 @@ export default function Home() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   // RAG similarity threshold (0.0–1.0), persisted in localStorage
-  const DEFAULT_SIMILARITY = 0.3;
+  const DEFAULT_SIMILARITY = 0.30;
   const [similarity, setSimilarity] = useState(() => {
     const v = localStorage.getItem('rag_similarity_threshold');
     const n = v != null ? parseFloat(v) : DEFAULT_SIMILARITY;
@@ -102,17 +101,9 @@ export default function Home() {
     lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
   }));
   // Server is the source of truth for threads now
-  const [chatWidth, setChatWidth] = useState(() => localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px");
-  const [chatSize, setChatSize] = useState(() => {
-    const saved = localStorage.getItem(LS_CHAT_WIDTH_KEY) || "900px";
-    if (saved === "1200px") return "medium";
-    if (saved === "1400px" || saved === "100%") return "large";
-    return "small";
-  });
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const [isActionOpen, setIsActionOpen] = useState(false);
   const actionRef = useRef(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const messagesEndRef = useRef(null);
@@ -134,17 +125,6 @@ export default function Home() {
     }
   }, [user]);
 
-  // Apply chat width on mount and when changed
-  useEffect(() => {
-    try {
-      const sizeToWidth = { small: "900px", medium: "1200px", large: "1400px" };
-      const width = sizeToWidth[chatSize] || chatWidth || "900px";
-      document.documentElement.style.setProperty("--chat-width", width);
-      localStorage.setItem(LS_CHAT_WIDTH_KEY, width);
-      setChatWidth(width);
-    } catch {}
-  }, [chatSize]);
-
   // Server-side thread loading on mount (no localStorage merge)
   useEffect(() => {
     const loadThreadsFromServer = async () => {
@@ -164,11 +144,17 @@ export default function Home() {
           const serverThreads = toClientThreads(data.threads || []);
           setThreads(serverThreads);
 
-          // Auto-load the most recent thread if available
-          if (serverThreads && serverThreads.length > 0) {
-            const mostRecentThread = serverThreads[0];
-            console.log('Auto-loading most recent thread:', mostRecentThread);
-            setCurrentThreadId(String(mostRecentThread.id));
+          // If URL has ?tid=..., prioritize that thread
+          const params = new URLSearchParams(window.location.search);
+          const fromParam = params.get('tid');
+          if (fromParam) {
+            setCurrentThreadId(String(fromParam));
+          } else {
+            // Auto-load the most recent thread if available
+            if (serverThreads && serverThreads.length > 0) {
+              const mostRecentThread = serverThreads[0];
+              setCurrentThreadId(String(mostRecentThread.id));
+            }
           }
         } else {
           console.error('Failed to load threads from server');
@@ -215,12 +201,12 @@ export default function Home() {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popupRef.current && !popupRef.current.contains(event.target)) setShowPopup(false);
-      if (actionRef.current && !actionRef.current.contains(event.target)) setIsActionOpen(false);
+      if (actionRef.current && !actionRef.current.contains(event.target)) setShowLangPicker(false);
     };
     if (showPopup) document.addEventListener("click", handleClickOutside);
-    if (isActionOpen) document.addEventListener("click", handleClickOutside);
+    if (showLangPicker) document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
-  }, [showPopup, isActionOpen]);
+  }, [showPopup, showLangPicker]);
 
   // Load messages from server when switching thread
   const loadThreadMessages = async (threadId) => {
@@ -346,8 +332,6 @@ export default function Home() {
     await updateUserLanguage(newLanguage, setUser, setToken);
     setLanguage(newLanguage);
   };
-
-  const handleSetSize = (size) => () => setChatSize(size);
 
   const handleSimilarityChange = (e) => {
     const n = parseFloat(e.target.value);
@@ -492,6 +476,7 @@ export default function Home() {
     const typingMsg = { id: "typing", role: "assistant", content: "…", typing: true };
     setMessages(prev => [...prev, userMsg, typingMsg]);
     setInput("");
+    resetTextareaHeight(); // textareaの高さをリセット
     setLoading(true);
     setErrorMessage("");
 
@@ -607,13 +592,32 @@ export default function Home() {
     }
   };
 
-  // --- Action menu (translate / summarize / simplify) ---
-  const openAction = () => {
-    setIsActionOpen((v) => !v);
-    setActionMessage("");
-    setShowLangPicker(false);
+  // textareaの自動サイズ調整
+  const textareaRef = useRef(null);
+  const handleInputChange = (e) => {
+    setInput(e.target.value);
+    
+    // 入力が空の場合は最小の高さにリセット
+    if (!e.target.value.trim()) {
+      e.target.style.height = '40px';
+      return;
+    }
+    
+    // リサイズのため一時的に高さを自動にして測定
+    e.target.style.height = 'auto';
+    // 内容に合わせて高さを調整（最小2.5rem、最大8rem）
+    const newHeight = Math.min(Math.max(e.target.scrollHeight, 40), 128);
+    e.target.style.height = newHeight + 'px';
   };
 
+  // 送信時にtextareaの高さをリセット
+  const resetTextareaHeight = () => {
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px'; // 2.5rem = 40px
+    }
+  };
+
+  // --- Action menu (translate / summarize / simplify) ---
   const applyAction = async (type, targetLangOverride = null) => {
     if (!token) {
       setErrorMessage(t.errorLogin);
@@ -624,7 +628,7 @@ export default function Home() {
     const lastAssistantIdx = [...messages].map((m, i) => ({ m, i })).reverse().find(x => x.m.role === 'assistant' && !x.m.typing)?.i;
     if (lastAssistantIdx == null) {
       setErrorMessage(t?.noRecentAnswer || "直近の回答がありません");
-      setIsActionOpen(false);
+      setShowLangPicker(false);
       return;
     }
     let lastUserIdx = -1;
@@ -732,303 +736,10 @@ export default function Home() {
       setErrorMessage(e.message || String(e));
     } finally {
       setActionLoading(false);
-      setIsActionOpen(false);
+      setShowLangPicker(false);
     }
   };
 
-  return (
-    <div className="home-container">
-      {/* Drawer Overlay */}
-      {isDrawerOpen && <div className="drawer-overlay" onClick={() => setIsDrawerOpen(false)}></div>}
-
-      {/* Sidebar: Threads Drawer */}
-      <aside className={`chat-sidebar drawer ${isDrawerOpen ? "open" : ""}`}>
-        <div className="sidebar-header">
-          <h3 className="sidebar-title">{t?.threads || "スレッド"}</h3>
-          <div className="header-buttons">
-            <button className="button" style={{ padding: "6px 10px" }} onClick={createThread}>{t?.newChat || "新規"}</button>
-            <button className="close-drawer-btn" onClick={() => setIsDrawerOpen(false)}>×</button>
-          </div>
-        </div>
-        {threadsLoading && (
-          <p className="no-threads-message">スレッドを読み込み中...</p>
-        )}
-        {!threadsLoading && threads.length === 0 && (
-          <p className="no-threads-message">{t?.noThreads || "まだスレッドがありません"}</p>
-        )}
-        <ul className="threads-list">
-          {threads.map(th => (
-            <li key={th.id} className={`thread-item ${String(th.id) === String(currentThreadId) ? "active" : "inactive"}`}>
-              <div onClick={() => {
-                selectThread(th.id);
-                setIsDrawerOpen(false);
-              }} className="thread-content">
-                <div className="thread-title">{th.title}</div>
-                <div className="thread-time">{new Date(th.lastUpdated || th.last_updated).toLocaleString()}</div>
-              </div>
-              <button className="button thread-button thread-edit-btn" onClick={(e) => {
-                e.stopPropagation();
-                const title = prompt(t?.renameThread || "スレッド名を変更", th.title);
-                if (title !== null && title.trim()) renameThread(th.id, title.trim());
-              }}>
-                <img src="./pencil.png" alt="編集" className="button-icon" />
-              </button>
-              <button className="button thread-button thread-delete-btn" onClick={(e) => {
-                e.stopPropagation();
-                removeThread(th.id);
-              }}>
-                <img src="./trash.png" alt="削除" className="button-icon" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      </aside>
-
-
-      {/* Main Content Area: Header + Chat */}
-      <div className="main-content">
-        <div className="chat-frame">
-          <header className="header">
-            <div className="header-left">
-              <div className="language-wrapper">
-                <img src="./globe.png" alt="言語" className="globe-icon" />
-                <select className="languageSelector" onChange={handleLanguageChange} value={language}>
-                  <option value="ja">日本語</option>
-                  <option value="en">English</option>
-                  <option value="zh">中文</option>
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="ko">한국어</option>
-                </select>
-              </div>
-            </div>
-          <h1>Shiga Chat</h1>
-          <div className="user-notification-wrapper">
-              <div className={`notification-container ${showPopup ? "show" : ""}`}>
-                <button className="notification-button" onClick={onNotificationClick}>
-                  <img src="./bell.png" alt="通知" className="notification-icon" />
-                  {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-                </button>
-                {showPopup && (
-                  <div className="notification-popup" ref={popupRef}>
-                    <div className="tabs">
-                      <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                        {t.personal}
-                      </button>
-                      <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                        {t.global}
-                      </button>
-                    </div>
-                    <div className="notifications-list">
-                      {activeTab === "personal" && (
-                        notifications.length > 0 ? (
-                          notifications.map((n) => (
-                            <div key={n.id} className={`notification-item ${n.is_read ? "read" : "unread"}`} onClick={() => onNotificationMove(n)}>
-                              {n.message}
-                              <span className="time">{new Date(n.time).toLocaleString()}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <p>{t.noNotifications}</p>
-                        )
-                      )}
-                      {activeTab === "global" && (
-                        globalNotifications.length > 0 ? (
-                          globalNotifications.map((n) => (
-                            <div key={n.id} className={`notification-item ${Array.isArray(n.read_users) && n.read_users.includes(userId) ? "read" : "unread"}`} onClick={() => onGlobalNotificationMove(n)}>
-                              {n.message}
-                              <span className="time">{new Date(n.time).toLocaleString()}</span>
-                            </div>
-                          ))
-                        ) : (
-                          <p>{t.noNotifications}</p>
-                        )
-                      )}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="userIcon">{user ? `${user.nickname} ` : t.guest}</div>
-            </div>
-          </header>
-
-          {/* Chat area */}
-
-          <main className="chat-main">
-            <div className="chat-controls">
-              <button className="hamburger-btn chat-hamburger" onClick={() => setIsDrawerOpen(true)}>
-                <img src="./threads.png" alt="スレッド一覧" className="threads-icon" />
-              </button>
-              <button className="new-chat-btn" onClick={createThread}>
-                <svg className="new-chat-icon" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" />
-                </svg>
-                {t?.newChat || "新規チャット"}
-              </button>
-            </div>
-            <div className="chat-widthbar" aria-label="画面サイズ設定">
-              <span className="widthLabel">{t?.screenSize || '画面サイズ'}</span>
-              <div className="widthToggle" role="group" aria-label="画面サイズ">
-                <button className={`widthBtn ${chatSize === 'small' ? 'active' : ''}`} onClick={handleSetSize('small')}>{t?.widthSmall || '小'}</button>
-                <button className={`widthBtn ${chatSize === 'medium' ? 'active' : ''}`} onClick={handleSetSize('medium')}>{t?.widthMedium || '中'}</button>
-                <button className={`widthBtn ${chatSize === 'large' ? 'active' : ''}`} onClick={handleSetSize('large')}>{t?.widthLarge || '大'}</button>
-              </div>
-            </div>
-            {/* Small threshold control on the right of size controls */}
-            <div className="rag-threshold" aria-label="RAG閾値設定">
-              <span className="simLabel">{t?.similarityLabel || '一致の厳しさ'}</span>
-              <div className="simRangeWrapper">
-                <input
-                  id="similarityRange"
-                  className="simRange"
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.05"
-                  value={similarity}
-                  onChange={handleSimilarityChange}
-                />
-                <div className="simScale">
-                  <span className="simLow">{t?.similarityLow || '弱い'}</span>
-                  <span className="simHigh">{t?.similarityHigh || '強い'}</span>
-                </div>
-              </div>
-              <span className="simValue">{similarity.toFixed(2)}</span>
-            </div>
-            <div className="chat-messages">
-              {messagesLoading && currentThreadId && (
-                <div className="empty-chat-message">
-                  <p className="empty-chat-title">メッセージを読み込み中...</p>
-                </div>
-              )}
-              {!messagesLoading && (!currentThreadId || messages.length === 0) && (
-                <div className="empty-chat-message">
-                  <p className="empty-chat-title">{t?.askQuestion || "質問を入力してください"}</p>
-                </div>
-              )}
-
-              {!messagesLoading && messages.length > 0 && messages.map((m) => (
-                <div key={m.id} className={`message-container ${m.role}`}>
-                  <div className={`message-bubble ${m.role} ${(m.type === 'action' && m.role === 'user') ? 'action' : ''}`}>
-                    <div className="message-role">
-                      {(m.type === 'action' && m.role === 'user')
-                        ? (t?.actionLabel || 'アクション')
-                        : (m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント"))}
-                    </div>
-                    <div className="message-content">
-                      {m.typing
-                        ? (t?.generatingAnswer || "回答を生成中…")
-                        : (m.role === "assistant"
-                            ? <RichText content={m.content} />
-                            : m.content)}
-                  </div>
-
-                    {/* Related (rag_qa) */}
-                    {!m.typing && m.role === "assistant" && ((m.type === "rag") || (m.rag_qa && m.rag_qa.length > 0)) && (
-                      <details className="rag-details">
-                        <summary className="rag-summary">{t?.similarQuestions || "関連質問"}</summary>
-                        {m.rag_qa && m.rag_qa.length > 0 ? (
-                          <ul className="rag-list">
-                            {m.rag_qa.map((q, idx) => (
-                              <li key={idx}>
-                                <details className="rag-item">
-                                  <summary className="rag-q-summary">
-                                    <span className="rag-q-row">
-                                      <span className="rag-q-text"><RichText content={q.question} /></span>
-                                      {formatDateTime(q.answer_time || q.time) && (
-                                        <span className="rag-edit-time">
-                                          {formatDateTime(q.answer_time || q.time)}
-                                        </span>
-                                      )}
-                                      {q.category_id && q.question_id && (
-                                        <button
-                                          className="rag-jump-icon"
-                                          title={t?.openInAdmin || "質問管理で開く"}
-                                          onClick={(e) => {
-                                            e.preventDefault();
-                                            e.stopPropagation();
-                                            navigate(`/admin/category/${q.category_id}?id=${q.question_id}`);
-                                          }}
-                                        >
-                                          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
-                                            <path fill="currentColor" d="M14 3h7v7h-2V6.41l-9.29 9.3-1.42-1.42 9.3-9.29H14V3z"></path>
-                                            <path fill="currentColor" d="M5 5h7v2H7v10h10v-5h2v7H5z"></path>
-                                          </svg>
-                                        </button>
-                                      )}
-                                    </span>
-                                  </summary>
-                                  <div className="rag-answer"><RichText content={q.answer} /></div>
-                                  {q.retrieved_at && (
-                                    <div className="rag-time">{new Date(q.retrieved_at).toLocaleString()}</div>
-                                  )}
-                                </details>
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <div className="rag-empty" style={{ padding: "10px 12px" }}>
-                            {t?.noSimilarWarning || "類似質問はありません。回答は正確でない可能性があります。"}
-                          </div>
-                        )}
-                      </details>
-                    )}
-                  </div>
-                </div>
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
-
-          {/* Composer */}
-          <div className="composer-area">
-            {errorMessage && (
-              <div className="error-message">{errorMessage}</div>
-            )}
-            {actionMessage && (
-              <div className="action-message">{actionMessage}</div>
-            )}
-            <div className="composer-input">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={handleKeyDown}
-                placeholder={t.placeholder}
-                className="textArea composer-textarea"
-              />
-              <div className="action-wrapper" ref={actionRef}>
-                <button className="button action-trigger" type="button" onClick={openAction} disabled={actionLoading}>
-                  {t?.actionButton || "アクション"}
-                </button>
-                {isActionOpen && (
-                  <div className="action-popup">
-                    <div className="action-item row">
-                      <span>{t?.actionTranslate || '翻訳'}</span>
-                      <button className="chevron-btn" onClick={(e)=>{e.stopPropagation(); setShowLangPicker(v=>!v);}}>›</button>
-                      {showLangPicker && (
-                        <div className="action-submenu">
-                          {Object.keys(languageCodeToLabel).map(code => (
-                            <button key={code} className="action-item" onClick={() => applyAction('translate', code)} disabled={actionLoading}>
-                              {languageCodeToLabel[code]}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    <button className="action-item" onClick={() => applyAction('summarize')} disabled={actionLoading}>{t?.actionSummarize || '要約'}</button>
-                    <button className="action-item" onClick={() => applyAction('simplify')} disabled={actionLoading}>{t?.actionSimplify || 'わかりやすく'}</button>
-                  </div>
-                )}
-              </div>
-              <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
-                {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
-              </button>
-            </div>
-            <div className="composer-help">⌘/Ctrl + Enter で送信</div>
-          </div>
-          </main>
-        </div>
-      </div>
-    </div>
-  );
   // Cross-browser date formatting (supports 'YYYY-MM-DD HH:mm:ss')
   function formatDateTime(val) {
     if (!val) return null;
@@ -1044,4 +755,337 @@ export default function Home() {
       return String(val);
     }
   }
+
+  return (
+    <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
+      {/* Centered chat container with limited width */}
+      <div className="h-full flex justify-center ">
+        <motion.main 
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          className="h-full w-full flex"
+        >
+          {/* Chat messages container */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3, duration: 0.4 }}
+            className="flex-1 min-h-0 max-h-full border border-blue-100 bg-white/80 shadow-sm backdrop-blur-sm relative"
+          >
+            {/* フローティング絞り込み強度コントロール */}
+            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
+              <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200 shadow-sm">
+                <span className="text-xs font-medium text-zinc-700 whitespace-nowrap">{t?.similarityLabel || '一致の厳しさ'}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-zinc-500">{t?.similarityLow || '弱い'}</span>
+                  <input
+                    id="similarityRange"
+                    className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-blue-100 to-blue-200 accent-blue-600 transition-all hover:scale-105"
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.05"
+                    value={similarity}
+                    onChange={handleSimilarityChange}
+                  />
+                  <span className="text-xs text-zinc-500">{t?.similarityHigh || '強い'}</span>
+                </div>
+                <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs font-mono text-blue-700">{similarity.toFixed(2)}</span>
+              </Card>
+            </div>
+
+            <div className="h-full flex flex-col">
+              {/* Messages area with full width scrolling */}
+              <div className="flex-1 overflow-y-auto p-4">
+                <div className="mx-auto w-full max-w-4xl">
+              {messagesLoading && currentThreadId && (
+                <div className="flex h-full items-center justify-center">
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                    <p className="text-sm text-zinc-600">メッセージを読み込み中...</p>
+                  </div>
+                </div>
+              )}
+              {!messagesLoading && (!currentThreadId || messages.length === 0) && (
+                <div className="flex h-full items-center justify-center">
+                  <div className="text-center">
+                    <div className="mb-4 rounded-full bg-blue-100 p-4 mx-auto w-fit">
+                      <MessageCircle className="h-8 w-8 text-blue-600" />
+                    </div>
+                    <p className="text-lg font-medium text-zinc-800">{t?.askQuestion || "質問を入力してください"}</p>
+                    <p className="text-sm text-zinc-500 mt-1">ShigaChatでお手伝いできることがあります</p>
+                  </div>
+                </div>
+              )}
+
+              <AnimatePresence mode="popLayout">
+                {!messagesLoading && messages.length > 0 && messages.map((m, index) => (
+                  <motion.div 
+                    key={m.id} 
+                    initial={{ opacity: 0, y: 20, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -20, scale: 0.95 }}
+                    transition={{ 
+                      duration: 0.3, 
+                      delay: index * 0.1,
+                      type: "spring",
+                      stiffness: 200,
+                      damping: 20
+                    }}
+                    className={`mb-6 ${m.role === 'user' ? 'flex justify-end' : ''}`}
+                  >
+                    {m.role === 'user' ? (
+                      // ユーザーメッセージは吹き出し形式
+                      <div 
+                        className={`max-w-[80%] rounded-2xl border p-4 shadow-sm ${
+                          (m.type === 'action' && m.role === 'user') 
+                            ? 'border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50 text-orange-900' 
+                            : 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900'
+                        }`}
+                      >
+                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                          {(m.type === 'action' && m.role === 'user')
+                            ? (t?.actionLabel || 'アクション')
+                            : (t?.you || "あなた")}
+                        </div>
+                        <div className="text-sm leading-relaxed">
+                          {m.content}
+                        </div>
+                      </div>
+                    ) : (
+                      // アシスタントメッセージはフラット形式
+                      <div className="w-full">
+                        <div className="mb-3 flex items-center gap-2">
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-blue-700">
+                            <Lightbulb className="h-4 w-4 text-white" />
+                          </div>
+                          <span className="text-sm font-medium text-zinc-700">{t?.assistant || "アシスタント"}</span>
+                        </div>
+                        <div className="prose prose-sm max-w-none text-zinc-800 leading-relaxed">
+                          {m.typing
+                            ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex gap-1">
+                                  <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]"></div>
+                                  <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]"></div>
+                                  <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600"></div>
+                                </div>
+                                <span className="text-sm text-zinc-600">{t?.generatingAnswer || "回答を生成中…"}</span>
+                              </div>
+                            )
+                            : <RichText content={m.content} />}
+                        </div>
+
+                        {/* Enhanced RAG section with simple text design */}
+                        {!m.typing && ((m.type === "rag") || (m.rag_qa && m.rag_qa.length > 0)) && (
+                          <details className="mt-4" open={false}>
+                            <summary className="cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none">
+                              <div className="flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-zinc-500" />
+                                <span>{t?.similarQuestions || "参考となる関連質問"} ({m.rag_qa?.length || 0}件)</span>
+                                <ChevronDown className="h-3 w-3 text-zinc-400 transition-transform duration-200" />
+                              </div>
+                            </summary>
+                        
+                        {m.rag_qa && m.rag_qa.length > 0 ? (
+                          <div className="divide-y divide-zinc-200">
+                            {m.rag_qa.map((q, idx) => (
+                              <details key={idx} className="group" open={false}>
+                                <summary className="cursor-pointer px-4 py-3 hover:bg-zinc-50 transition-colors duration-200 list-none">
+                                  <div className="flex items-start gap-3">
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1 text-sm font-medium text-zinc-800 line-clamp-2">
+                                          <RichText content={q.question} />
+                                        </div>
+                                        {q.category_id && q.question_id && (
+                                          <button
+                                            className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors flex-shrink-0"
+                                            title={t?.openInAdmin || "質問管理で開く"}
+                                            onClick={(e) => {
+                                              e.preventDefault();
+                                              e.stopPropagation();
+                                              navigate(`/admin/category/${q.category_id}?id=${q.question_id}`);
+                                            }}
+                                          >
+                                            <ExternalLink className="h-3 w-3" />
+                                            管理画面で開く
+                                          </button>
+                                        )}
+                                      </div>
+                                      {formatDateTime(q.answer_time || q.time) && (
+                                        <div className="flex items-center gap-1 mt-2">
+                                          <Clock className="h-3 w-3 text-zinc-500" />
+                                          <span className="text-xs text-zinc-500">
+                                            {formatDateTime(q.answer_time || q.time)}
+                                          </span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </summary>
+                                <div className="px-4 pb-4">
+                                  <div className="rounded-md bg-white border border-zinc-200 p-4">
+                                    <div className="text-sm text-zinc-700 leading-relaxed">
+                                      <RichText content={q.answer} />
+                                    </div>
+                                    {q.retrieved_at && (
+                                      <div className="mt-3 pt-3 border-t border-zinc-200">
+                                        <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md">
+                                          取得日時: {new Date(q.retrieved_at).toLocaleString()}
+                                        </span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </details>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="px-4 py-6 text-center">
+                            <div className="flex flex-col items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-200">
+                                <AlertTriangle className="h-5 w-5 text-zinc-500" />
+                              </div>
+                              <div>
+                                <p className="text-sm font-medium text-zinc-700">{t?.noSimilarWarning || "類似質問が見つかりませんでした"}</p>
+                                <p className="text-xs text-zinc-500 mt-1">回答は一般的な知識に基づいています</p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                          </details>
+                        )}
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </AnimatePresence>
+                </div>
+            </div>
+            
+            {/* Fixed input area at bottom - no border */}
+            <div className="bg-white/95 backdrop-blur-sm p-4">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5, duration: 0.4 }}
+                className="mx-auto w-full max-w-4xl"
+              >
+                <Card className="shadow-sm">
+                  <CardContent className="p-4">
+                    {/* アクション機能 */}
+                    <motion.div 
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ delay: 0.3, duration: 0.4 }}
+                      className="mb-3"
+                      aria-label="アクション機能"
+                    >
+                      <Card className="p-2 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-zinc-700">{t?.actionLabel || 'アクション'}</span>
+                          <div className="flex items-center gap-2">
+                        <div className="relative" ref={actionRef}>
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={(e) => {e.stopPropagation(); setShowLangPicker(v => !v);}} 
+                            disabled={actionLoading}
+                            className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
+                          >
+                            <Languages className="h-3 w-3" />
+                            {t?.actionTranslate || '翻訳'}
+                          </Button>
+                          {showLangPicker && (
+                            <div className="absolute left-0 bottom-full z-50 mb-1 min-w-32 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
+                              {Object.keys(languageCodeToLabel).map(code => (
+                                <button 
+                                  key={code} 
+                                  className="block w-full rounded p-2 text-left text-xs hover:bg-zinc-50 transition-colors" 
+                                  onClick={() => {
+                                    applyAction('translate', code);
+                                    setShowLangPicker(false);
+                                  }} 
+                                  disabled={actionLoading}
+                                >
+                                  {languageCodeToLabel[code]}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => applyAction('summarize')} 
+                          disabled={actionLoading}
+                          className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
+                        >
+                          <FileBarChart className="h-3 w-3" />
+                          {t?.actionSummarize || '要約'}
+                        </Button>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => applyAction('simplify')} 
+                          disabled={actionLoading}
+                          className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
+                        >
+                          <Sparkles className="h-3 w-3" />
+                          {t?.actionSimplify || 'わかりやすく'}
+                        </Button>
+                          </div>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  {errorMessage && (
+                    <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                      {errorMessage}
+                    </div>
+                  )}
+                  {actionMessage && (
+                    <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">
+                      {actionMessage}
+                    </div>
+                  )}
+                  <div className="flex gap-3">
+                    <textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={handleInputChange}
+                      onKeyDown={handleKeyDown}
+                      placeholder={t.placeholder}
+                      className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm shadow-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 min-h-[2.5rem] h-10 leading-5"
+                      rows="1"
+                    />
+                    <Button 
+                      onClick={sendMessage} 
+                      disabled={loading || !input.trim()}
+                      className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-md disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                    >
+                      {loading ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Send className="h-3 w-3" />
+                          <span className="hidden sm:inline">{t.askButton || "送信"}</span>
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                  <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </div>
+        </motion.div>
+        
+        <div ref={messagesEndRef} />
+      </motion.main>
+    </div>
+    </div>
+  );
 }
