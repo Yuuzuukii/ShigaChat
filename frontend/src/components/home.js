@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useRef, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { UserContext } from "../UserContext";
 import { redirectToLogin } from "../utils/auth";
 import { updateUserLanguage } from "../utils/language";
@@ -33,7 +33,8 @@ import {
   Send,
   Languages,
   FileBarChart,
-  Sparkles
+  Sparkles,
+  Plus
 } from "lucide-react";
 
 // --- Local persistence keys (per-browser, per-user scoped) ---
@@ -46,6 +47,7 @@ export default function Home() {
   const [language, setLanguage] = useState("ja");
   const t = translations[language];
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Notifications (existing)
   const userId = user?.id;
@@ -107,8 +109,16 @@ export default function Home() {
   const actionRef = useRef(null);
   const [showLangPicker, setShowLangPicker] = useState(false);
   const messagesEndRef = useRef(null);
+  const messagesContainerRef = useRef(null);
   const scrollToBottom = () => {
-    try { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); } catch {}
+    try {
+      const el = messagesContainerRef.current;
+      if (el) {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    } catch {}
   };
 
   // Derived
@@ -149,13 +159,9 @@ export default function Home() {
           const fromParam = params.get('tid');
           if (fromParam) {
             setCurrentThreadId(String(fromParam));
-          } else {
-            // Auto-load the most recent thread if available
-            if (serverThreads && serverThreads.length > 0) {
-              const mostRecentThread = serverThreads[0];
-              setCurrentThreadId(String(mostRecentThread.id));
-            }
           }
+          // ログイン時は自動的にスレッドを開かない（新しいチャット画面を維持）
+          // 以前のロジック: 最新スレッドを自動で開く機能を削除
         } else {
           console.error('Failed to load threads from server');
           setThreads([]);
@@ -170,6 +176,56 @@ export default function Home() {
 
     loadThreadsFromServer();
   }, [token, userId]);
+
+  // React to URL ?tid= changes and switch thread accordingly
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const tid = params.get('tid');
+    if (tid && String(tid) !== String(currentThreadId)) {
+      setCurrentThreadId(String(tid));
+    }
+  }, [location.search]);
+
+  // Also respond to explicit threadSelected events (from Navbar)
+  useEffect(() => {
+    const onThreadSelected = (e) => {
+      const tid = e?.detail ? String(e.detail) : null;
+      if (!tid) return;
+      if (String(tid) !== String(currentThreadId)) {
+        setCurrentThreadId(String(tid));
+        const url = new URL(window.location);
+        url.searchParams.set('tid', tid);
+        window.history.replaceState({}, '', url.toString());
+      }
+    };
+    window.addEventListener('threadSelected', onThreadSelected);
+    return () => window.removeEventListener('threadSelected', onThreadSelected);
+  }, [currentThreadId]);
+
+  // Listen for thread deletion events from NavBar
+  useEffect(() => {
+    const onThreadDeleted = (e) => {
+      const { threadId } = e?.detail || {};
+      if (!threadId) return;
+      
+      // If the deleted thread is currently displayed, redirect to new chat
+      if (String(threadId) === String(currentThreadId)) {
+        setCurrentThreadId(null);
+        setMessages([]);
+        clearCurrentThreadIdLS();
+        // Clear URL parameters
+        const url = new URL(window.location);
+        url.searchParams.delete('tid');
+        window.history.replaceState({}, '', url.toString());
+      }
+      
+      // Update local thread list
+      setThreads(prev => prev.filter(t => String(t.id) !== String(threadId)));
+    };
+    
+    window.addEventListener('threadDeleted', onThreadDeleted);
+    return () => window.removeEventListener('threadDeleted', onThreadDeleted);
+  }, [currentThreadId]);
 
   // Notifications loading
   useEffect(() => {
@@ -196,6 +252,31 @@ export default function Home() {
     window.addEventListener("tokenUpdated", handleTokenUpdate);
     return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
   }, [user, navigate, fetchUser]);
+
+  // ログイン時に新しいチャットを開く
+  useEffect(() => {
+    // ユーザーがログインした直後（userがnullからオブジェクトに変わった時）
+    if (user && user.id && token) {
+      // URLにスレッドIDが指定されていない場合のみ新しいチャットを開く
+      const params = new URLSearchParams(window.location.search);
+      const tidFromUrl = params.get('tid');
+      
+      if (!tidFromUrl) {
+        // 新しいチャットを開始
+        setCurrentThreadId(null);
+        setMessages([]);
+        setInput("");
+        setErrorMessage("");
+        setActionMessage("");
+        clearCurrentThreadIdLS();
+        
+        // URLからクエリパラメータも削除
+        const url = new URL(window.location);
+        url.searchParams.delete('tid');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [user, token]);
 
   // Notification popup outside-click
   useEffect(() => {
@@ -242,7 +323,8 @@ export default function Home() {
               id: crypto.randomUUID(),
               role: "user",
               content: msg.question,
-              time: msg.created_at
+              time: msg.created_at,
+              type: msg.type // アクションメッセージの場合は "action" が設定される
             });
             clientMessages.push({
               id: crypto.randomUUID(),
@@ -345,6 +427,20 @@ export default function Home() {
   };
 
   // --- Thread ops ---
+  const createNewChat = () => {
+    // Clear current thread and start fresh - no server call
+    setCurrentThreadId(null);
+    setMessages([]);
+    setInput("");
+    setErrorMessage("");
+    setActionMessage("");
+    clearCurrentThreadIdLS();
+    // URLからクエリパラメータも削除
+    const url = new URL(window.location);
+    url.searchParams.delete('tid');
+    window.history.replaceState({}, '', url.toString());
+  };
+
   const createThread = () => {
     // Create a local-only temporary thread context; do not add to sidebar.
     const id = `tmp-${Date.now().toString()}`;
@@ -360,8 +456,12 @@ export default function Home() {
   };
 
   const renameThread = (id, title) => {
-    const updated = threads.map(th => String(th.id) === String(id) ? { ...th, title } : th);
+    // Update local state for immediate UI feedback
+    const newTitle = title || (t?.newChat || "新しいチャット");
+    console.log('renameThread called:', { id, newTitle, currentThreads: threads.length });
+    const updated = threads.map(th => String(th.id) === String(id) ? { ...th, title: newTitle } : th);
     setThreads(updated);
+    console.log('Updated threads:', updated.map(th => ({ id: th.id, title: th.title })));
   };
 
   const removeThread = async (id) => {
@@ -397,12 +497,14 @@ export default function Home() {
             setThreads(serverThreads);
             // 選択中スレッドが削除された場合のハンドリング
             if (String(threadId) === String(currentThreadId)) {
-              if (serverThreads.length > 0) setCurrentThreadId(String(serverThreads[0].id));
-              else {
-                setCurrentThreadId(null);
-                setMessages([]);
-                clearCurrentThreadIdLS();
-              }
+              // 削除されたスレッドを表示中の場合、新しいチャット画面に遷移
+              setCurrentThreadId(null);
+              setMessages([]);
+              clearCurrentThreadIdLS();
+              // URLもクリア
+              const url = new URL(window.location);
+              url.searchParams.delete('tid');
+              window.history.replaceState({}, '', url.toString());
             }
           }
         } catch {}
@@ -437,14 +539,14 @@ export default function Home() {
       localStorage.removeItem(`${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${threadId}`);
 
       if (threadId === String(currentThreadId)) {
-        if (updated.length > 0) {
-          const nextThread = updated[Math.max(0, Math.min(idx, updated.length - 1))];
-          setCurrentThreadId(String(nextThread.id));
-        } else {
-          setCurrentThreadId(null);
-          setMessages([]);
-          clearCurrentThreadIdLS();
-        }
+        // 削除されたスレッドを表示中の場合、新しいチャット画面に遷移
+        setCurrentThreadId(null);
+        setMessages([]);
+        clearCurrentThreadIdLS();
+        // URLもクリア
+        const url = new URL(window.location);
+        url.searchParams.delete('tid');
+        window.history.replaceState({}, '', url.toString());
       }
     }
   };
@@ -474,7 +576,13 @@ export default function Home() {
     // optimistic UI
     const userMsg = { id: crypto.randomUUID(), role: "user", content: text, time: new Date().toISOString() };
     const typingMsg = { id: "typing", role: "assistant", content: "…", typing: true };
+    
+    // Check if this is the first message BEFORE updating messages
+    const isFirstMessage = messages.length === 0;
+    
     setMessages(prev => [...prev, userMsg, typingMsg]);
+    // Ensure the view scrolls when user sends a message
+    try { setTimeout(scrollToBottom, 0); } catch {}
     setInput("");
     resetTextareaHeight(); // textareaの高さをリセット
     setLoading(true);
@@ -542,14 +650,20 @@ export default function Home() {
           setCurrentThreadId(newId);
           setCurrentThreadIdLS(newId);
           threadId = newId;
+          
+          // Update URL to reflect the new thread ID
+          const url = new URL(window.location);
+          url.searchParams.set('tid', newId);
+          window.history.replaceState({}, '', url.toString());
+          
+          // Notify NavBar about the new active thread
+          try {
+            window.dispatchEvent(new CustomEvent('threadSelected', { detail: newId }));
+          } catch {}
         }
       }
 
-      // title bootstrap
-      if (!currentThread || !currentThread.title || currentThread.title === (t?.newChat || "新しいチャット")) {
-        renameThread(threadId, text.slice(0, 24) || (t?.newChat || "新しいチャット"));
-      }
-
+      // Add assistant message
       const asstMsg = {
         id: crypto.randomUUID(),
         role: "assistant",
@@ -565,8 +679,21 @@ export default function Home() {
         return next;
       });
 
-      // update thread time
-      // Refresh from server to ensure sidebar sync
+      // Update local title immediately for better UX if it's the first message
+      if (isFirstMessage) {
+        const newTitle = text.slice(0, 50) + (text.length > 50 ? "..." : "");
+        console.log('Updating thread title:', threadId, 'with:', newTitle);
+        renameThread(threadId, newTitle);
+        
+        // Immediately notify NavBar about the title change
+        try {
+          window.dispatchEvent(new CustomEvent('threadTitleChanged', { 
+            detail: { threadId, title: newTitle } 
+          }));
+        } catch {}
+      }
+
+      // Refresh from server to get updated thread list with server-generated titles
       try {
         const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
         if (resp.status === 401) {
@@ -575,6 +702,11 @@ export default function Home() {
           const data2 = await resp.json();
           const serverThreads = toClientThreads(data2.threads || []);
           setThreads(serverThreads);
+          
+          // Notify NavBar to refresh its thread list
+          try { 
+            window.dispatchEvent(new CustomEvent('threadUpdated')); 
+          } catch {}
         }
       } catch {}
     } catch (e) {
@@ -624,6 +756,8 @@ export default function Home() {
       redirectToLogin(navigate);
       return;
     }
+    // Scroll once to bottom on action start to reduce perceived jump
+    try { scrollToBottom(); } catch {}
     // Find latest assistant answer and its preceding user question
     const lastAssistantIdx = [...messages].map((m, i) => ({ m, i })).reverse().find(x => x.m.role === 'assistant' && !x.m.typing)?.i;
     if (lastAssistantIdx == null) {
@@ -720,6 +854,16 @@ export default function Home() {
           } catch {}
           setCurrentThreadId(newId);
           setCurrentThreadIdLS(newId);
+          
+          // Update URL to reflect the new thread ID
+          const url = new URL(window.location);
+          url.searchParams.set('tid', newId);
+          window.history.replaceState({}, '', url.toString());
+          
+          // Notify NavBar about the new active thread
+          try {
+            window.dispatchEvent(new CustomEvent('threadSelected', { detail: newId }));
+          } catch {}
         }
         // Refresh thread list timestamps
         try {
@@ -771,11 +915,26 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3, duration: 0.4 }}
-            className="flex-1 min-h-0 max-h-full border border-blue-100 bg-white/80 shadow-sm backdrop-blur-sm relative"
+            className="flex-1 min-h-0 max-h-full border border-blue-100 bg-white/80 backdrop-blur-sm relative"
           >
+            {/* 新しいチャットボタン（チャットエリア左上端） */}
+            <div className="absolute top-3 left-3 z-10">
+              <button
+                onClick={createNewChat}
+                className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-transform duration-200 hover:scale-105 group text-sm font-medium"
+                title={t?.newChat || '新しいチャット'}
+                aria-label="新しいチャットを開始"
+              >
+                <Plus className="h-4 w-4 group-hover:scale-110 transition-transform duration-200" />
+                <span className="group-hover:scale-105 transition-transform duration-200">
+                  {t?.newChat || '新しいチャット'}
+                </span>
+              </button>
+            </div>
+
             {/* フローティング絞り込み強度コントロール */}
             <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
-              <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200 shadow-sm">
+              <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200">
                 <span className="text-xs font-medium text-zinc-700 whitespace-nowrap">{t?.similarityLabel || '一致の厳しさ'}</span>
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-zinc-500">{t?.similarityLow || '弱い'}</span>
@@ -797,8 +956,8 @@ export default function Home() {
 
             <div className="h-full flex flex-col">
               {/* Messages area with full width scrolling */}
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="mx-auto w-full max-w-4xl">
+              <div className="flex-1 overflow-y-auto p-4" ref={messagesContainerRef}>
+                <div className="mx-auto w-full max-w-4xl h-full">
               {messagesLoading && currentThreadId && (
                 <div className="flex h-full items-center justify-center">
                   <div className="flex flex-col items-center gap-3">
@@ -808,13 +967,13 @@ export default function Home() {
                 </div>
               )}
               {!messagesLoading && (!currentThreadId || messages.length === 0) && (
-                <div className="flex h-full items-center justify-center">
+                <div className="flex items-center justify-center h-full">
                   <div className="text-center">
                     <div className="mb-4 rounded-full bg-blue-100 p-4 mx-auto w-fit">
                       <MessageCircle className="h-8 w-8 text-blue-600" />
                     </div>
-                    <p className="text-lg font-medium text-zinc-800">{t?.askQuestion || "質問を入力してください"}</p>
-                    <p className="text-sm text-zinc-500 mt-1">ShigaChatでお手伝いできることがあります</p>
+                    <p className="text-lg font-medium text-zinc-800">{t?.askQuestion || "質問してみよう"}</p>
+                    <p className="text-xs text-zinc-500 mt-2">{t?.disclaimer || "ShigaChatの情報は正確でない場合があります"}</p>
                   </div>
                 </div>
               )}
@@ -840,14 +999,23 @@ export default function Home() {
                       <div 
                         className={`max-w-[80%] rounded-2xl border p-4 shadow-sm ${
                           (m.type === 'action' && m.role === 'user') 
-                            ? 'border-orange-200 bg-gradient-to-br from-orange-50 to-orange-100/50 text-orange-900' 
-                            : 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900'
+                            ? 'bg-blue-300 bg-gradient-to-br from-blue-100 to-zinc-100/60 text-blue-900 shadow-blue-100' 
+                            : 'border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900 shadow-blue-100'
                         }`}
                       >
-                        <div className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-                          {(m.type === 'action' && m.role === 'user')
-                            ? (t?.actionLabel || 'アクション')
-                            : (t?.you || "あなた")}
+                        <div className={`mb-2 flex items-center gap-1.5 ${
+                          (m.type === 'action' && m.role === 'user') ? 'text-blue-600' : 'text-zinc-500'
+                        }`}>
+                          {(m.type === 'action' && m.role === 'user') && (
+                            <div className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600">
+                              <Sparkles className="h-2.5 w-2.5 text-white" />
+                            </div>
+                          )}
+                          <span className="text-[10px] font-semibold uppercase tracking-wider">
+                            {(m.type === 'action' && m.role === 'user')
+                              ? (t?.actionLabel || 'アクション')
+                              : (t?.you || "あなた")}
+                          </span>
                         </div>
                         <div className="text-sm leading-relaxed">
                           {m.content}
@@ -973,7 +1141,7 @@ export default function Home() {
                 transition={{ delay: 0.5, duration: 0.4 }}
                 className="mx-auto w-full max-w-4xl"
               >
-                <Card className="shadow-sm">
+                <Card>
                   <CardContent className="p-4">
                     {/* アクション機能 */}
                     <motion.div 
@@ -983,62 +1151,65 @@ export default function Home() {
                       className="mb-3"
                       aria-label="アクション機能"
                     >
-                      <Card className="p-2 bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                      <div className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 border border-slate-200">
                         <div className="flex items-center gap-2">
-                          <span className="text-xs font-medium text-zinc-700">{t?.actionLabel || 'アクション'}</span>
-                          <div className="flex items-center gap-2">
-                        <div className="relative" ref={actionRef}>
+                          <div className="flex h-5 w-5 items-center justify-center rounded-full bg-blue-600">
+                            <Sparkles className="h-2.5 w-2.5 text-white" />
+                          </div>
+                          <span className="text-xs font-medium text-slate-700">{t?.actionLabel || 'アクション'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <div className="relative" ref={actionRef}>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              onClick={(e) => {e.stopPropagation(); setShowLangPicker(v => !v);}} 
+                              disabled={actionLoading}
+                              className="px-2.5 py-1 rounded-md transition-all text-xs h-7 flex items-center gap-1 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400"
+                            >
+                              <Languages className="h-3 w-3" />
+                              {t?.actionTranslate || '翻訳'}
+                            </Button>
+                            {showLangPicker && (
+                              <div className="absolute left-0 bottom-full z-50 mb-1 min-w-32 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
+                                {Object.keys(languageCodeToLabel).map(code => (
+                                  <button 
+                                    key={code} 
+                                    className="block w-full rounded-sm p-1.5 text-left text-xs hover:bg-slate-50 transition-colors text-slate-700" 
+                                    onClick={() => {
+                                      applyAction('translate', code);
+                                      setShowLangPicker(false);
+                                    }} 
+                                    disabled={actionLoading}
+                                  >
+                                    {languageCodeToLabel[code]}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+                          </div>
                           <Button 
                             variant="outline" 
                             size="sm"
-                            onClick={(e) => {e.stopPropagation(); setShowLangPicker(v => !v);}} 
+                            onClick={() => applyAction('summarize')} 
                             disabled={actionLoading}
-                            className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
+                            className="px-2.5 py-1 rounded-md transition-all text-xs h-7 flex items-center gap-1 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400"
                           >
-                            <Languages className="h-3 w-3" />
-                            {t?.actionTranslate || '翻訳'}
+                            <FileBarChart className="h-3 w-3" />
+                            {t?.actionSummarize || '要約'}
                           </Button>
-                          {showLangPicker && (
-                            <div className="absolute left-0 bottom-full z-50 mb-1 min-w-32 rounded-lg border border-zinc-200 bg-white p-1 shadow-lg">
-                              {Object.keys(languageCodeToLabel).map(code => (
-                                <button 
-                                  key={code} 
-                                  className="block w-full rounded p-2 text-left text-xs hover:bg-zinc-50 transition-colors" 
-                                  onClick={() => {
-                                    applyAction('translate', code);
-                                    setShowLangPicker(false);
-                                  }} 
-                                  disabled={actionLoading}
-                                >
-                                  {languageCodeToLabel[code]}
-                                </button>
-                              ))}
-                            </div>
-                          )}
+                          <Button 
+                            variant="outline" 
+                            size="sm"
+                            onClick={() => applyAction('simplify')} 
+                            disabled={actionLoading}
+                            className="px-2.5 py-1 rounded-md transition-all text-xs h-7 flex items-center gap-1 bg-white border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400"
+                          >
+                            <Sparkles className="h-3 w-3" />
+                            {t?.actionSimplify || 'わかりやすく'}
+                          </Button>
                         </div>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => applyAction('summarize')} 
-                          disabled={actionLoading}
-                          className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
-                        >
-                          <FileBarChart className="h-3 w-3" />
-                          {t?.actionSummarize || '要約'}
-                        </Button>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => applyAction('simplify')} 
-                          disabled={actionLoading}
-                          className="px-3 py-1 rounded-lg transition-all hover:shadow-sm text-xs h-7 flex items-center gap-1"
-                        >
-                          <Sparkles className="h-3 w-3" />
-                          {t?.actionSimplify || 'わかりやすく'}
-                        </Button>
-                          </div>
-                        </div>
-                      </Card>
+                      </div>
                     </motion.div>
                   {errorMessage && (
                     <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
@@ -1057,13 +1228,13 @@ export default function Home() {
                       onChange={handleInputChange}
                       onKeyDown={handleKeyDown}
                       placeholder={t.placeholder}
-                      className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm shadow-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 min-h-[2.5rem] h-10 leading-5"
+                      className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 min-h-[2.5rem] h-10 leading-5"
                       rows="1"
                     />
                     <Button 
                       onClick={sendMessage} 
                       disabled={loading || !input.trim()}
-                      className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white shadow-sm transition-all hover:from-blue-700 hover:to-blue-800 hover:shadow-md disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                      className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
                     >
                       {loading ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

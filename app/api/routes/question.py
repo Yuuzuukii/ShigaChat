@@ -128,6 +128,25 @@ def load_data_from_database():
     
     return questions_and_answers
 
+@router.post("/create_thread")
+def create_thread(current_user: dict = Depends(current_user_info)):
+    """
+    空のスレッドを作成してIDを返す。最初の投稿前にUIから作成したいケース用。
+    """
+    user_id = current_user["id"]
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
+                (user_id, datetime.now()),
+            )
+            new_id = cursor.lastrowid
+            conn.commit()
+            return {"thread_id": int(new_id)}
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
+
 @router.post("/get_answer")
 async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
     question_text = request.text
