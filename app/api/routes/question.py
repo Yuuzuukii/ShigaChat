@@ -22,7 +22,7 @@ from api.utils.RAG import (
     rag,
     LanguageDetectionError,
     UnsupportedLanguageError,
-    orchestrate,
+    answer_with_rag,
     detect_lang,
 )
 import json
@@ -168,45 +168,30 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             past_qa_rows = cursor.fetchall()
         history_qa = list(reversed(past_qa_rows))  # [(user, bot), ...] の昇順に
 
-        # ---- 逐次フロー実行： reactive →（必要時のみ）RAG -----------------------
-        # 既定の出力言語（reactive用）を入力言語から推定
-        try:
-            reactive_lang = detect_lang(question_text)
-        except Exception:
-            reactive_lang = "ja"
-
-        # 受信した similarity_threshold を優先（未指定時は 0.3）
+        # ---- 回答生成：RAG 専用に固定 ---------------------------------------
+        # UIから受け取った similarity_threshold（未指定時は 0.3）を適用
         sim_th = request.similarity_threshold if (hasattr(request, 'similarity_threshold') and request.similarity_threshold is not None) else 0.3
-        # クランプ（0.0〜1.0の範囲外は丸め）
         try:
             sim_th = max(0.0, min(1.0, float(sim_th)))
         except Exception:
             sim_th = 0.3
 
-        resp = orchestrate(
+        resp = answer_with_rag(
             question_text=question_text,
             history_qa=history_qa,
-            similarity_threshold=sim_th,       # UIから指定可能
+            similarity_threshold=sim_th,
             max_history_in_prompt=6,
-            model="gpt-4.1-mini",           # 最終回答用のやや強めモデル
-            reactive_default_lang=reactive_lang,
+            model="gpt-4.1-mini",
         )
-        # resp["type"] ∈ {"translate","summarize","rewrite","rag","error"}
-        if resp.get("type") == "error":
-            # 統一エラーハンドリング（例外で返す）
-            meta = resp.get("meta", {}) or {}
-            raise HTTPException(status_code=400, detail=resp.get("text", "処理に失敗しました。"))
 
+        # RAG専用応答を展開
         answer_text = resp.get("text", "").strip()
         meta = resp.get("meta", {}) or {}
         references = meta.get("references", []) if isinstance(meta, dict) else []
-        action_type = resp.get("type")  # "translate" | "summarize" | "rewrite" | "rag"
+        action_type = "rag"
 
-        # ---- 保存用に rag_qa を JSON 化（汎用タスク時は空配列） ------------------
-        rag_qa = []
-        if action_type == "rag" and isinstance(references, list):
-            # 既に orchestrate で UI 向け dict リストに整形済み
-            rag_qa = references
+        # ---- 保存用に rag_qa を JSON 化 -------------------------------------
+        rag_qa = references if isinstance(references, list) else []
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
         with sqlite3.connect(DATABASE) as conn:

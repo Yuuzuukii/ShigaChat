@@ -8,6 +8,7 @@ import {
   translations,
   languageCodeToId,
   languageLabelToCode,
+  languageCodeToLabel,
 } from "../config/constants";
 import {
   fetchNotifications,
@@ -87,7 +88,9 @@ export default function Home() {
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
   });
   const [loading, setLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   // Guard to avoid wiping optimistic messages when creating first thread
@@ -109,6 +112,13 @@ export default function Home() {
 
   // Drawer state
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isActionOpen, setIsActionOpen] = useState(false);
+  const actionRef = useRef(null);
+  const [showLangPicker, setShowLangPicker] = useState(false);
+  const messagesEndRef = useRef(null);
+  const scrollToBottom = () => {
+    try { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); } catch {}
+  };
 
   // Derived
   const currentThread = useMemo(
@@ -205,10 +215,12 @@ export default function Home() {
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (popupRef.current && !popupRef.current.contains(event.target)) setShowPopup(false);
+      if (actionRef.current && !actionRef.current.contains(event.target)) setIsActionOpen(false);
     };
     if (showPopup) document.addEventListener("click", handleClickOutside);
+    if (isActionOpen) document.addEventListener("click", handleClickOutside);
     return () => document.removeEventListener("click", handleClickOutside);
-  }, [showPopup]);
+  }, [showPopup, isActionOpen]);
 
   // Load messages from server when switching thread
   const loadThreadMessages = async (threadId) => {
@@ -595,6 +607,135 @@ export default function Home() {
     }
   };
 
+  // --- Action menu (translate / summarize / simplify) ---
+  const openAction = () => {
+    setIsActionOpen((v) => !v);
+    setActionMessage("");
+    setShowLangPicker(false);
+  };
+
+  const applyAction = async (type, targetLangOverride = null) => {
+    if (!token) {
+      setErrorMessage(t.errorLogin);
+      redirectToLogin(navigate);
+      return;
+    }
+    // Find latest assistant answer and its preceding user question
+    const lastAssistantIdx = [...messages].map((m, i) => ({ m, i })).reverse().find(x => x.m.role === 'assistant' && !x.m.typing)?.i;
+    if (lastAssistantIdx == null) {
+      setErrorMessage(t?.noRecentAnswer || "直近の回答がありません");
+      setIsActionOpen(false);
+      return;
+    }
+    let lastUserIdx = -1;
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (messages[i].role === 'user') { lastUserIdx = i; break; }
+    }
+    const questionText = lastUserIdx >= 0 ? (messages[lastUserIdx].content || "") : "";
+    const answerText = messages[lastAssistantIdx].content || "";
+
+    // Add a user-side action bubble
+    const actionLabels = {
+      translate: t?.actionTranslate || '翻訳',
+      summarize: t?.actionSummarize || '要約',
+      simplify: t?.actionSimplify || 'わかりやすく',
+    };
+    const actionText = `${t?.actionApplyPrefix || ''}${actionLabels[type]}${type==='translate' ? ` (${(languageCodeToLabel[targetLangOverride||language] || (targetLangOverride||language))})` : ''}${t?.actionApplySuffix || ''}`;
+    const actionMsg = {
+      id: crypto.randomUUID(),
+      role: "user",
+      type: "action",
+      content: actionText,
+      time: new Date().toISOString(),
+    };
+    const typingMsg = { id: "action-typing", role: "assistant", type: "action", content: "…", typing: true };
+    setMessages(prev => [...prev, actionMsg, typingMsg]);
+    setTimeout(scrollToBottom, 0);
+
+    setActionLoading(true);
+    setActionMessage("");
+    try {
+      // Thread ID if available (numeric only)
+      let threadIdNum = null;
+      if (currentThreadId && !String(currentThreadId).startsWith('tmp-')) {
+        const n = Number(currentThreadId);
+        if (Number.isFinite(n)) threadIdNum = n;
+      }
+      const res = await fetch(`${API_BASE_URL}/action/apply`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          action: type,
+          question: questionText,
+          answer: answerText,
+          target_lang: targetLangOverride || language,
+          thread_id: threadIdNum,
+          action_label: actionText
+        })
+      });
+      if (res.status === 401) {
+        setMessages(prev => prev.filter(m => m.id !== "action-typing"));
+        redirectToLogin(navigate);
+        return;
+      }
+      if (!res.ok) {
+        let msg = t.failtogetanswer || "Failed";
+        try { const err = await res.json(); msg = err?.detail || msg; } catch {}
+        throw new Error(msg);
+      }
+      const data = await res.json();
+      const result = (data && typeof data.result === 'string') ? data.result : '';
+      const asstMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        // Note: assistant bubble stays normal styling
+        type: undefined,
+        content: result,
+        time: new Date().toISOString(),
+      };
+      setMessages(prev => {
+        const next = prev.filter(m => m.id !== "action-typing");
+        next.push(asstMsg);
+        return next;
+      });
+
+      // If server assigned/mapped thread_id, update current thread and sidebar
+      if (data && data.thread_id != null) {
+        const newId = String(data.thread_id);
+        const oldId = String(currentThreadId || '');
+        if (newId !== oldId) {
+          // migrate localStorage messages key if needed
+          try {
+            const oldKey = `${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${oldId}`;
+            const newKey = `${LS_MSGS_PREFIX}${userId ?? 'nouser'}_${newId}`;
+            const oldVal = localStorage.getItem(oldKey);
+            if (oldVal !== null) {
+              localStorage.setItem(newKey, oldVal);
+              localStorage.removeItem(oldKey);
+            }
+          } catch {}
+          setCurrentThreadId(newId);
+          setCurrentThreadIdLS(newId);
+        }
+        // Refresh thread list timestamps
+        try {
+          const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, { headers: { Authorization: `Bearer ${token}` } });
+          if (resp.ok) {
+            const data2 = await resp.json();
+            const serverThreads = toClientThreads(data2.threads || []);
+            setThreads(serverThreads);
+          }
+        } catch {}
+      }
+    } catch (e) {
+      setMessages(prev => prev.filter(m => m.id !== "action-typing"));
+      setErrorMessage(e.message || String(e));
+    } finally {
+      setActionLoading(false);
+      setIsActionOpen(false);
+    }
+  };
+
   return (
     <div className="home-container">
       {/* Drawer Overlay */}
@@ -767,15 +908,19 @@ export default function Home() {
 
               {!messagesLoading && messages.length > 0 && messages.map((m) => (
                 <div key={m.id} className={`message-container ${m.role}`}>
-                  <div className={`message-bubble ${m.role}`}>
-                    <div className="message-role">{m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント")}</div>
+                  <div className={`message-bubble ${m.role} ${(m.type === 'action' && m.role === 'user') ? 'action' : ''}`}>
+                    <div className="message-role">
+                      {(m.type === 'action' && m.role === 'user')
+                        ? (t?.actionLabel || 'アクション')
+                        : (m.role === "user" ? (t?.you || "あなた") : (t?.assistant || "アシスタント"))}
+                    </div>
                     <div className="message-content">
                       {m.typing
                         ? (t?.generatingAnswer || "回答を生成中…")
                         : (m.role === "assistant"
                             ? <RichText content={m.content} />
                             : m.content)}
-                    </div>
+                  </div>
 
                     {/* Related (rag_qa) */}
                     {!m.typing && m.role === "assistant" && ((m.type === "rag") || (m.rag_qa && m.rag_qa.length > 0)) && (
@@ -830,27 +975,55 @@ export default function Home() {
                   </div>
                 </div>
               ))}
+              <div ref={messagesEndRef} />
             </div>
 
-            {/* Composer */}
-            <div className="composer-area">
-              {errorMessage && (
-                <div className="error-message">{errorMessage}</div>
-              )}
-              <div className="composer-input">
-                <textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={t.placeholder}
-                  className="textArea composer-textarea"
-                />
-                <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
-                  {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
+          {/* Composer */}
+          <div className="composer-area">
+            {errorMessage && (
+              <div className="error-message">{errorMessage}</div>
+            )}
+            {actionMessage && (
+              <div className="action-message">{actionMessage}</div>
+            )}
+            <div className="composer-input">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder={t.placeholder}
+                className="textArea composer-textarea"
+              />
+              <div className="action-wrapper" ref={actionRef}>
+                <button className="button action-trigger" type="button" onClick={openAction} disabled={actionLoading}>
+                  {t?.actionButton || "アクション"}
                 </button>
+                {isActionOpen && (
+                  <div className="action-popup">
+                    <div className="action-item row">
+                      <span>{t?.actionTranslate || '翻訳'}</span>
+                      <button className="chevron-btn" onClick={(e)=>{e.stopPropagation(); setShowLangPicker(v=>!v);}}>›</button>
+                      {showLangPicker && (
+                        <div className="action-submenu">
+                          {Object.keys(languageCodeToLabel).map(code => (
+                            <button key={code} className="action-item" onClick={() => applyAction('translate', code)} disabled={actionLoading}>
+                              {languageCodeToLabel[code]}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <button className="action-item" onClick={() => applyAction('summarize')} disabled={actionLoading}>{t?.actionSummarize || '要約'}</button>
+                    <button className="action-item" onClick={() => applyAction('simplify')} disabled={actionLoading}>{t?.actionSimplify || 'わかりやすく'}</button>
+                  </div>
+                )}
               </div>
-              <div className="composer-help">⌘/Ctrl + Enter で送信</div>
+              <button className="button" onClick={sendMessage} disabled={loading || !input.trim()}>
+                {loading ? (t.generatingAnswer || "生成中…") : (t.askButton || "送信")}
+              </button>
             </div>
+            <div className="composer-help">⌘/Ctrl + Enter で送信</div>
+          </div>
           </main>
         </div>
       </div>

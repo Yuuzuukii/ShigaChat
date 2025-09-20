@@ -761,6 +761,18 @@ html, body, #root {
   border: 1px solid #e5e5e5;
 }
 
+/* Action bubbles */
+.message-bubble.action {
+  background: #fff7ed;
+  color: #7c2d12;
+  border: 1px dashed #fdba74;
+}
+.message-container .message-bubble.user.action {
+  background: #f8fafc;
+  color: #0f172a;
+  border: 1px dashed #cbd5e1;
+}
+
 .message-role {
   font-size: 12px;
   margin-bottom: 8px;
@@ -800,6 +812,50 @@ html, body, #root {
   border-radius: 8px;
   cursor: pointer;
 }
+
+/* Action popup near composer */
+.action-wrapper { position: relative; display: inline-block; }
+.action-trigger { background: #4b5563; }
+.action-popup {
+  position: absolute;
+  bottom: 110%;
+  left: 0;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  padding: 8px;
+  min-width: 140px;
+  z-index: 30;
+}
+.action-item.row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.chevron-btn { background: transparent; border: none; color: #6b7280; cursor: pointer; font-size: 16px; line-height: 1; padding: 0 4px; }
+.chevron-btn:hover { color: #111827; }
+.action-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.12);
+  padding: 6px;
+  min-width: 160px;
+}
+.action-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  padding: 8px 10px;
+  border-radius: 6px;
+  color: #111827;
+  font-size: 14px;
+  cursor: pointer;
+}
+.action-item:hover { background: #f3f4f6; }
+.action-message { background: #ecfeff; border: 1px solid #a5f3fc; color: #075985; padding: 8px 10px; border-radius: 8px; margin-bottom: 10px; font-size: 13px; }
 
 /* エラーメッセージのスタイル */
 .error-message {
