@@ -1,42 +1,32 @@
-import React, { useEffect, useState, useContext, useRef } from "react";
+import React, { useEffect, useState, useContext } from "react";
 import { useParams, useNavigate, useSearchParams } from "react-router-dom";
 import { UserContext } from "../UserContext";
-import { updateUserLanguage } from "../utils/language";
 import {
     API_BASE_URL,
     translations,
-    languageCodeToId,
     languageLabelToCode,
 } from "../config/constants";
-import {
-    fetchNotifications,
-    handleNotificationClick,
-    handleNotificationMove,
-    handleGlobalNotificationMove
-} from "../utils/notifications";
-import "./CategoryDetail.css";
 import { redirectToLogin } from "../utils/auth";
 import RichText from "./common/RichText";
 
 function CategoryDetail() {
     const { categoryId } = useParams();
-    const [questions, setQuestions] = useState([]);
+    const [questions, setQuestions] = useState(null);
     const [categoryName, setCategoryName] = useState("");
     const [visibleAnswerId, setVisibleAnswerId] = useState(null);
     const [language, setLanguage] = useState("ja");
+    const [mounted, setMounted] = useState(false);
     const navigate = useNavigate();
-    const { user, token, setToken, setUser, fetchUser } = useContext(UserContext);
-    const [notifications, setNotifications] = useState([]);
-    const [showPopup, setShowPopup] = useState(false); // ポップアップの表示制御
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { user, token, fetchUser } = useContext(UserContext);
     const [searchParams] = useSearchParams();
     const questionId = searchParams.get("id");
-    const [activeTab, setActiveTab] = useState("personal"); // "personal" または "global"
-    const [globalNotifications, setGlobalNotifications] = useState([]); // 全体通知を管理
-    const [isNotifLoading, setIsNotifLoading] = useState(true);
-    const popupRef = useRef(null);
 
     const t = translations[language];
+
+    useEffect(() => {
+        const r = requestAnimationFrame(() => setMounted(true));
+        return () => cancelAnimationFrame(r);
+    }, []);
 
     useEffect(() => {
         if (user?.spokenLanguage) {
@@ -51,49 +41,20 @@ function CategoryDetail() {
     }, [user]);
 
     useEffect(() => {
-        if (user?.id && token) {
-            fetchNotifications({
-                language,
-                token,
-                userId: user.id,
-                setNotifications,
-                setGlobalNotifications,
-                setUnreadCount,
-            }).finally(() => setIsNotifLoading(false));
-        } else {
-        }
-    }, [user, token]);
-
-    useEffect(() => {
-        if (user) {
-            fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-        }
-    }, [language]);
-
-    useEffect(() => {
         if (user === null) {
             redirectToLogin(navigate);
         }
         const handleTokenUpdate = () => {
             const latestToken = localStorage.getItem("token");
             if (latestToken) {
-                fetchUser(latestToken); // ✅ 正常に動作！
+                fetchUser(latestToken);
             }
         };
         window.addEventListener("tokenUpdated", handleTokenUpdate);
         return () => {
             window.removeEventListener("tokenUpdated", handleTokenUpdate);
         };
-    }, [user, navigate, fetchUser]); // ← 依存に fetchUser を追加
-
-    useEffect(() => {
-        if (showPopup) {
-            document.addEventListener("click", handleClickOutside);
-        } else {
-            document.removeEventListener("click", handleClickOutside);
-        }
-        return () => document.removeEventListener("click", handleClickOutside);
-    }, [showPopup]);
+    }, [user, navigate, fetchUser]);
 
     useEffect(() => {
         if (questionId) {
@@ -106,9 +67,7 @@ function CategoryDetail() {
                 }
             };
 
-            // 少し待ってからスクロールを実行する
             const timeout = setTimeout(scrollToQuestion, 300);
-
             return () => clearTimeout(timeout);
         }
     }, [questionId]);
@@ -127,43 +86,6 @@ function CategoryDetail() {
             );
         }
     }, [categoryId, language, user, token]);
-
-    const handleClickOutside = (event) => {
-        if (popupRef.current && !popupRef.current.contains(event.target)) {
-            setShowPopup(false);
-        }
-    };
-
-    const onNotificationClick = () => {
-        handleNotificationClick({
-            showPopup,
-            setShowPopup,
-            language,
-            token,
-            userId,
-            setNotifications,
-            setGlobalNotifications,
-            setUnreadCount,
-        });
-    };
-
-    const onNotificationMove = (notification) => {
-        handleNotificationMove(notification, navigate, token, () => {
-            fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-        });
-    };
-
-    const onGlobalNotificationMove = (notification) => {
-        handleGlobalNotificationMove(notification, navigate, token, () => {
-            fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-        });
-    };
-
-    const handleLanguageChange = async (event) => {
-        const newLanguage = event.target.value;
-        await updateUserLanguage(newLanguage, setUser, setToken); // サーバー側の言語設定とトークン更新
-        setLanguage(newLanguage); // ローカルの言語設定を最後に変更（401回避）
-    };
 
     const fetchQuestions = async (categoryId, user, token, t, setLanguage, setCategoryName, setQuestions, navigate) => {
         if (!token || !user) {
@@ -244,133 +166,99 @@ function CategoryDetail() {
         addHistory(questionId);
     };
 
-    const userData = localStorage.getItem("user");
-    const userId = userData ? JSON.parse(userData).id : null;
-
     if (questions === null) {
-        return <div>{t.loading}</div>;
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+                <div className="text-lg text-gray-500">{t.loading}</div>
+            </div>
+        );
     }
 
     return (
-        <div className="category-question-container">
-            <header className="header">
-                <div className="language-wrapper">
-                    <img src="./../globe.png" alt="言語" className="globe-icon" />
-                    <select className="languageSelector" onChange={handleLanguageChange} value={language}>
-                        <option value="ja">日本語</option>
-                        <option value="en">English</option>
-                        <option value="zh">中文</option>
-                        <option value="vi">Tiếng Việt</option>
-                        <option value="ko">한국어</option>
-                    </select>
-                </div>
-                <h1>Shiga Chat</h1>
-                {/* ユーザーアイコンと通知をまとめたラッパー */}
-                <div className="user-notification-wrapper">
-                    {/* 🔔 通知ボタン（画像版） */}
-                    <div className={`notification-container ${showPopup ? "show" : ""}`}>
-                        {/* 🔔 通知ボタン */}
-                        <button className="notification-button" onClick={onNotificationClick}>
-                            <img src="./../bell.png" alt="通知" className="notification-icon" />
-                            {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-                        </button>
+        <div className="w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+            <div className="flex justify-center">
+                <div 
+                    className={`relative z-10 w-full mx-auto max-w-4xl px-4 py-6 text-zinc-800 transition-opacity duration-500 ${
+                        mounted ? "opacity-100" : "opacity-0"
+                    }`}
+                >
+                    <div className="w-full">
+                        {/* カテゴリタイトル */}
+                        <div className="mb-8 text-center">
+                            <h1 className="text-3xl font-bold text-blue-800 mb-2">{categoryName}</h1>
+                            <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
+                        </div>
 
-                        {/* 🔔 通知ポップアップ */}
-                        {showPopup && (
-                            <div className="notification-popup" ref={popupRef}>
-                                {/* タブ切り替えボタン */}
-                                <div className="tabs">
-                                    <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                                        {t.personal}
-                                    </button>
-                                    <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                                        {t.global}
-                                    </button>
-                                </div>
-
-                                <div className="notifications-list">
-                                    {/* 🔹 個人通知リスト */}
-                                    {activeTab === "personal" && (
-                                        notifications.length > 0 ? (
-                                            notifications.map((notification) => (
-                                                <div
-                                                    key={notification.id}
-                                                    className={`notification-item ${notification.is_read ? "read" : "unread"}`}
-                                                    onClick={() => onNotificationMove(notification)}
-                                                >
-                                                    {notification.message}
-                                                    <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                        {/* 質問リスト */}
+                        <div className="w-full space-y-6 mb-20">
+                        {questions.length > 0 ? (
+                            <div className="space-y-6">
+                                {questions.map((question) => (
+                                    <div
+                                        key={question.question_id}
+                                        id={`question-${question.question_id}`}
+                                        onClick={() => toggleAnswer(question.question_id)}
+                                        className="cursor-pointer rounded-lg bg-zinc-50 p-6 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm min-h-[120px]"
+                                    >
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
+                                                <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                                </svg>
+                                                <div className="flex-1 min-w-0 leading-relaxed">
+                                                    <RichText content={question.質問} />
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <p>{t.noNotifications}</p> // 🔹 個人通知がない場合のメッセージ
-                                        )
-                                    )}
+                                            </div>
+                                            <div className="flex items-center gap-2 flex-shrink-0">
+                                                {question?.title === "official" && (
+                                                    <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                                                        {t.official}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
 
-                                    {/* 🔹 全体通知リスト */}
-                                    {activeTab === "global" && (
-                                        globalNotifications.length > 0 ? (
-                                            globalNotifications.map((notification) => (
-                                                <div
-                                                    key={notification.id}
-                                                    className={`notification-item ${Array.isArray(notification.read_users) && notification.read_users.includes(userId) ? "read" : "unread"}`}
-                                                    onClick={() => onGlobalNotificationMove(notification)}
-                                                >
-                                                    {notification.message}
-                                                    <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                                        <div className="mt-3 flex items-center justify-end gap-1 text-sm text-zinc-500">
+                                            <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <span>
+                                                {t.questionDate}
+                                                {new Date(question.time).toLocaleString()}
+                                            </span>
+                                        </div>
+
+                                        {visibleAnswerId === question.question_id && (
+                                            <div className="mt-4 rounded-md bg-blue-50/50 p-4 text-zinc-800">
+                                                <div className="text-sm font-semibold text-zinc-700 mb-2">{t.answer}</div>
+                                                <div className="text-base leading-8 whitespace-pre-wrap break-words">
+                                                    <RichText content={question.回答 || t.loading} />
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <p>{t.noNotifications}</p> // 🔹 全体通知がない場合のメッセージ
-                                        )
-                                    )}
-                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
                             </div>
+                        ) : (
+                            <p className="text-center text-sm text-zinc-500">{t.noQuestions}</p>
                         )}
                     </div>
-                    {/* ユーザー名 */}
-                    <div className="userIcon">
-                        {user ? `${user.nickname} ` : t.guest}
+
+                    {/* 戻るボタン */}
+                    <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+                        <button 
+                            onClick={() => navigate(-1)} 
+                            className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
+                        >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                            {t.backButton}
+                        </button>
+                    </div>
                     </div>
                 </div>
-            </header>
-
-            <div className="question-list">
-                <h1 className="situmon-header">{`${categoryName}`}</h1>
-                {questions.length > 0 ? (
-                    questions.map((question) => (
-                        <div
-                            className="question-item"
-                            id={`question-${question.question_id}`}
-                            key={question.question_id}
-                            onClick={() => toggleAnswer(question.question_id)}
-                            style={{ cursor: "pointer" }}
-                        >
-                            <div className="question-header">
-                                <div className="question-text"><RichText content={question.質問} /></div>
-                                {question.title === "official" && (
-                                    <span className="official-badge">{t.official}</span>
-                                )}
-                            </div>
-                            <div className="question-date" style={{ textAlign: "right" }}>
-                                {t.questionDate}
-                                {new Date(question.time).toLocaleString()}
-                            </div>
-                            {visibleAnswerId === question.question_id && (
-                                <div className="answer-section">
-                                    <strong>{t.answer}</strong>
-                                    <p><RichText content={question.回答 || t.loading} /></p>
-                                </div>
-                            )}
-                        </div>
-                    ))
-                ) : (
-                    <p className="no-questions">{t.noQuestions}</p>
-                )}
             </div>
-            <button onClick={() => navigate(-1)} className="back-button">
-                {t.backButton}
-            </button>
         </div>
     );
 }

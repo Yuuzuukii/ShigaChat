@@ -457,3 +457,326 @@
       transform: translateY(0);
     }
   }
+
+/* 回転角をアニメーション可能にするカスタムプロパティ宣言 */
+@property --spin {
+  syntax: '<angle>';
+  inherits: true;
+  initial-value: 0deg;
+}
+
+/* 円形リングレイアウト（追記・更新） */
+.category-ring {
+  position: relative;
+  --outerPad: 8rem; /* 外側余白（デフォルト） */
+  --centerOffsetY: -9rem; /* default offset for center text */
+  width: calc(var(--radius) * 2 + var(--outerPad)); /* リング外側の余白 */
+  height: calc(var(--radius) * 2 + var(--outerPad));
+  display: grid;
+  place-items: center;
+  --spin: 0deg;
+  --ellipseY: 1;
+  /* 初回入場: フェード+軽いスライド/スケール、回転は遅延開始 */
+  animation: ring-enter 700ms ease-out both, ring-spin 30s linear infinite 900ms;
+}
+
+/* 中央テキスト */
+.category-ring .ring-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none; /* クリックは背面のボタンに通す */
+  font-size: clamp(0.9rem, 2.2vw, 1.5rem);
+  font-weight: 700;
+  color: #1d4ed8; /* blue-700 */
+  text-align: center;
+  padding: 0 1rem;
+  /* 入場演出 */
+  opacity: 0;
+  animation: center-fade 640ms ease-out 200ms forwards;
+  /* リング中心のオフセットを反映（transformアニメと干渉しない） */
+  margin-top: var(--centerOffsetY);
+}
+
+@keyframes center-fade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ホバー/フォーカス時に回転停止（リング全体のアニメーションを停止） */
+.category-ring:hover,
+.category-ring:focus-within {
+  animation-play-state: paused;
+}
+
+/* 既存のトラック回転は無効化（位置決めだけに使用） */
+.category-ring .ring-track {
+  position: relative;
+  width: calc(var(--radius) * 2);
+  height: calc(var(--radius) * 2);
+  border-radius: 9999px;
+  animation: none !important;
+  transform: scaleY(var(--ellipseY));
+  transform-origin: center center;
+}
+
+/* 各アイテムを回転＋逆回転の単一式で配置し、常に正面を維持 */
+.category-ring .ring-item {
+  position: absolute;
+  top: calc(50% + var(--centerOffsetY, 0px));
+  left: 50%;
+  transform: translate(-50%, -50%)
+             rotate(calc(360deg / var(--count) * var(--i) + var(--spin)))
+             translate(var(--radius))
+             rotate(calc(-360deg / var(--count) * var(--i) - var(--spin)));
+  transform-origin: center;
+}
+
+/* アイテムの入場ポップ（ステップ表示） */
+.category-ring .ring-item-cancel {
+  opacity: 0;
+  transform: scale(0.88);
+  animation: item-pop 520ms cubic-bezier(.2,.9,.2,1) forwards;
+  animation-delay: calc(var(--i) * 70ms + 120ms);
+}
+
+/* 親の縦方向スケールを相殺してボタンの縦横比を維持（有効化） */
+.category-ring .ring-item-inner {
+  transform: scaleY(calc(1 / var(--ellipseY)));
+}
+
+/* 角度用アニメーション：--spin を0→360degに */
+@keyframes ring-spin {
+  from { --spin: 0deg; }
+  to   { --spin: 360deg; }
+}
+
+/* 初回入場アニメ（リング全体） */
+@keyframes ring-enter {
+  0% { opacity: 0; transform: translateY(12px) scale(0.98); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* アイテム個別のポップ */
+@keyframes item-pop {
+  0% { opacity: 0; transform: scale(0.88); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+/* reduced motion: アニメーション無効化 */
+@media (prefers-reduced-motion: reduce) {
+  .category-ring { animation: none !important; }
+  .category-ring .ring-item-cancel { animation: none !important; opacity: 1; transform: none; }
+}
+
+/* 旧: スマホ最適化の固定サイズは--outerPad運用に統合したため削除 */
+/*
+@media (max-width: 640px) {
+  .category-ring { width: calc(var(--radius) * 2 + 4rem); height: calc(var(--radius) * 2 + 4rem); }
+  .category-ring .ring-button { width: 4.5rem; height: 4.5rem; }
+}
+*/
+
+/* ボタンの形状を整える */
+.category-ring .ring-button {
+  width: 7.5rem;
+  height: 7.5rem;
+  aspect-ratio: 1 / 1; /* どんな環境でも正円維持 */
+  border-radius: 9999px;
+  padding: 0; /* 余計なパディングを除去して正円を保つ */
+  display: grid;
+  place-items: center;
+  overflow: hidden; /* はみ出し防止 */
+  border: 1.5px solid rgba(15, 23, 42, 0.08); /* 微妙な縁取り */
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+  transform-origin: center center;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 内部の縦レイアウト（アイコン上・テキスト下） */
+.category-ring .ring-button > div {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto auto; /* 自然な高さで配置 */
+  align-items: center;
+  align-content: center; /* 全体を中央寄せ */
+  justify-items: center;
+  padding: 0.55rem; /* わずかに余裕 */
+  gap: 0.3rem;
+}
+
+/* アイコンサイズを統一 */
+.category-ring .ring-button svg {
+  width: 1.5rem;
+  height: 1.5rem;
+  opacity: 0.9;
+}
+
+/* ラベルの可読性向上（最大2行でトリム、クリッピング対策） */
+.category-ring .ring-button span {
+  font-size: clamp(0.78rem, 1.8vw, 0.82rem);
+  font-weight: 700;
+  text-align: center;
+  line-height: 1.22; /* クリッピング防止に余裕 */
+  max-width: 100%;
+  display: -webkit-box;
+  line-clamp: 2; /* 標準 */
+  -webkit-line-clamp: 2; /* Safari等 */
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  /* 長い語の折返しを許可 */
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  hyphens: auto;
+}
+
+/* ホバー/フォーカス時の視認性 */
+.category-ring .ring-button:hover,
+.category-ring .ring-button:focus-visible {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+}
+
+/* キーボードフォーカスのリング */
+.category-ring .ring-button:focus-visible {
+  outline: 3px solid rgba(59, 130, 246, 0.35);
+  outline-offset: 0;
+}
+
+/* モバイル最適化 */
+@media (max-width: 640px) {
+  .category-ring { --outerPad: 5rem; } /* 余白は変数で制御 */
+  .category-ring .ring-button { width: 5rem; height: 5rem; }
+  .category-ring .ring-button > div { padding: 0.4rem; gap: 0.2rem; }
+  .category-ring .ring-button svg { width: 1.25rem; height: 1.25rem; }
+  .category-ring .ring-button span { font-size: clamp(0.72rem, 2.2vw, 0.74rem); line-height: 1.2; }
+}
+
+/* 旧: リング外側に余裕（固定幅/高さ）は--outerPadに統合したため削除 */
+/*
+.category-ring {
+  width: calc(var(--radius) * 2 + 8rem);
+  height: calc(var(--radius) * 2 + 8rem);
+}
+@media (max-width: 640px) {
+  .category-ring { width: calc(var(--radius) * 2 + 5rem); height: calc(var(--radius) * 2 + 5rem); }
+}
+*/
+
+@media (max-width: 1024px) {
+  .category-ring { --centerOffsetY: -7rem; }
+}
+@media (max-width: 640px) {
+  .category-ring { --centerOffsetY: -5.5rem; }
+}
+
+.category-ring .center-content {
+  display: grid;
+  place-items: center;
+  gap: 0.35rem;
+  padding-inline: 0.5rem;
+  margin-top: -4rem;
+}
+
+.category-ring .center-title {
+  font-size: clamp(1.1rem, 2.4vw, 2rem);
+  font-weight: 700; /* match Keyword header feel */
+  letter-spacing: 0.01em;
+  color: #1e40af; /* blue-800 to align with Keyword */
+}
+
+.category-ring .center-subtitle {
+  font-size: clamp(0.8rem, 1.8vw, 1rem);
+  color: #475569; /* slate-600 */
+  font-weight: 500; /* lighter like Keyword subtext */
+}
+
+.category-ring .center-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  background: rgba(59, 130, 246, 0.08); /* blue-500/8% */
+  color: #1d4ed8; /* blue-700 */
+  border: 1px solid rgba(29, 78, 216, 0.2);
+  padding: 0.2rem 0.5rem;
+  border-radius: 9999px;
+}
+
+.category-ring .center-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.25rem;
+  border-radius: 9999px;
+  background: #1d4ed8; /* blue-700 */
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.category-ring .center-meta-text {
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.category-ring .center-halo {
+  position: absolute;
+  width: clamp(9rem, 22vw, 16rem);
+  height: clamp(9rem, 22vw, 16rem);
+  border-radius: 9999px;
+  background: radial-gradient(closest-side, rgba(59,130,246,0.15), rgba(59,130,246,0.04) 60%, transparent 70%);
+  filter: blur(2px);
+  transform: translateZ(0);
+}
+
+.category-ring .center-icon svg {
+  width: 1.5rem;  /* a bit larger to match Keyword */
+  height: 1.5rem;
+  color: #1e40af; /* blue-800 */
+  opacity: .95;
+}
+
+.category-ring .center-samples {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.category-ring .center-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.2rem 0.55rem;
+  border-radius: 9999px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #1e293b; /* slate-800 */
+  background: linear-gradient(180deg, #fff, #f1f5f9);
+  border: 1px solid rgba(15,23,42,0.08);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.6) inset, 0 2px 6px rgba(15,23,42,0.08);
+}
+
+@media (max-width: 640px) {
+  .category-ring .center-halo {
+    width: clamp(7rem, 36vw, 12rem);
+    height: clamp(7rem, 36vw, 12rem);
+  }
+  .category-ring .center-samples { gap: 0.25rem; }
+  .category-ring .center-chip { font-size: 0.68rem; padding: 0.16rem 0.5rem; }
+}
+
+/* タイトル行（アイコン+テキストを横並び） */
+.category-ring .center-title-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem; /* more breathing room like Keyword */
+}

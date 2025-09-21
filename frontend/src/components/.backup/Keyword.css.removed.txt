@@ -1,0 +1,2 @@
+This file intentionally notes that `frontend/src/components/Keyword.css` has been removed.
+The keyword page now uses the shared layout and Tailwind-based utility classes via global styling.

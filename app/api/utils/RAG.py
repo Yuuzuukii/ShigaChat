@@ -506,6 +506,7 @@ def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- 実際に使った出典だけを used_source_ids に列挙（未使用は含めない）。\n"
         "- 可能なら根拠箇所を evidence.quotes に原文抜粋として含める（任意）。\n"
         "- 根拠が不足する場合は『十分な根拠がありません』と述べる。\n"
+        "- 読みやすさのため、改行や段落（空行）・箇条書き（- や 1.）で整理する。\n"
         "- 出力は次のJSONに厳密準拠し、これ以外は何も出力しない:\n"
         "{\n  \"answer\": \"文末ごとに [S1] のように出典IDを付与\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文抜粋\"]} ]\n}\n"
     )
@@ -531,6 +532,7 @@ def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- List only actually used sources in used_source_ids.\n"
         "- Optionally include exact quotes in evidence.quotes.\n"
         "- If insufficient evidence, state 'Insufficient evidence.'.\n"
+        "- For readability, structure with paragraphs/line breaks and bullet points (-, 1.) where helpful.\n"
         "- Output exactly this JSON and nothing else:\n"
         "{\n  \"answer\": \"Sentences with [S1] style citations\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"verbatim quote\"]} ]\n}\n"
     )
@@ -556,6 +558,7 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- Chỉ liệt kê nguồn đã dùng trong used_source_ids.\n"
         "- Tùy chọn: evidence.quotes trích nguyên văn.\n"
         "- Nếu thiếu bằng chứng, nêu rõ 'Thiếu bằng chứng.'.\n"
+        "- Để dễ đọc, hãy trình bày bằng đoạn xuống dòng và gạch đầu dòng (-, 1.) khi phù hợp.\n"
         "- Chỉ xuất đúng JSON sau:\n"
         "{\n  \"answer\": \"Mỗi câu có trích dẫn [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn\"]} ]\n}\n"
     )
@@ -581,6 +584,7 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- used_source_ids 仅列出实际使用的来源。\n"
         "- 可选：在 evidence.quotes 中加入原文引文。\n"
         "- 若证据不足，请说明‘证据不足。’\n"
+        "- 为了可读性，请使用段落/换行，并在合适处使用项目符号（-、1.）。\n"
         "- 只输出如下 JSON：\n"
         "{\n  \"answer\": \"每句含 [S1] 引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
     )
@@ -601,11 +605,12 @@ def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[현재 질문]\n{question_text}\n\n"
     prompt += (
         "요건:\n"
-        "- 제공된 컨텍スト만 사용.\n"
+        "- 제공된 컨텍스트만 사용.\n"
         "- 각 문장에 [S#] 추가.\n"
         "- 실제 사용한 출처만 used_source_ids에 나열.\n"
         "- evidence.quotes에 원문 인용(선택).\n"
         "- 증거가 부족하면 ‘증거가 충분하지 않습니다’ 명시.\n"
+        "- 가독성을 위해 단락/줄바꿈을 사용하고 필요 시 글머리표(-, 1.)로 정리.\n"
         "- 다음 JSON만 출력:\n"
         "{\n  \"answer\": \"문장마다 [S1] 참고 표시\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"원문 인용\"]} ]\n}\n"
     )
@@ -726,27 +731,32 @@ def answer_with_rag(
         fallback_texts = {
             "ja": (
                 "参照情報を見つけられませんでした。推測は避け、情報不足を明示しつつ、\n"
-                "わかっている範囲で簡潔に回答してください。\n\n"
+                "わかっている範囲で簡潔に回答してください。\n"
+                "読みやすさのため、段落や箇条書き（- や 1.）を適宜用いてください。\n\n"
                 f"【質問】\n{question_text}\n"
             ),
             "en": (
                 "No reference information was found. Avoid guessing and clearly state the information gap.\n"
-                "Answer concisely only within what is known.\n\n"
+                "Answer concisely only within what is known.\n"
+                "For readability, use paragraphs and bullet points (-, 1.) where helpful.\n\n"
                 f"Question:\n{question_text}\n"
             ),
             "vi": (
                 "Không tìm thấy thông tin tham chiếu. Tránh suy đoán và nêu rõ những phần còn thiếu thông tin.\n"
-                "Vui lòng trả lời ngắn gọn trong phạm vi điều đã biết.\n\n"
+                "Vui lòng trả lời ngắn gọn trong phạm vi điều đã biết.\n"
+                "Để dễ đọc, hãy dùng đoạn xuống dòng và gạch đầu dòng (-, 1.) khi phù hợp.\n\n"
                 f"Câu hỏi:\n{question_text}\n"
             ),
             "zh": (
                 "未找到可参考的信息。请避免猜测，明确说明信息不足之处。\n"
-                "请在已知范围内简洁作答。\n\n"
+                "请在已知范围内简洁作答。\n"
+                "为提高可读性，请使用段落/换行与项目符号（-、1.）。\n\n"
                 f"问题：\n{question_text}\n"
             ),
             "ko": (
                 "참고할 정보를 찾지 못했습니다. 추측은 피하고 정보 부족을 명확히 밝혀주세요.\n"
-                "아는 범위 내에서 간결하게 답변해주세요.\n\n"
+                "아는 범위 내에서 간결하게 답변해주세요.\n"
+                "가독성을 위해 단락/줄바꿈과 글머리표(-, 1.)를 적절히 사용하세요.\n\n"
                 f"질문:\n{question_text}\n"
             ),
         }
@@ -777,8 +787,12 @@ def answer_with_rag(
     used_references = [r for r in references if r.get("sid") in used_ids] if used_ids else references
 
     # Strip inline citation tags like [S1], [S2] from the displayed answer
-    clean_text = re.sub(r"\s*\[S\d+\]", "", answer_text)
-    clean_text = re.sub(r"\s{2,}", " ", clean_text).strip()
+    # Preserve line breaks and normalize spaces without collapsing paragraphs
+    text_no_cite = re.sub(r"\s*\[S\d+\]", "", answer_text)
+    t = text_no_cite.replace("\r\n", "\n").replace("\r", "\n")
+    t = re.sub(r"[ \t]{2,}", " ", t)             # collapse multiple spaces/tabs only
+    t = "\n".join(line.rstrip() for line in t.split("\n"))  # trim end-of-line spaces
+    clean_text = re.sub(r"\n{3,}", "\n\n", t).strip()     # keep at most one blank line between paragraphs
 
     return {
         "type": "rag",
