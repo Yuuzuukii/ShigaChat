@@ -915,7 +915,7 @@ export default function Home() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.3, duration: 0.4 }}
-            className="flex-1 min-h-0 max-h-full border border-blue-100 bg-white/80 backdrop-blur-sm relative"
+            className="flex-1 min-h-0 max-h-full backdrop-blur-sm relative"
           >
             {/* 新しいチャットボタン（チャットエリア左上端） */}
             <div className="absolute top-3 left-3 z-10">
@@ -1094,18 +1094,16 @@ export default function Home() {
                                   </div>
                                 </summary>
                                 <div className="px-4 pb-4">
-                                  <div className="rounded-md bg-white border border-zinc-200 p-4">
-                                    <div className="text-sm text-zinc-700 leading-relaxed">
-                                      <RichText content={q.answer} />
-                                    </div>
-                                    {q.retrieved_at && (
-                                      <div className="mt-3 pt-3 border-t border-zinc-200">
-                                        <span className="text-xs text-zinc-500 bg-zinc-100 px-2 py-1 rounded-md">
-                                          取得日時: {new Date(q.retrieved_at).toLocaleString()}
-                                        </span>
-                                      </div>
-                                    )}
+                                  <div className="text-sm text-zinc-700 leading-relaxed">
+                                    <RichText content={q.answer} />
                                   </div>
+                                  {q.retrieved_at && (
+                                    <div className="mt-2">
+                                      <span className="text-xs text-zinc-500">
+                                        取得日時: {new Date(q.retrieved_at).toLocaleString()}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </details>
                             ))}
@@ -1134,7 +1132,7 @@ export default function Home() {
             </div>
             
             {/* Fixed input area at bottom - no border */}
-            <div className="bg-white/95 backdrop-blur-sm p-4">
+            <div className=" backdrop-blur-sm p-4">
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}

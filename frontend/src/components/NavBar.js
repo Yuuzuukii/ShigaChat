@@ -85,7 +85,7 @@ export default function Navbar({ children }) {
   const saveOverrides = (obj) => {
     try { localStorage.setItem(`thread_title_overrides_${userId ?? 'nouser'}`, JSON.stringify(obj)); } catch {}
   };
-  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const loadThreads = useCallback(async () => {
     if (!token || !userId) return;
     try {
@@ -241,7 +241,6 @@ export default function Navbar({ children }) {
         <div className="flex h-full flex-col">
           <SidebarHeader className="py-8 border-0">
             <div className={`flex items-center ${isDrawerOpen ? 'gap-2 px-2' : 'justify-center'}`}>
-              <img src="/icon_192.png" alt="Menu" className={`${isDrawerOpen ? 'h-6 w-6' : 'h-7 w-7'} object-contain rounded-md`} />
               {isDrawerOpen && (
                 <div className="text-sm font-semibold text-blue-800">{t.menu || 'Menu'}</div>
               )}
@@ -629,7 +628,7 @@ export default function Navbar({ children }) {
       )}
 
       {/* Page content */}
-      <main className="h-screen overflow-hidden" style={{ marginLeft: isDrawerOpen ? '18rem' : '3.5rem', paddingTop: '4.5rem', transition: 'margin-left 300ms ease' }}>
+      <main className="h-screen overflow-auto" style={{ marginLeft: isDrawerOpen ? '18rem' : '3.5rem', paddingTop: '4.5rem', transition: 'margin-left 300ms ease' }}>
         <Outlet />
       </main>
 

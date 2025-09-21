@@ -1,232 +1,242 @@
-import React, { useState, useContext, useEffect, useRef } from "react"; // 修正: useStateをインポート
+import React, { useState, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../UserContext";
-import { updateUserLanguage } from "../utils/language";
 import {
-  API_BASE_URL,
   translations,
   categoryList,
   languageLabelToCode,
 } from "../config/constants";
-import {
-  fetchNotifications,
-  handleNotificationClick,
-  handleNotificationMove,
-  handleGlobalNotificationMove
-} from "../utils/notifications";
-import "./Category.css";
 import { redirectToLogin } from "../utils/auth";
+import { Button } from "./ui/button";
+import {
+  IdCard,
+  HeartHandshake,
+  Stethoscope,
+  PiggyBank,
+  Briefcase,
+  GraduationCap,
+  Heart,
+  Baby,
+  Home,
+  Receipt,
+  HelpingHand,
+  Siren,
+  CloudLightning,
+  Tag,
+  Layers
+} from "lucide-react";
+import "./Category.css"; // 円形レイアウト用のスタイルを読み込み
+
+const categoryColors = {
+  // 元CSSの色をマッピング
+  "category-zairyu": { base: "#ffe599", hover: "#ffd966" },
+  "category-seikatsu": { base: "#d9ead3", hover: "#b6d7a8" },
+  "category-iryo": { base: "#f9cb9c", hover: "#f6b26b" },
+  "category-nenkin": { base: "#c9daf8", hover: "#6d9eeb" },
+  "category-roudou": { base: "#f6d7b0", hover: "#f4b183" },
+  "category-kyouiku": { base: "#e06666", hover: "#cc0000" },
+  "category-kekkon": { base: "#a4c2f4", hover: "#6fa8dc" },
+  "category-shussan": { base: "#d9d2e9", hover: "#b4a7d6" },
+  "category-jutaku": { base: "#b6d7a8", hover: "#93c47d" },
+  "category-zeikin": { base: "#cfe2f3", hover: "#76a5af" },
+  "category-fukushi": { base: "#f6e0b5", hover: "#e69138" },
+  "category-jiken": { base: "#ea9999", hover: "#cc0000" },
+  "category-saigai": { base: "#b4a7d6", hover: "#674ea7" },
+  "category-sonota": { base: "#f3cda8", hover: "#e69138" },
+};
+
+const categoryIcons = {
+  "category-zairyu": IdCard,
+  "category-seikatsu": HeartHandshake,
+  "category-iryo": Stethoscope,
+  "category-nenkin": PiggyBank,
+  "category-roudou": Briefcase,
+  "category-kyouiku": GraduationCap,
+  "category-kekkon": Heart,
+  "category-shussan": Baby,
+  "category-jutaku": Home,
+  "category-zeikin": Receipt,
+  "category-fukushi": HelpingHand,
+  "category-jiken": Siren,
+  "category-saigai": CloudLightning,
+  "category-sonota": Tag,
+};
+
+function getTextColorForBg(hex) {
+  // hex -> #rrggbb
+  if (!hex || typeof hex !== "string" || !hex.startsWith("#")) return "#1f2937"; // slate-800
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  const srgb = [r, g, b].map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  const luminance = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
+  return luminance > 0.6 ? "#1f2937" : "#ffffff"; // 明るい背景→濃い文字、暗い背景→白
+}
 
 const Kategori = () => {
   const navigate = useNavigate();
-  const { user, setUser, token, setToken, fetchUser } = useContext(UserContext);
+  const { user, fetchUser } = useContext(UserContext);
   const [language, setLanguage] = useState("ja");
-  const [notifications, setNotifications] = useState([]);
-  const [showPopup, setShowPopup] = useState(false); // ポップアップの表示制御
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [globalNotifications, setGlobalNotifications] = useState([]); // 全体通知を管理
-  const [activeTab, setActiveTab] = useState("personal"); // "personal" または "global"
-  const [isNotifLoading, setIsNotifLoading] = useState(true);
-  const popupRef = useRef(null);
+  const [hoveredCategoryId, setHoveredCategoryId] = useState(null);
+  const ringRef = useRef(null);
   const t = translations[language];
 
   useEffect(() => {
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
-      if (code) {
-        setLanguage(code);
-      } else {
-        console.warn("❗未対応のspokenLanguage:", user.spokenLanguage);
-        setLanguage("ja"); // fallback
-      }
+      setLanguage(code || "ja");
     }
   }, [user]);
 
   useEffect(() => {
-    if (user?.id && token) {
-      //console.log("✅ fetchNotifications を開始:", user?.id);
-      fetchNotifications({
-        language,
-        token,
-        userId: user.id,
-        setNotifications,
-        setGlobalNotifications,
-        setUnreadCount,
-      }).finally(() => setIsNotifLoading(false));
-    } else {
-      //console.log("⚠️ user.id または token が未定義のため fetchNotifications をスキップ");
-    }
-  }, [user, token]);
-
-  useEffect(() => {
-    if (user) {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-    }
-  }, [language]);
-
-  useEffect(() => {
-    //console.log("UserContext 更新後のユーザー情報:", user);
     if (user === null) {
       redirectToLogin(navigate);
     }
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
       if (latestToken) {
-        fetchUser(latestToken); // ✅ 正常に動作！
+        fetchUser(latestToken);
       }
     };
     window.addEventListener("tokenUpdated", handleTokenUpdate);
-    return () => {
-      window.removeEventListener("tokenUpdated", handleTokenUpdate);
-    };
-  }, [user, navigate, fetchUser]); // ← 依存に fetchUser を追加
+    return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
+  }, [user, navigate, fetchUser]);
 
+  // CSS @property(--spin) 非対応時のフォールバック（JSで--spinを更新）
   useEffect(() => {
-    if (showPopup) {
-      document.addEventListener("click", handleClickOutside);
-    } else {
-      document.removeEventListener("click", handleClickOutside);
+    const el = ringRef.current;
+    if (!el) return;
+
+    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (prefersReduced) return; // モーション低減ではフォールバックもしない
+
+    const hasRegisterProperty = typeof window !== 'undefined' && 'CSS' in window && 'registerProperty' in CSS;
+    if (hasRegisterProperty) return; // 充分なサポートがあるとみなし、CSSのアニメーションに任せる
+
+    // 検出: 一定時間後に --spin が変化していなければJSフォールバック起動
+    let rafId = 0;
+    let running = false;
+    let paused = false;
+    let lastTs = 0;
+    let angle = 0;
+    let started = false;
+    let checkTimer = 0;
+
+    const SPEED_DEG_PER_SEC = 360 / 30; // CSSと同じ30秒/周
+
+    const onEnter = () => { paused = true; };
+    const onLeave = () => { paused = false; };
+
+    function tick(ts) {
+      if (!running) return;
+      if (paused) {
+        lastTs = ts;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
+      if (!lastTs) lastTs = ts;
+      const dt = (ts - lastTs) / 1000;
+      lastTs = ts;
+      angle = (angle + dt * SPEED_DEG_PER_SEC) % 360;
+      el.style.setProperty('--spin', angle + 'deg');
+      rafId = requestAnimationFrame(tick);
     }
-    return () => document.removeEventListener("click", handleClickOutside);
-  }, [showPopup]);
 
-  const handleClickOutside = (event) => {
-    if (popupRef.current && !popupRef.current.contains(event.target)) {
-      setShowPopup(false);
+    function startJsFallback() {
+      if (started) return;
+      started = true;
+      running = true;
+      lastTs = 0;
+      el.addEventListener('mouseenter', onEnter);
+      el.addEventListener('mouseleave', onLeave);
+      el.addEventListener('focusin', onEnter);
+      el.addEventListener('focusout', onLeave);
+      rafId = requestAnimationFrame(tick);
     }
-  };
 
-  const onNotificationClick = () => {
-    handleNotificationClick({
-      showPopup,
-      setShowPopup,
-      language,
-      token,
-      userId,
-      setNotifications,
-      setGlobalNotifications,
-      setUnreadCount,
-    });
-  };
+    // 初期値リセット
+    el.style.setProperty('--spin', '0deg');
+    // 800ms後に--spinが変化していなければ非対応とみなす
+    checkTimer = window.setTimeout(() => {
+      const val = getComputedStyle(el).getPropertyValue('--spin').trim();
+      if (!val || val === '0deg') {
+        startJsFallback();
+      }
+    }, 800);
 
-  const onNotificationMove = (notification) => {
-    handleNotificationMove(notification, navigate, token, () => {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-    });
-  };
-
-  const onGlobalNotificationMove = (notification) => {
-    handleGlobalNotificationMove(notification, navigate, token, () => {
-      fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount });
-    });
-  };
-
-  const handleLanguageChange = async (event) => {
-    const newLanguage = event.target.value;
-    await updateUserLanguage(newLanguage, setUser, setToken); // サーバー側の言語設定とトークン更新
-    setLanguage(newLanguage); // ローカルの言語設定を最後に変更（401回避）
-  };
-
-  const userData = localStorage.getItem("user");
-  const userId = userData ? JSON.parse(userData).id : null;
+    return () => {
+      window.clearTimeout(checkTimer);
+      if (rafId) cancelAnimationFrame(rafId);
+      el.removeEventListener('mouseenter', onEnter);
+      el.removeEventListener('mouseleave', onLeave);
+      el.removeEventListener('focusin', onEnter);
+      el.removeEventListener('focusout', onLeave);
+    };
+  }, []);
 
   return (
-    <div className="container-kategori">
-      <header className="header">
-        <div className="language-wrapper">
-          <img src="./globe.png" alt="言語" className="globe-icon" />
-          <select className="languageSelector" onChange={handleLanguageChange} value={language}>
-            <option value="ja">日本語</option>
-            <option value="en">English</option>
-            <option value="zh">中文</option>
-            <option value="vi">Tiếng Việt</option>
-            <option value="ko">한국어</option>
-          </select>
-        </div>
-        <h1>Shiga Chat</h1>
-        {/* ユーザーアイコンと通知をまとめたラッパー */}
-        <div className="user-notification-wrapper">
-          {/* 🔔 通知ボタン（画像版） */}
-          <div className={`notification-container ${showPopup ? "show" : ""}`}>
-            {/* 🔔 通知ボタン */}
-            <button className="notification-button" onClick={onNotificationClick}>
-              <img src="./bell.png" alt="通知" className="notification-icon" />
-              {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
-            </button>
-
-            {/* 🔔 通知ポップアップ */}
-            {showPopup && (
-              <div className="notification-popup" ref={popupRef}>
-                {/* タブ切り替えボタン */}
-                <div className="tabs">
-                  <button onClick={() => setActiveTab("personal")} className={activeTab === "personal" ? "active" : ""}>
-                    {t.personal}
-                  </button>
-                  <button onClick={() => setActiveTab("global")} className={activeTab === "global" ? "active" : ""}>
-                    {t.global}
-                  </button>
+    <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
+      <div className="h-full flex justify-center ">
+        <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 md:py-8 text-slate-800 w-full">
+          {/* 共通ヘッダーに統一。本文のみ */}
+          <div className="mt-2">
+            {/* 円形にカテゴリを配置し、自動回転（ホバーで停止） */}
+            <div className="mx-auto mt-8 flex items-center justify-center">
+              <div
+                className="category-ring"
+                style={{ '--count': categoryList.length, '--radius': 'clamp(8rem, 27vw, 24rem)', '--ellipseY': '0.8' }}
+                role="list"
+                ref={ringRef}
+              >
+                <div className="ring-center" aria-hidden="true">
+                  <div className="center-halo" aria-hidden="true"></div>
+                  <div className="center-content" role="presentation">
+                    <div className="center-title-row" aria-hidden="true">
+                      <div className="center-icon" aria-hidden="true"><Layers /></div>
+                      <div className="center-title">{t.categorySearch}</div>
+                    </div>
+                    <div className="w-44 h-1 bg-blue-600 mx-auto rounded-full"></div>
+                    <div className="center-subtitle ">{language === 'ja' ? 'カテゴリを選択してください' : (t.selectcategory || t.select)}</div>
+                  </div>
                 </div>
-
-                <div className="notifications-list">
-                  {/* 🔹 個人通知リスト */}
-                  {activeTab === "personal" && (
-                    notifications.length > 0 ? (
-                      notifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${notification.is_read ? "read" : "unread"}`}
-                          onClick={() => onNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
+                <div className="ring-track">
+                  {categoryList.map((category, i) => {
+                    const palette = categoryColors[category.className] || { base: "#f4f4f4", hover: "#e5e5e5" };
+                    const isHover = hoveredCategoryId === category.id;
+                    const bg = isHover ? palette.hover : palette.base;
+                    const color = getTextColorForBg(bg);
+                    const Icon = categoryIcons[category.className] || Tag;
+                    return (
+                      <div className="ring-item" style={{ ['--i']: i }} key={category.id} role="listitem">
+                        <div className="ring-item-cancel">
+                          <div className="ring-item-inner">
+                            <Button
+                              variant="ghost"
+                              aria-label={category.name[language] || category.name.ja}
+                              onClick={() => navigate(`/category/${category.id}`)}
+                              onMouseEnter={() => setHoveredCategoryId(category.id)}
+                              onMouseLeave={() => setHoveredCategoryId(null)}
+                              onFocus={() => setHoveredCategoryId(category.id)}
+                              onBlur={() => setHoveredCategoryId(null)}
+                              className="ring-button group border border-slate-200 shadow-sm focus-visible:ring-blue-400"
+                              style={{ backgroundColor: bg, color }}
+                            >
+                              <div className="flex h-full w-full flex-col items-center justify-center gap-1">
+                                <Icon className="h-6 w-6 opacity-90" />
+                                <span className="text-center text-xs font-bold leading-tight">
+                                  {category.name[language] || category.name.ja}
+                                </span>
+                              </div>
+                            </Button>
+                          </div>
                         </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p> // 🔹 個人通知がない場合のメッセージ
-                    )
-                  )}
-
-                  {/* 🔹 全体通知リスト */}
-                  {activeTab === "global" && (
-                    globalNotifications.length > 0 ? (
-                      globalNotifications.map((notification) => (
-                        <div
-                          key={notification.id}
-                          className={`notification-item ${Array.isArray(notification.read_users) && notification.read_users.includes(userId) ? "read" : "unread"}`}
-                          onClick={() => onGlobalNotificationMove(notification)}
-                        >
-                          {notification.message}
-                          <span className="time">{new Date(notification.time).toLocaleString()}</span>
-                        </div>
-                      ))
-                    ) : (
-                      <p>{t.noNotifications}</p> // 🔹 全体通知がない場合のメッセージ
-                    )
-                  )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            )}
+            </div>
           </div>
-          {/* ユーザー名 */}
-          <div className="userIcon">
-            {user ? `${user.nickname} ` : t.guest}
-          </div>
-        </div>
-      </header>
-
-      <div className="body">
-        <h1 className="category-header">{t.categorySearch}</h1>
-        <h2 className="kotoba">{t.select}</h2>
-        <div className="category-container">
-          {categoryList.map((category) => (
-            <button
-              key={category.id}
-              className={`category-button ${category.className}`}
-              onClick={() => navigate(`/category/${category.id}`)}
-            >
-              {category.name[language]}
-            </button>
-          ))}
         </div>
       </div>
     </div>

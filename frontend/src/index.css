@@ -1,1 +1,9 @@
 /* intentionally empty; toaster styling lives in components/ui/toaster.jsx */
+
+/* Make h-full work across the app */
+html, body, #root {
+  height: 100%;
+}
+body {
+  margin: 0;
+}
