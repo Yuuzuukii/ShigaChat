@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useRef, useState, useMemo, useCallback } from "react";
 import { Link, useNavigate, Outlet, useLocation } from "react-router-dom";
-import { toast } from "../lib/utils";
+import { toast } from "sonner";
+
 import { UserContext } from "../UserContext";
 import { API_BASE_URL, translations } from "../config/constants";
 import { fetchNotifications, handleGlobalNotificationMove, handleNotificationClick, handleNotificationMove } from "../utils/notifications";

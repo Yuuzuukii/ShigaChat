@@ -95,6 +95,11 @@ const Shinki = () => {
                     <SelectItem value="zh">中文</SelectItem>
                     <SelectItem value="vi">Tiếng Việt</SelectItem>
                     <SelectItem value="ko">한국어</SelectItem>
+                    <SelectItem value="pt">Português</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                    <SelectItem value="de">Tagalog</SelectItem>
+                    <SelectItem value="id">Bahasa Indonesia</SelectItem>
+                    
                   </SelectContent>
                 </Select>
               </div>
@@ -156,6 +161,10 @@ const Shinki = () => {
                       <SelectItem value="Tiếng Việt">Tiếng Việt</SelectItem>
                       <SelectItem value="中文">中文</SelectItem>
                       <SelectItem value="한국어">한국어</SelectItem>
+                      <SelectItem value="Português">Português</SelectItem>
+                      <SelectItem value="Español">Español</SelectItem>
+                      <SelectItem value="Tagalog">Tagalog</SelectItem>
+                      <SelectItem value="Bahasa Indonesia">Bahasa Indonesia</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
