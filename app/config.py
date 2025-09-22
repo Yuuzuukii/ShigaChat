@@ -17,4 +17,8 @@ language_mapping = {
     "Tiếng Việt": 3,
     "中文": 4,
     "한국어": 5,
+    "Português": 6,
+    "Español": 7,
+    "Tagalog": 8,
+    "Bahasa Indonesia": 9,
 }
