@@ -119,6 +119,10 @@ function New() {
                     <SelectItem value="zh">中文</SelectItem>
                     <SelectItem value="vi">Tiếng Việt</SelectItem>
                     <SelectItem value="ko">한국어</SelectItem>
+                    <SelectItem value="pt">Português</SelectItem>
+                    <SelectItem value="es">Español</SelectItem>
+                    <SelectItem value="tl">Tagalog</SelectItem>
+                    <SelectItem value="id">Bahasa Indonesia</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -597,6 +597,10 @@ export default function Navbar({ children }) {
                   <SelectItem value="zh">中文</SelectItem>
                   <SelectItem value="vi">Tiếng Việt</SelectItem>
                   <SelectItem value="ko">한국어</SelectItem>
+                  <SelectItem value="es">Português</SelectItem>
+                  <SelectItem value="pt">Español</SelectItem>
+                  <SelectItem value="fr">Tagalog</SelectItem>
+                  <SelectItem value="de">Bahasa Indonesia</SelectItem>
                 </SelectContent>
               </Select>
             </div>

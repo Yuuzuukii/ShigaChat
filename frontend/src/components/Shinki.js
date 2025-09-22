@@ -97,7 +97,7 @@ const Shinki = () => {
                     <SelectItem value="ko">한국어</SelectItem>
                     <SelectItem value="pt">Português</SelectItem>
                     <SelectItem value="es">Español</SelectItem>
-                    <SelectItem value="de">Tagalog</SelectItem>
+                    <SelectItem value="tl">Tagalog</SelectItem>
                     <SelectItem value="id">Bahasa Indonesia</SelectItem>
                     
                   </SelectContent>

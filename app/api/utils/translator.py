@@ -4,8 +4,6 @@ from fastapi import HTTPException, Depends
 from api.routes.user import get_current_user
 from config import DATABASE
 
-from deep_translator import GoogleTranslator
-
 
 import re
 
@@ -163,6 +161,10 @@ def question_translate(
         "vi": "vi",       # ベトナム語
         "zh": "zh-CN",    # 簡体字
         "ko": "ko",       # 韓国語
+        "pt": "pt",       # ポルトガル語
+        "es": "es",       # スペイン語
+        "tl": "tl",       # タガログ語
+        "id": "id",       # インドネシア語
     }
 
     with sqlite3.connect(DATABASE) as conn:
@@ -230,6 +232,10 @@ def answer_translate(
         "vi": "vi",       # ベトナム語
         "zh": "zh-CN",    # 簡体字
         "ko": "ko",       # 韓国語
+        "pt": "pt",       # ポルトガル語
+        "es": "es",       # スペイン語
+        "tl": "tl",       # タガログ語
+        "id": "id",       # インドネシア語
     }
 
     with sqlite3.connect(DATABASE) as conn:

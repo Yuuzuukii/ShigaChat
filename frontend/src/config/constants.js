@@ -1147,7 +1147,7 @@ export const translations = {
     tooltipUserMenu: "Buksan ang menu ng user",
   },
 
-  id: { // インドネシア語
+  id: {
     home: "Beranda",
     keyword: "Pencarian kata kunci",
     logout: "Keluar",
@@ -1251,7 +1251,45 @@ export const translations = {
     age: "Usia",
     gender: "Jenis kelamin",
     spokenLanguage: "Bahasa",
-  }
+    male: "Laki-laki",
+    female: "Perempuan",
+    other: "Lainnya",
+    errorEmptyFields: "Masukkan nama dan kata sandi.",
+    errorInvalidLogin: "Nama atau kata sandi salah.",
+    errorServer: "Gagal masuk. Harap masukkan nama dan kata sandi yang benar.",
+    errorAllFields: "Harap isi semua kolom!",
+    successRegistration: "Pendaftaran berhasil!",
+    errorRegistration: "Pendaftaran gagal",
+    selectLanguage: "Pilih bahasa",
+    editor: "Editor",
+    openInAdmin: "Buka di manajemen pertanyaan",
+    historyOpen: "Lihat jawaban sebelumnya",
+    historyClose: "Tutup riwayat",
+    historyEmpty: "Tidak ada riwayat.",
+    diffShow: "Tampilkan perbedaan",
+    diffHide: "Sembunyikan perbedaan",
+    diffCaption: "Versi ini → Perbedaan dengan versi berikutnya",
+    actionButton: "Aksi",
+    actionTranslate: "Terjemahkan",
+    actionSummarize: "Ringkas",
+    actionSimplify: "Permudah",
+    actionApplied: "Hasil aksi telah diterapkan ke kolom input",
+    actionLabel: "Aksi",
+    noRecentAnswer: "Tidak ada jawaban terbaru",
+    actionApplyPrefix: "",
+    actionApplySuffix: " diterapkan",
+    notSelected: "Tidak dipilih",
+    // Tooltips
+    tooltipHome: "Layar beranda",
+    tooltipKeywordSearch: "Pencarian kata kunci",
+    tooltipCategorySearch: "Pencarian kategori",
+    tooltipQuestionManagement: "Manajemen pertanyaan",
+    tooltipNotifications: "Periksa notifikasi",
+    tooltipLanguageSelect: "Ubah bahasa tampilan",
+    tooltipSidebarToggle: "Tampilkan/sembunyikan sidebar",
+    tooltipUserMenu: "Buka menu pengguna"
+}
+
 
 
 };
@@ -1477,7 +1515,7 @@ export const languageLabelToCode = {
   Português: "pt",
   Español: "es",
   "Tagalog": "tl",
-  Bahasa: "id"
+  "Bahasa Indonesia" : "id"
 };
 
 export const languageCodeToLabel = Object.fromEntries(

@@ -30,6 +30,10 @@ _LABEL_TO_CODE = {
     "Tiếng Việt": "vi",
     "中文": "zh",
     "한국어": "ko",
+    "Português": "pt",
+    "Español": "es",
+    "Tagalog": "tl",
+    "Bahasa Indonesia": "id",
 }
 
 
@@ -115,6 +119,74 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
                 "사실의 추가/삭제/변경 금지, ‘질문(Question)’을 이용한 보충 금지. 중요한 정보는 유지하고, 짧은 문장과 쉬운 단어를 사용하세요. 결과는 수정된 본문만 출력하세요."
             ),
         },
+        "pt": {
+            "translate": lambda tgt: (
+                f"Você é um tradutor preciso. Traduza apenas a Resposta (Answer) para {tgt}. "
+                "Não use a Pergunta (Question) para adicionar ou inferir conteúdo. Sem notas ou explicações. "
+                "Mantenha fatos, entidades, números e condições. Saída somente a tradução."
+            ),
+            "summarize": (
+                "Você é um resumidor extrativo. Resuma apenas a Resposta, no mesmo idioma da Resposta. "
+                "Não adicione novos fatos/interpretações; não use a Pergunta para acrescentar conteúdo. "
+                "Mantenha entidades, números e condições-chave; em caso de dúvida, omita. Saída apenas o resumo."
+            ),
+            "simplify": (
+                "Você é um reescritor cuidadoso. Reescreva apenas a Resposta para ficar mais fácil de entender, no mesmo idioma. "
+                "Não adicionar/remover/alterar fatos; não use a Pergunta para acrescentar conteúdo. "
+                "Mantenha detalhes importantes, use frases curtas e palavras simples. Saída apenas o texto reescrito."
+            ),
+        },
+        "es": {
+            "translate": lambda tgt: (
+                f"Eres un traductor preciso. Traduce solo la Respuesta (Answer) al {tgt}. "
+                "No uses la Pregunta (Question) para añadir o inferir contenido. Sin notas ni explicaciones. "
+                "Conserva hechos, entidades, números y condiciones. Produce únicamente la traducción."
+            ),
+            "summarize": (
+                "Eres un resumidor extractivo. Resume solo la Respuesta, en el mismo idioma de la Respuesta. "
+                "No agregues hechos/interpretaciones nuevas; no uses la Pregunta para añadir contenido. "
+                "Mantén entidades, números y condiciones clave; si hay dudas, omite en lugar de adivinar. Salida: solo el resumen."
+            ),
+            "simplify": (
+                "Eres un redactor cuidadoso. Reescribe solo la Respuesta para que sea más fácil de entender, en el mismo idioma. "
+                "No añadas/elimines/modifiques hechos; no uses la Pregunta para añadir contenido. "
+                "Mantén los detalles importantes, usa oraciones cortas y palabras sencillas. Salida: solo el texto reescrito."
+            ),
+        },
+        "tl": {
+            "translate": lambda tgt: (
+                f"Ikaw ay isang tumpak na tagasalin. Isalin lamang ang Sagot (Answer) sa {tgt}. "
+                "Huwag gamitin ang Tanong (Question) para magdagdag o manghula ng nilalaman. Walang tala o paliwanag. "
+                "Panatilihin ang mga katotohanan, entidad, numero, at mga kondisyon. Ilabas lamang ang salin."
+            ),
+            "summarize": (
+                "Ikaw ay isang extractive na tagabuod. Ibuod lamang ang Sagot, sa parehong wika ng Sagot. "
+                "Huwag magdagdag ng bagong katotohanan/paliwanag; huwag gamitin ang Tanong para magdagdag ng nilalaman. "
+                "Panatilihin ang mahahalagang entidad, numero, at kondisyon; kung hindi tiyak, huwag manghula—laktawan. Ilabas lamang ang buod."
+            ),
+            "simplify": (
+                "Ikaw ay isang maingat na manunulat muli. Isulat muli lamang ang Sagot upang mas madaling maunawaan, sa parehong wika. "
+                "Huwag magdagdag/magbawas/magbago ng mga katotohanan; huwag gamitin ang Tanong para magdagdag ng nilalaman. "
+                "Panatilihin ang mahahalagang detalye, gumamit ng maiikling pangungusap at payak na salita. Ilabas lamang ang binagong teksto."
+            ),
+        },
+        "id": {
+            "translate": lambda tgt: (
+                f"Anda adalah penerjemah yang presisi. Terjemahkan hanya Jawaban (Answer) ke {tgt}. "
+                "Jangan gunakan Pertanyaan (Question) untuk menambah atau menebak isi. Tanpa catatan atau penjelasan. "
+                "Pertahankan fakta, entitas, angka, dan kondisi. Keluarkan hanya terjemahannya."
+            ),
+            "summarize": (
+                "Anda adalah peringkas ekstraktif. Ringkas hanya Jawaban, dalam bahasa yang sama dengan Jawaban. "
+                "Jangan menambah fakta/interpretasi baru; jangan gunakan Pertanyaan untuk menambah konten. "
+                "Pertahankan entitas, angka, dan kondisi kunci; jika ragu, hilangkan, jangan menebak. Keluarkan hanya ringkasan."
+            ),
+            "simplify": (
+                "Anda adalah penulis ulang yang cermat. Tulis ulang hanya Jawaban agar lebih mudah dipahami, dalam bahasa yang sama. "
+                "Jangan menambah/menghapus/mengubah fakta; jangan gunakan Pertanyaan untuk menambah konten. "
+                "Pertahankan detail penting, gunakan kalimat pendek dan kata sederhana. Keluarkan hanya teks yang telah ditulis ulang."
+            ),
+        },
     }
 
     lang = ui_lang if ui_lang in prompts else "en"
@@ -132,6 +204,10 @@ def _build_human(question: str, answer: str, ui_lang: str) -> str:
         "vi": ("Ngữ cảnh (Question: KHÔNG bổ sung)", "Answer (CHỈ văn bản cần xử lý)"),
         "zh": ("上下文问题（不得据此添加内容）", "答案（唯一需要处理的文本）"),
         "ko": ("문맥 질문(추가 금지)", "답변(처리 대상 유일 텍스트)"),
+        "pt": ("Contexto (Pergunta: NÃO adicionar)", "Resposta (o ÚNICO texto a processar)"),
+        "es": ("Contexto (Pregunta: NO añadir)", "Respuesta (el ÚNICO texto a procesar)"),
+        "tl": ("Konteksto (Tanong: HUWAG magdagdag)", "Sagot (tanging tekstong ipoproseso)"),
+        "id": ("Konteks (Pertanyaan: JANGAN menambah)", "Jawaban (TEKS satu-satunya untuk diproses)"),
     }
     lang = ui_lang if ui_lang in labels else "en"
     ql, al = labels[lang]
