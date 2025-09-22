@@ -26,9 +26,17 @@ function New() {
 
   useEffect(() => {
     if (user) {
-      const redirectPath = localStorage.getItem("redirectAfterLogin") || "/home";
+      // ログイン成功時のリダイレクト処理
+      const redirectPath = localStorage.getItem("redirectAfterLogin");
       localStorage.removeItem("redirectAfterLogin");
-      if (redirectPath) navigate(redirectPath);
+      
+      if (redirectPath && redirectPath !== "/new" && redirectPath !== "/") {
+        console.log("🔄 ログイン後のリダイレクト:", redirectPath);
+        navigate(redirectPath, { replace: true });
+      } else {
+        // デフォルトはホームページ
+        navigate("/home", { replace: true });
+      }
     }
   }, [user, navigate]);
 
@@ -65,9 +73,17 @@ function New() {
       setUser(mappedUser);
       try { localStorage.setItem("user", JSON.stringify(mappedUser)); } catch {}
 
-      const redirectPath = localStorage.getItem("redirectAfterLogin") || "/home";
+      // ログイン成功時のリダイレクト処理
+      const redirectPath = localStorage.getItem("redirectAfterLogin");
       localStorage.removeItem("redirectAfterLogin");
-      navigate(redirectPath);
+      
+      if (redirectPath && redirectPath !== "/new" && redirectPath !== "/") {
+        console.log("🔄 ログイン後のリダイレクト:", redirectPath);
+        navigate(redirectPath, { replace: true });
+      } else {
+        // デフォルトはホームページ
+        navigate("/home", { replace: true });
+      }
     } catch (error) {
       if (error.response?.status === 401) {
         setErrorMessage(t.errorInvalidLogin);
