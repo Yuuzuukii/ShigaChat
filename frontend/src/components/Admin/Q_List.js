@@ -39,6 +39,7 @@ import {
   Archive,
   History,
   ArrowLeft,
+  Layers,
 } from "lucide-react";
 
 // カテゴリアイコンのマッピング（Question_Adminと同じ）
@@ -65,6 +66,38 @@ const Q_List = () => {
   const { categoryId } = useParams();
   const [searchParams] = useSearchParams();
   const targetQuestionId = Number(searchParams.get("id")) || null;
+
+  // デバッグ用ログ
+  console.log("Q_List - categoryId:", categoryId, "targetQuestionId:", targetQuestionId);
+
+  // デバッグ用のスクロール関数をグローバルに追加
+  useEffect(() => {
+    window.debugScrollToQuestion = (questionId) => {
+      const el = document.getElementById(`admin-question-${questionId}`);
+      if (el) {
+        const rect = el.getBoundingClientRect();
+        const elementTop = rect.top + window.pageYOffset;
+        const scrollPosition = Math.max(0, elementTop - 120);
+        
+        console.log("Debug scroll - questionId:", questionId, "scrollPosition:", scrollPosition);
+        window.scrollTo({ top: scrollPosition, behavior: "smooth" });
+        
+        // ハイライト
+        el.style.boxShadow = "0 0 20px rgba(255, 0, 0, 0.5)";
+        el.style.backgroundColor = "rgba(255, 0, 0, 0.1)";
+        setTimeout(() => {
+          el.style.boxShadow = "";
+          el.style.backgroundColor = "";
+        }, 2000);
+      } else {
+        console.log("Element not found:", `admin-question-${questionId}`);
+      }
+    };
+    
+    return () => {
+      delete window.debugScrollToQuestion;
+    };
+  }, []);
 
   const [questions, setQuestions] = useState([]);
   const [categoryName, setCategoryName] = useState("");
@@ -197,21 +230,105 @@ const Q_List = () => {
 
   // 特定質問へスクロール
   useEffect(() => {
+    console.log("Scroll effect triggered - targetQuestionId:", targetQuestionId, "questions length:", questions?.length);
+    
     if (!targetQuestionId || !questions || questions.length === 0) return;
-    const el = document.getElementById(`admin-question-${targetQuestionId}`);
-    if (el) {
-      const container = document.querySelector(".admin-question-history-container");
-      if (container) {
-        const offset = el.offsetTop - container.offsetTop - 80;
-        container.scrollTo({ top: Math.max(0, offset), behavior: "smooth" });
+    
+    // 少し遅延してスクロール（DOM描画完了を待つ）
+    const scrollTimer = setTimeout(() => {
+      const el = document.getElementById(`admin-question-${targetQuestionId}`);
+      console.log("Looking for element with ID:", `admin-question-${targetQuestionId}`, "Found:", !!el);
+      
+      if (el) {
+        // まず自動的に該当質問の回答を展開
+        try { 
+          setVisibleAnswerId(String(targetQuestionId)); 
+          console.log("Set visible answer ID:", targetQuestionId);
+        } catch (e) {
+          console.warn("Failed to set visible answer ID:", e);
+        }
+        
+        // 回答展開後にスクロール処理を実行（さらに遅延）
+        setTimeout(() => {
+          // 複数のスクロール方法を試行
+          const rect = el.getBoundingClientRect();
+          const elementTop = rect.top + window.pageYOffset;
+          const offset = 120; // ヘッダー分のオフセット
+          const scrollPosition = Math.max(0, elementTop - offset);
+          
+          console.log("Element position:", {
+            elementTop,
+            offset,
+            scrollPosition,
+            currentScroll: window.pageYOffset
+          });
+          
+          // Method 1: window.scrollTo
+          window.scrollTo({ 
+            top: scrollPosition, 
+            behavior: "smooth" 
+          });
+          
+          // スクロール完了確認
+          let scrollCheckCount = 0;
+          const checkScroll = () => {
+            scrollCheckCount++;
+            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
+            console.log(`Scroll check ${scrollCheckCount}: current=${currentScroll}, target=${scrollPosition}`);
+            
+            if (scrollCheckCount < 10 && Math.abs(currentScroll - scrollPosition) > 20) {
+              setTimeout(checkScroll, 100);
+            } else if (scrollCheckCount >= 10 && Math.abs(currentScroll - scrollPosition) > 50) {
+              console.log("Force scrolling with scrollIntoView");
+              el.scrollIntoView({ 
+                behavior: "smooth", 
+                block: "start",
+                inline: "nearest"
+              });
+            }
+          };
+          setTimeout(checkScroll, 100);
+          
+          // Method 2: 1秒後にscrollIntoViewでフォールバック
+          setTimeout(() => {
+            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const targetScrollTop = scrollPosition;
+            
+            // スクロールが正しく実行されていない場合のフォールバック
+            if (Math.abs(currentScrollTop - targetScrollTop) > 50) {
+              console.log("Fallback scrolling with scrollIntoView");
+              el.scrollIntoView({ 
+                behavior: "smooth", 
+                block: "start",
+                inline: "nearest"
+              });
+            }
+          }, 1000);
+          
+          // ハイライト効果を追加
+          el.style.transition = "all 0.3s ease";
+          el.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.5)";
+          el.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
+          el.style.border = "2px solid rgba(59, 130, 246, 0.3)";
+          
+          // ハイライトを一定時間後に削除
+          setTimeout(() => {
+            el.style.boxShadow = "";
+            el.style.backgroundColor = "";
+            el.style.border = "";
+          }, 4000);
+          
+        }, 200); // 回答展開後の遅延
+        
       } else {
-        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        console.warn(`Element with ID admin-question-${targetQuestionId} not found`);
+        // 全ての質問要素のIDをログ出力してデバッグ
+        const allQuestionElements = document.querySelectorAll('[id^="admin-question-"]');
+        console.log("Available question IDs:", Array.from(allQuestionElements).map(el => el.id));
       }
-      el.classList.add("target-highlight");
-      setTimeout(() => el.classList.remove("target-highlight"), 2000);
-      // 自動的に該当質問の回答を展開
-      try { setVisibleAnswerId(String(targetQuestionId)); } catch {}
-    }
+    }, 500); // 初期遅延を増加
+    
+    return () => clearTimeout(scrollTimer);
   }, [targetQuestionId, questions]);
 
   // userId（通知の既読判定用）
@@ -370,23 +487,39 @@ const Q_List = () => {
 
       setEditingAnswerId(null);
       setEditText("");
+      
       // 即時に履歴を更新（該当回答の履歴パネルが開いている場合）
       try {
-        if (historyOpenId === answerId) {
-          const key = `${answerId}:${language}`;
-          const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(answerId)}&lang=${encodeURIComponent(language)}`, {
+        const targetAnswerId = Number(answerId);
+        const isHistoryOpen = historyOpenId === targetAnswerId;
+        
+        if (isHistoryOpen) {
+          const key = `${targetAnswerId}:${language}`;
+          const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(targetAnswerId)}&lang=${encodeURIComponent(language)}`, {
             headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
           });
           if (res.ok) {
             const data = await res.json();
             setHistoryMap(prev => ({ ...prev, [key]: data.history || [] }));
           } else {
-            // invalidate cache to force reload next toggle
-            setHistoryMap(prev => ({ ...prev, [key]: [] }));
+            // キャッシュを無効化して次回切り替え時に強制リロード
+            setHistoryMap(prev => {
+              const newMap = { ...prev };
+              delete newMap[key];
+              return newMap;
+            });
           }
         }
       } catch (e) {
         console.warn('Failed to refresh history immediately:', e);
+        // キャッシュをクリアして次回再読み込みを強制
+        const targetAnswerId = Number(answerId);
+        const key = `${targetAnswerId}:${language}`;
+        setHistoryMap(prev => {
+          const newMap = { ...prev };
+          delete newMap[key];
+          return newMap;
+        });
       }
       window.alert(t.answerupdated);
 
@@ -425,12 +558,18 @@ const Q_List = () => {
   };
 
   const toggleHistory = async (answerId) => {
-    setHistoryOpenId(prev => (prev === answerId ? null : answerId));
-    if (!answerId) return;
-    const key = `${answerId}:${language}`;
-    if (historyMap[key]) return; // already loaded for this language
+    const targetAnswerId = Number(answerId);
+    const isCurrentlyOpen = historyOpenId === targetAnswerId;
+    
+    setHistoryOpenId(prev => (prev === targetAnswerId ? null : targetAnswerId));
+    
+    if (!answerId || isCurrentlyOpen) return; // 閉じる場合は何もしない
+    
+    const key = `${targetAnswerId}:${language}`;
+    if (historyMap[key] && historyMap[key].length > 0) return; // 既に読み込み済み
+    
     try {
-      const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(answerId)}&lang=${encodeURIComponent(language)}`, {
+      const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(targetAnswerId)}&lang=${encodeURIComponent(language)}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (!res.ok) throw new Error('failed');
@@ -626,12 +765,11 @@ const Q_List = () => {
                 return (
                   <div className="flex items-center justify-center gap-3 mb-4">
                     <CategoryIcon className="w-8 h-8 text-blue-800" />
-                    <h1 className="text-3xl font-bold text-blue-800">{`${categoryName} の質問管理`}</h1>
+                    <h1 className="text-3xl font-bold text-blue-800">{`${categoryName} `}</h1>
                   </div>
                 );
               })()}
-              <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full mb-2"></div>
-              <p className="text-gray-600">質問の編集・削除・カテゴリ変更を行うことができます。</p>
+              <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
             </div>
 
             {questions.length > 0 ? (
@@ -668,7 +806,7 @@ const Q_List = () => {
                               openCategoryModal(question.question_id, question.category_id);
                             }}
                           >
-                            <FolderOpen className="w-4 h-4" />
+                            <Layers className="w-4 h-4" />
                             カテゴリ変更
                           </button>
                           <button
@@ -728,7 +866,7 @@ const Q_List = () => {
 
                     {/* 編集・保存・履歴ボタン */}
                     {editingAnswerId === question.question_id ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 mt-6">
                         {(() => {
                           const unchanged = String(editText ?? "").trim() === String(question.回答 ?? "").trim();
                           return (
@@ -771,7 +909,7 @@ const Q_List = () => {
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-2 mt-6">
                         <button
                           className="px-4 py-2 bg-blue-500 text-white rounded-md font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
                           onClick={() => handleEditClick(question.question_id, question.answer_id, question.回答)}
@@ -868,9 +1006,7 @@ const Q_List = () => {
               onClick={() => navigate && navigate("/admin/QuestionAdmin")}
               className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
+              <ArrowLeft className="w-5 h-5" />
               {t.backButton || "戻る"}
             </button>
           </div>
@@ -883,23 +1019,27 @@ const Q_List = () => {
           <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
             <h2 className="text-xl font-bold text-gray-800 mb-4">{t.selectcategory || "カテゴリを選択"}</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-              {categoryList.map((category) => (
-                <button
-                  key={category.id}
-                  className={`p-3 rounded-lg border-2 font-medium transition-all duration-200 ${
-                    category.id === selectedCategoryId
-                      ? 'border-gray-400 bg-gray-100 cursor-not-allowed opacity-50'
-                      : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
-                  }`}
-                  style={{
-                    backgroundColor: category.id === selectedCategoryId ? '#f3f4f6' : '#ffffff',
-                  }}
-                  onClick={() => handleChangeCategory(category.id, category.name[language] || category.name.ja)}
-                  disabled={category.id === selectedCategoryId}
-                >
-                  {category.name[language] || category.name.ja}
-                </button>
-              ))}
+              {categoryList.map((category) => {
+                const CategoryIcon = categoryIcons[category.className] || Tag;
+                return (
+                  <button
+                    key={category.id}
+                    className={`p-3 rounded-lg border-2 font-medium transition-all duration-200 flex items-center gap-2 ${
+                      category.id === selectedCategoryId
+                        ? 'border-gray-400 bg-gray-100 cursor-not-allowed opacity-50'
+                        : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                    }`}
+                    style={{
+                      backgroundColor: category.id === selectedCategoryId ? '#f3f4f6' : '#ffffff',
+                    }}
+                    onClick={() => handleChangeCategory(category.id, category.name[language] || category.name.ja)}
+                    disabled={category.id === selectedCategoryId}
+                  >
+                    <CategoryIcon className="w-5 h-5 text-gray-600" />
+                    {category.name[language] || category.name.ja}
+                  </button>
+                );
+              })}
             </div>
             <div className="flex justify-end gap-2">
               <button

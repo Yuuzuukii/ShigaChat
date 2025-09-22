@@ -25,6 +25,8 @@ import {
   CloudLightning,
   Tag,
   Layers,
+  Wrench,
+  Plus,
 } from "lucide-react";
 
 // カテゴリアイコンのマッピング
@@ -195,10 +197,15 @@ const Question_Admin = () => {
         >
           <div className="w-full">
             {/* ページタイトル */}
-            <div className="mb-6 text-center">
-              <h1 className="text-3xl font-bold text-blue-800 mb-2">{t.questionmanagement}</h1>
-              <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
+            <div className="mb-10 text-center">
+              <div className="flex items-center justify-center gap-3 mb-4">
+                <Wrench className="w-8 h-8 text-blue-800" />
+                <h1 className="text-3xl font-bold text-blue-800">{t.questionmanagement}</h1>
+              </div>
+              <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full mb-4"></div>
+              <p className="text-gray-600">質問の編集・削除・カテゴリ変更を行うことができます</p>
             </div>
+            
 
             {/* 質問登録ボタン - 上部に移動 */}
             <div className="flex justify-center mb-8">
@@ -207,9 +214,7 @@ const Question_Admin = () => {
                 disabled={isSubmitting}
                 className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                </svg>
+                <Plus className="w-5 h-5" />
                 {t.registerquestion}
               </button>
             </div>
