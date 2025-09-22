@@ -96,7 +96,7 @@ const Question_Admin = () => {
   const [errorMessage, setErrorMessage] = useState("");
   const [mounted, setMounted] = useState(false);
 
-  const t = translations[language] || translations.ja;
+  const t = translations[language] || translations.en || translations.ja;
 
   useEffect(() => {
     const r = requestAnimationFrame(() => setMounted(true));

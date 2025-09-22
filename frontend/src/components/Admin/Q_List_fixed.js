@@ -56,7 +56,7 @@ const Q_List = () => {
   const popupRef = useRef(null);
 
   const { user, setUser, token, setToken, fetchUser } = useContext(UserContext);
-  const t = translations[language];
+  const t = translations[language] || translations.en || translations.ja;
 
   // マウント時のフェードイン効果
   useEffect(() => {
