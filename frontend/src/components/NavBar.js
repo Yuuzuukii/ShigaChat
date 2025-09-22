@@ -287,12 +287,23 @@ export default function Navbar({ children }) {
                 <div className="flex items-center justify-between px-2">
                   <div className="text-xs font-semibold text-zinc-500">{t.threads || 'スレッド'}</div>
                   <button
-                    onClick={() => navigate('/home')}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105"
+                    onClick={() => {
+                      // Clear URL parameters and start fresh chat
+                      const url = new URL(window.location);
+                      url.searchParams.delete('tid');
+                      window.history.replaceState({}, '', url.toString());
+                      navigate('/home');
+                      // Notify home component to start new chat
+                      try {
+                        window.dispatchEvent(new CustomEvent('startNewChat'));
+                      } catch {}
+                      setIsDrawerOpen(false);
+                    }}
+                    className="flex items-center gap-1 px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-200 hover:scale-105 group"
                     title={t.newChat || '新しいチャット'}
                     aria-label="新しいチャットを開始"
                   >
-                    <Plus className="h-3 w-3" />
+                    <Plus className="h-3 w-3 group-hover:rotate-90 transition-transform duration-200" />
                     <span className="font-medium">{t.newChat || '新規'}</span>
                   </button>
                 </div>
