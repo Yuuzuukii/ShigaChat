@@ -15,51 +15,9 @@ import {
   handleNotificationMove,
   handleGlobalNotificationMove,
 } from "../../utils/notifications";
-// Migrated to Tailwind CSS
 import { redirectToLogin } from "../../utils/auth";
 import RichText from "../common/RichText";
-import {
-  IdCard,
-  HeartHandshake,
-  Stethoscope,
-  PiggyBank,
-  Briefcase,
-  GraduationCap,
-  Heart,
-  Baby,
-  Home,
-  Receipt,
-  HelpingHand,
-  Siren,
-  CloudLightning,
-  Tag,
-  Edit3,
-  Trash2,
-  FolderOpen,
-  Archive,
-  History,
-  ArrowLeft,
-} from "lucide-react";
-
-// カテゴリアイコンのマッピング（Question_Adminと同じ）
-const categoryIcons = {
-  "category-zairyu": IdCard,
-  "category-seikatsu": HeartHandshake,
-  "category-iryo": Stethoscope,
-  "category-nenkin": PiggyBank,
-  "category-roudou": Briefcase,
-  "category-kyouiku": GraduationCap,
-  "category-kekkon": Heart,
-  "category-shussan": Baby,
-  "category-jutaku": Home,
-  "category-zeikin": Receipt,
-  "category-fukushi": HelpingHand,
-  "category-jiken": Siren,
-  "category-saigai": CloudLightning,
-  "category-sonota": Tag,
-};
-
-// RichText moved to common component
+import "./Q_List.css";
 
 const Q_List = () => {
   const { categoryId } = useParams();
@@ -209,8 +167,6 @@ const Q_List = () => {
       }
       el.classList.add("target-highlight");
       setTimeout(() => el.classList.remove("target-highlight"), 2000);
-      // 自動的に該当質問の回答を展開
-      try { setVisibleAnswerId(String(targetQuestionId)); } catch {}
     }
   }, [targetQuestionId, questions]);
 
@@ -370,24 +326,6 @@ const Q_List = () => {
 
       setEditingAnswerId(null);
       setEditText("");
-      // 即時に履歴を更新（該当回答の履歴パネルが開いている場合）
-      try {
-        if (historyOpenId === answerId) {
-          const key = `${answerId}:${language}`;
-          const res = await fetch(`${API_BASE_URL}/admin/answer_history?answer_id=${encodeURIComponent(answerId)}&lang=${encodeURIComponent(language)}`, {
-            headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setHistoryMap(prev => ({ ...prev, [key]: data.history || [] }));
-          } else {
-            // invalidate cache to force reload next toggle
-            setHistoryMap(prev => ({ ...prev, [key]: [] }));
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to refresh history immediately:', e);
-      }
       window.alert(t.answerupdated);
 
       try {
@@ -549,13 +487,34 @@ const Q_List = () => {
       window.alert(`${t.categorychanged}: ${categoryName}`);
       setQuestions((prev) => prev.filter((q) => q.question_id !== selectedQuestionId));
 
-      // 必要なら最新再取得
-      // await fetchQuestions(...)
-
       closeCategoryModal();
     } catch (error) {
       console.error("カテゴリ変更エラー:", error);
       window.alert(t.failtochangecategory);
+    }
+  };
+
+  const togglePublicStatus = async (questionId, currentStatus) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/admin/change_public`,
+        { question_id: questionId },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      setQuestions((prev) =>
+        prev.map((q) =>
+          q.question_id === questionId
+            ? {
+                ...q,
+                public: response.data.public,
+                editor_name: user && user.nickname ? user.nickname : q.editor_name,
+              }
+            : q
+        )
+      );
+    } catch (error) {
+      console.error(t.publicerror, error);
     }
   };
 
@@ -564,15 +523,11 @@ const Q_List = () => {
       console.error("質問IDが取得できません:", questionId);
       return;
     }
-    const id = String(questionId);
-    setVisibleAnswerId((prevId) => (String(prevId) === id ? null : id));
+    setVisibleAnswerId((prevId) => (prevId === questionId ? null : questionId));
   };
 
-  // マウント時のフェードイン効果と初期認証チェック
+  // 初期認証チェック
   useEffect(() => {
-    const r = requestAnimationFrame(() => setMounted(true));
-    
-    // 初期認証チェック
     const initializeAuth = () => {
       const storedToken = localStorage.getItem("token");
       const storedUser = localStorage.getItem("user");
@@ -583,7 +538,6 @@ const Q_List = () => {
     };
     
     initializeAuth();
-    return () => cancelAnimationFrame(r);
   }, []);
 
   if (!navigate) {
@@ -610,104 +564,157 @@ const Q_List = () => {
   }
 
   return (
-    <div className="w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
-      <div className="flex justify-center">
-        <div 
-          className={`relative z-10 w-full mx-auto max-w-4xl px-4 py-6 text-zinc-800 transition-opacity duration-500 ${
-            mounted ? "opacity-100" : "opacity-0"
-          }`}
-        >
-          <div className="w-full">
-            {/* カテゴリタイトル */}
-            <div className="mb-8 text-center">
-              {(() => {
-                const currentCategory = categoryList.find(cat => cat.id === parseInt(categoryId));
-                const CategoryIcon = currentCategory ? categoryIcons[currentCategory.className] : Tag;
-                return (
-                  <div className="flex items-center justify-center gap-3 mb-4">
-                    <CategoryIcon className="w-8 h-8 text-blue-800" />
-                    <h1 className="text-3xl font-bold text-blue-800">{`${categoryName} の質問管理`}</h1>
-                  </div>
-                );
-              })()}
-              <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full mb-2"></div>
-              <p className="text-gray-600">質問の編集・削除・カテゴリ変更を行うことができます。</p>
-            </div>
+    <div className="admin-question-history-container">
+      {/* ヘッダー */}
+      <div className="header">
+        {/* 言語選択 */}
+        <div className="language-wrapper">
+          <img
+            src="/globe.png"
+            alt="Language"
+            className="globe-icon"
+          />
+          <select
+            className="languageSelector"
+            value={language}
+            onChange={handleLanguageChange}
+          >
+            <option value="ja">日本語</option>
+            <option value="en">English</option>
+            <option value="zh">中文</option>
+            <option value="ko">한국어</option>
+            <option value="pt">Português</option>
+            <option value="es">Español</option>
+            <option value="vi">Tiếng Việt</option>
+            <option value="th">ไทย</option>
+            <option value="tl">Filipino</option>
+            <option value="hi">हिन्दी</option>
+            <option value="ne">नेपाली</option>
+            <option value="fr">Français</option>
+          </select>
+        </div>
 
-            {questions.length > 0 ? (
-              <div className="w-full space-y-6 mb-20">
-                {questions.map((question) => (
-                  <div
-                    key={question.question_id}
-                    id={`admin-question-${question.question_id}`}
-                    className="cursor-pointer rounded-lg bg-zinc-50 p-6 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm min-h-[120px]"
+        {/* タイトル */}
+        <h1>{`${categoryName} の質問管理`}</h1>
+
+        {/* 通知エリア */}
+        <div className="user-notification-wrapper">
+          <div className="notification-container" ref={popupRef}>
+            <button className="notification-button" onClick={onNotificationClick}>
+              <img src="/bell.png" alt="Notifications" />
+              {unreadCount > 0 && <span className="badge">{unreadCount}</span>}
+            </button>
+
+            {showPopup && (
+              <div className="notification-popup">
+                <h3>{t.notifications || "通知"}</h3>
+                <div className="tabs">
+                  <button
+                    className={activeTab === "personal" ? "active" : ""}
+                    onClick={() => setActiveTab("personal")}
                   >
-                    <div
-                      className="w-full"
-                      onClick={(e) => {
-                        const target = e.target;
-                        if (target && target.closest && target.closest("button")) return;
-                        if (target && target.closest && target.closest("a")) return;
-                        toggleAnswer(question.question_id);
-                      }}
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
-                          <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                          </svg>
-                          <div className="flex-1 min-w-0 leading-relaxed">
-                            <RichText content={question.質問} />
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                          <button
-                            className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              openCategoryModal(question.question_id, question.category_id);
-                            }}
-                          >
-                            <FolderOpen className="w-4 h-4" />
-                            カテゴリ変更
-                          </button>
-                          <button
-                            className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center gap-1"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              deleteQuestion(question.question_id);
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                            削除
-                          </button>
-                        </div>
-                      </div>
+                    {t.personal || "個人"}
+                  </button>
+                  <button
+                    className={activeTab === "global" ? "active" : ""}
+                    onClick={() => setActiveTab("global")}
+                  >
+                    {t.global || "全体"}
+                  </button>
+                </div>
 
-                      <div className="mt-3 flex items-center justify-between gap-1 text-sm text-zinc-500">
-                        <div className="flex items-center gap-4">
-                          <span>
-                            編集者: {question.editor_name || question.user_name || "—"}
-                          </span>
-                          <div className="flex items-center gap-1">
-                            <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                            <span>
-                              投稿日: {new Date((question.last_edited_at || question.time).replace(' ', 'T')).toLocaleString()}
-                            </span>
-                          </div>
+                <div className="notification-content">
+                  {isNotifLoading ? (
+                    <div className="no-notifications">{t.loading || "読み込み中..."}</div>
+                  ) : activeTab === "personal" ? (
+                    notifications.length > 0 ? (
+                      notifications.map((notification, index) => (
+                        <div
+                          key={index}
+                          className={`notification-item ${notification.read ? "read" : "unread"}`}
+                          onClick={() => onNotificationMove(notification)}
+                        >
+                          <span>{notification.message}</span>
+                          <span className="time">{notification.timestamp}</span>
                         </div>
+                      ))
+                    ) : (
+                      <div className="no-notifications">{t.nonotifications || "通知はありません"}</div>
+                    )
+                  ) : globalNotifications.length > 0 ? (
+                    globalNotifications.map((notification, index) => (
+                      <div
+                        key={index}
+                        className={`notification-item ${notification.read ? "read" : "unread"}`}
+                        onClick={() => onGlobalNotificationMove(notification)}
+                      >
+                        <span>{notification.message}</span>
+                        <span className="time">{notification.timestamp}</span>
                       </div>
-                    </div>
+                    ))
+                  ) : (
+                    <div className="no-notifications">{t.nonotifications || "通知はありません"}</div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
 
-                {String(visibleAnswerId) === String(question.question_id) && (
-                  <div className="mt-4 rounded-md bg-blue-50/50 p-4 text-zinc-800">
-                    <div className="text-sm font-semibold text-zinc-700 mb-3">{t.answer || "回答"}</div>
+      {/* メインコンテンツ */}
+      <div className="admin-question-list">
+        {questions.length > 0 ? (
+          <div>
+            {questions.map((question) => (
+              <div
+                key={question.question_id}
+                id={`admin-question-${question.question_id}`}
+                className="admin-question-item"
+              >
+                <div
+                  className="admin-question-text"
+                  onClick={(e) => {
+                    const target = e.target;
+                    if (target && target.closest && target.closest("a")) return;
+                    toggleAnswer(question.question_id);
+                  }}
+                >
+                  <RichText content={question.質問} />
+                </div>
+                <div className="admin-question-meta">
+                  <span>編集者: {question.editor_name || question.user_name || "—"}</span>
+                  <span>投稿日: {new Date((question.last_edited_at || question.time).replace(' ', 'T')).toLocaleString()}</span>
+                  <span className={question.public ? 'admin-public' : 'admin-private'}>
+                    {question.public ? '公開中' : '非公開'}
+                  </span>
+                  <button
+                    className="change-category-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      openCategoryModal(question.question_id, question.category_id);
+                    }}
+                  >
+                    カテゴリ変更
+                  </button>
+                  <button
+                    className="delete-button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      deleteQuestion(question.question_id);
+                    }}
+                  >
+                    削除
+                  </button>
+                </div>
+
+                {visibleAnswerId === question.question_id && (
+                  <div className="admin-answer-section">
+                    <h3>回答</h3>
                     
                     {editingAnswerId === question.question_id ? (
                       <textarea
-                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[200px] text-base leading-8"
+                        className="admin-answer-textarea"
                         rows={12}
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
@@ -716,7 +723,7 @@ const Q_List = () => {
                       />
                     ) : (
                       <div
-                        className="text-base leading-8 whitespace-pre-wrap break-words"
+                        className="admin-answer-text"
                         onClick={(e) => {
                           const target = e.target;
                           if (target && target.closest && target.closest("a")) e.stopPropagation();
@@ -728,118 +735,95 @@ const Q_List = () => {
 
                     {/* 編集・保存・履歴ボタン */}
                     {editingAnswerId === question.question_id ? (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="admin-edit-actions">
                         {(() => {
                           const unchanged = String(editText ?? "").trim() === String(question.回答 ?? "").trim();
                           return (
                             <>
                               <button
-                                className={`px-4 py-2 rounded-md font-medium transition-colors flex items-center gap-2 ${
-                                  isSaving || unchanged
-                                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                                    : 'bg-green-500 text-white hover:bg-green-600'
-                                }`}
+                                className={`admin-save-button ${isSaving || unchanged ? 'disabled' : ''}`}
                                 onClick={() => handleSaveEdit(question.answer_id, question.question_id)}
                                 disabled={isSaving || unchanged}
                                 title={unchanged ? '変更はありません' : ''}
                               >
-                                <Archive className="w-4 h-4" />
                                 {isSaving ? "保存中..." : "保存"}
                               </button>
                               <button
-                                className={`px-4 py-2 bg-gray-500 text-white rounded-md font-medium transition-colors flex items-center gap-2 ${
-                                  isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-gray-600'
-                                }`}
+                                className={`admin-cancel-button ${isSaving ? 'disabled' : ''}`}
                                 onClick={() => handleEditClick(question.question_id)}
                                 disabled={isSaving}
                               >
-                                <ArrowLeft className="w-4 h-4" />
                                 キャンセル
                               </button>
                             </>
                           );
                         })()}
                         <button
-                          className={`px-4 py-2 bg-purple-500 text-white rounded-md font-medium transition-colors flex items-center gap-2 ${
-                            isSaving ? 'opacity-50 cursor-not-allowed' : 'hover:bg-purple-600'
-                          }`}
+                          className={`admin-history-button inline ${isSaving ? 'disabled' : ''}`}
                           onClick={() => toggleHistory(question.answer_id)}
                           disabled={isSaving}
                         >
-                          <History className="w-4 h-4" />
                           {historyOpenId === question.answer_id ? '履歴を閉じる' : '過去の回答を見る'}
                         </button>
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2">
+                      <div className="admin-actions-row">
                         <button
-                          className="px-4 py-2 bg-blue-500 text-white rounded-md font-medium hover:bg-blue-600 transition-colors flex items-center gap-2"
+                          className="admin-edit-button"
                           onClick={() => handleEditClick(question.question_id, question.answer_id, question.回答)}
                         >
-                          <Edit3 className="w-4 h-4" />
                           編集
                         </button>
                         <button
-                          className="px-4 py-2 bg-purple-500 text-white rounded-md font-medium hover:bg-purple-600 transition-colors flex items-center gap-2"
+                          className="admin-history-button inline"
                           onClick={() => toggleHistory(question.answer_id)}
                         >
-                          <History className="w-4 h-4" />
                           {historyOpenId === question.answer_id ? '履歴を閉じる' : '過去の回答を見る'}
+                        </button>
+                        <button
+                          className={`official-button ${question.public ? 'public' : 'private'}`}
+                          onClick={() => togglePublicStatus(question.question_id, question.public)}
+                        >
+                          {question.public ? '非公開にする' : '公開する'}
                         </button>
                       </div>
                     )}
 
                     {/* 履歴表示 */}
                     {historyOpenId === question.answer_id && (
-                      <div className="mt-6 bg-white rounded-lg border border-gray-200 p-4">
-                        <h4 className="font-semibold text-gray-800 mb-3">編集履歴</h4>
+                      <div className="admin-history-list">
+                        <h4>編集履歴</h4>
                         {(() => {
                           const historyKey = `${question.answer_id}:${language}`;
                           const list = historyMap[historyKey] || [];
                           return list.length === 0 ? (
-                            <p className="text-gray-500 text-center py-4">履歴はありません。</p>
+                            <p className="admin-history-empty">履歴はありません。</p>
                           ) : (
-                            <div className="space-y-4">
+                            <div>
                               {list.map((h, i) => {
                                 const localKey = `${question.answer_id}:${language}:${i}`;
                                 const baseText = (i < (list.length - 1))
                                   ? (list[i + 1].texts || '')
                                   : (question.回答 || '');
                                 return (
-                                  <div key={i} className="border border-gray-100 rounded-lg p-3">
-                                    <div className="flex items-center justify-between mb-2">
-                                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                                        <span>{fmtTime(h.edited_at)}</span>
-                                        {h.editor_name && <span>編集者: {h.editor_name}</span>}
-                                      </div>
+                                  <div key={i} className="admin-history-item">
+                                    <div className="admin-history-meta">
+                                      <span className="admin-history-time">{fmtTime(h.edited_at)}</span>
+                                      {h.editor_name && <span>編集者: {h.editor_name}</span>}
                                       <button
-                                        className="px-2 py-1 text-xs bg-gray-100 text-gray-600 rounded hover:bg-gray-200 transition-colors"
+                                        className="admin-history-diff-toggle"
                                         onClick={() => setHistoryDiffOpenMap(prev => ({ ...prev, [localKey]: !prev[localKey] }))}
                                       >
                                         {historyDiffOpenMap[localKey] ? '差分を隠す' : '差分を表示'}
                                       </button>
                                     </div>
-                                    <div className="prose max-w-none text-sm">
+                                    <div className="admin-history-text">
                                       <RichText content={h.texts} />
                                     </div>
                                     {historyDiffOpenMap[localKey] && (
-                                      <div className="mt-3 border-t border-gray-100 pt-3">
-                                        <div className="text-xs text-gray-500 mb-2">この版 → 次の版との差分</div>
-                                        <div className="diff-block">
-                                          {diffLines(h.texts || '', baseText).map((p, idx) => (
-                                            <div key={idx} className={`text-sm font-mono ${
-                                              p.type === 'del' ? 'bg-red-100 text-red-700' :
-                                              p.type === 'add' ? 'bg-green-100 text-green-700' :
-                                              'bg-gray-50 text-gray-600'
-                                            } px-2 py-1 border-l-2 ${
-                                              p.type === 'del' ? 'border-red-400' :
-                                              p.type === 'add' ? 'border-green-400' :
-                                              'border-gray-300'
-                                            }`}>
-                                              {p.text || '\u00A0'}
-                                            </div>
-                                          ))}
-                                        </div>
+                                      <div className="admin-history-diff">
+                                        <div className="admin-history-diff-caption">この版 → 次の版との差分</div>
+                                        {renderDiff(h.texts || '', baseText)}
                                       </div>
                                     )}
                                   </div>
@@ -852,48 +836,29 @@ const Q_List = () => {
                   </div>
                 )}
               </div>
-            ))}              </div>
-            ) : (
-              <div className="text-center py-12">
-                <div className="text-gray-400 text-6xl mb-4">📝</div>
-                <p className="text-xl text-gray-500 mb-2">{t.noQuestions || "質問がありません"}</p>
-                <p className="text-gray-400">このカテゴリには質問が登録されていません。</p>
-              </div>
-            )}
+            ))}
           </div>
-
-          {/* 戻るボタン */}
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
-            <button 
-              onClick={() => navigate && navigate("/admin/QuestionAdmin")}
-              className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-              </svg>
-              {t.backButton || "戻る"}
-            </button>
+        ) : (
+          <div className="admin-no-questions">
+            <div className="text-gray-400 text-6xl mb-4">📝</div>
+            <p>{t.noQuestions || "質問がありません"}</p>
+            <p>このカテゴリには質問が登録されていません。</p>
           </div>
-        </div>
+        )}
       </div>
 
       {/* カテゴリ選択モーダル */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-4xl w-full mx-4 max-h-[80vh] overflow-y-auto">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">{t.selectcategory || "カテゴリを選択"}</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
+        <div className="category-modal">
+          <div className="category-modal-content">
+            <h2>{t.selectcategory || "カテゴリを選択"}</h2>
+            <div className="category-grid">
               {categoryList.map((category) => (
                 <button
                   key={category.id}
-                  className={`p-3 rounded-lg border-2 font-medium transition-all duration-200 ${
-                    category.id === selectedCategoryId
-                      ? 'border-gray-400 bg-gray-100 cursor-not-allowed opacity-50'
-                      : 'border-gray-200 hover:border-blue-300 hover:shadow-md'
+                  className={`category-option-button ${
+                    category.id === selectedCategoryId ? 'disabled' : ''
                   }`}
-                  style={{
-                    backgroundColor: category.id === selectedCategoryId ? '#f3f4f6' : '#ffffff',
-                  }}
                   onClick={() => handleChangeCategory(category.id, category.name[language] || category.name.ja)}
                   disabled={category.id === selectedCategoryId}
                 >
@@ -901,21 +866,29 @@ const Q_List = () => {
                 </button>
               ))}
             </div>
-            <div className="flex justify-end gap-2">
-              <button
-                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 transition-colors"
-                onClick={closeCategoryModal}
-              >
-                {t.cancel || "キャンセル"}
-              </button>
-            </div>
+            <button
+              className="modal-close-button"
+              onClick={closeCategoryModal}
+            >
+              {t.cancel || "キャンセル"}
+            </button>
           </div>
         </div>
       )}
 
+      {/* 戻るボタン */}
+      <div className="admin-back-button-container">
+        <button
+          onClick={() => navigate && navigate("/admin/QuestionAdmin")}
+          className="admin-back-button"
+        >
+          {t.backButton || "戻る"}
+        </button>
+      </div>
+
       {/* エラーメッセージ */}
       {errorMessage && (
-        <div className="fixed bottom-4 right-4 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg">
+        <div className="error-message">
           {errorMessage}
         </div>
       )}

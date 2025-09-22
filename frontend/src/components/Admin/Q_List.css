@@ -6,10 +6,10 @@
   width: 100vw;
   height: 100vh;
   padding: 30px;
-  background: linear-gradient(135deg, #ffe6e6, #ffcccc);
+  background: linear-gradient(135deg, #e6f7ff, #cce7ff);
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
   animation: fadeIn 0.7s ease-out;
-  border: 1px solid #ff9999;
+  border: 1px solid #aad4ff;
   overflow-y: auto;
 }
 
@@ -227,7 +227,7 @@
   margin: 0 auto;
   max-width: 900px;
   margin-top: 20px;
-  background-color: #fff;
+  background: rgba(255, 255, 255, 0.9);
   padding: 20px;
   border-radius: 10px;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
@@ -236,7 +236,7 @@
 .admin-question-item {
   margin-bottom: 20px;
   padding: 15px;
-  background-color: #f9f9f9;
+  background-color: #f0f8ff;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
   display: flex;
@@ -260,7 +260,7 @@
 }
 
 .admin-question-item:hover {
-  background-color: #fceaea;
+  background-color: #e6f3ff;
   transform: translateY(-3px);
   /* 上に少し浮かせる */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -282,7 +282,7 @@
 }
 
 .admin-answer-section {
-  background-color: #fceaea;
+  background-color: #e6f3ff;
   padding: 10px;
   border-radius: 6px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -425,7 +425,7 @@
 }
 
 .admin-answer-text {
-  background-color: #f9f9f9;
+  background-color: #f0f8ff;
   padding: 10px;
   border-radius: 5px;
   min-height: 60px;
