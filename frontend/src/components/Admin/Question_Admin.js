@@ -89,7 +89,9 @@ const Question_Admin = () => {
   const [content, setContent] = useState("");
   const [answerText, setAnswerText] = useState("");
 
-  const [language, setLanguage] = useState("ja");
+  const [language, setLanguage] = useState(() => {
+    try { return localStorage.getItem("shigachat_lang") || "ja"; } catch { return "ja"; }
+  });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -107,6 +109,16 @@ const Question_Admin = () => {
       setLanguage(code || "ja");
     }
   }, [user]);
+
+  // 同一タブ内の言語変更（NavBarなど）に即時追従
+  useEffect(() => {
+    const onLang = (e) => {
+      const code = e?.detail?.code;
+      if (code) setLanguage(code);
+    };
+    window.addEventListener("languageChanged", onLang);
+    return () => window.removeEventListener("languageChanged", onLang);
+  }, []);
 
   useEffect(() => {
     if (user === null) redirectToLogin(navigate);
@@ -203,7 +215,7 @@ const Question_Admin = () => {
                 <h1 className="text-3xl font-bold text-blue-800">{t.questionmanagement}</h1>
               </div>
               <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full mb-4"></div>
-              <p className="text-gray-600">質問の編集・削除・カテゴリ変更を行うことができます</p>
+              <p className="text-gray-600">{t.adminIntro || "質問の編集・削除・カテゴリ変更を行うことができます"}</p>
             </div>
             
 
@@ -370,7 +382,7 @@ const Question_Admin = () => {
                     <div className="flex items-center gap-3">
                       <Layers className="w-5 h-5" />
                       <span className="font-medium">
-                        {selectedCategoryId ? "カテゴリを変更する" : t.selectcategory}
+                        {selectedCategoryId ? (t.changecategory || "カテゴリを変更する") : t.selectcategory}
                       </span>
                     </div>
                   </button>

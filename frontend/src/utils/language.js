@@ -41,6 +41,18 @@ export const updateUserLanguage = async (newLanguageCode, setUser, setToken) => 
         spokenLanguage: newLanguageName,
       }));
     }
+
+    // 3) ローカル保存 + グローバルイベント発火（同一タブでも反映させる）
+    try {
+      localStorage.setItem("shigachat_lang", newLanguageCode);
+    } catch {}
+    try {
+      window.dispatchEvent(
+        new CustomEvent("languageChanged", {
+          detail: { code: newLanguageCode, label: newLanguageName },
+        })
+      );
+    } catch {}
   } catch (error) {
     console.error("❌ 言語の更新に失敗:", error);
   }

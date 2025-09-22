@@ -102,7 +102,9 @@ const Q_List = () => {
   const [questions, setQuestions] = useState([]);
   const [categoryName, setCategoryName] = useState("");
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
-  const [language, setLanguage] = useState("ja");
+  const [language, setLanguage] = useState(() => {
+    try { return localStorage.getItem("shigachat_lang") || "ja"; } catch { return "ja"; }
+  });
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editText, setEditText] = useState("");
   const [historyOpenId, setHistoryOpenId] = useState(null);
@@ -153,6 +155,16 @@ const Q_List = () => {
       setLanguage(code || "ja");
     }
   }, [user]);
+
+  // 同一タブ内の言語変更（NavBarなど）に即時追従
+  useEffect(() => {
+    const onLang = (e) => {
+      const code = e?.detail?.code;
+      if (code) setLanguage(code);
+    };
+    window.addEventListener("languageChanged", onLang);
+    return () => window.removeEventListener("languageChanged", onLang);
+  }, []);
 
   // 通知
   useEffect(() => {
@@ -807,7 +819,7 @@ const Q_List = () => {
                             }}
                           >
                             <Layers className="w-4 h-4" />
-                            カテゴリ変更
+                            {t.changecategory || "カテゴリ変更"}
                           </button>
                           <button
                             className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center gap-1"
@@ -817,7 +829,7 @@ const Q_List = () => {
                             }}
                           >
                             <Trash2 className="w-4 h-4" />
-                            削除
+                            {t.delete || "削除"}
                           </button>
                         </div>
                       </div>
@@ -995,7 +1007,7 @@ const Q_List = () => {
               <div className="text-center py-12">
                 <div className="text-gray-400 text-6xl mb-4">📝</div>
                 <p className="text-xl text-gray-500 mb-2">{t.noQuestions || "質問がありません"}</p>
-                <p className="text-gray-400">このカテゴリには質問が登録されていません。</p>
+                <p className="text-gray-400">{t.noQuestionsRegisteredInCategory || t.noQuestions || "このカテゴリには質問が登録されていません。"}</p>
               </div>
             )}
           </div>

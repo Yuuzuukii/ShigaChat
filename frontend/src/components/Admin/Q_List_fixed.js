@@ -27,7 +27,9 @@ const Q_List = () => {
   const [questions, setQuestions] = useState([]);
   const [categoryName, setCategoryName] = useState("");
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
-  const [language, setLanguage] = useState("ja");
+  const [language, setLanguage] = useState(() => {
+    try { return localStorage.getItem("shigachat_lang") || "ja"; } catch { return "ja"; }
+  });
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editText, setEditText] = useState("");
   const [historyOpenId, setHistoryOpenId] = useState(null);
@@ -78,6 +80,16 @@ const Q_List = () => {
       setLanguage(code || "ja");
     }
   }, [user]);
+
+  // 同一タブ内の言語変更（NavBarなど）に即時追従
+  useEffect(() => {
+    const onLang = (e) => {
+      const code = e?.detail?.code;
+      if (code) setLanguage(code);
+    };
+    window.addEventListener("languageChanged", onLang);
+    return () => window.removeEventListener("languageChanged", onLang);
+  }, []);
 
   // 通知
   useEffect(() => {
@@ -695,7 +707,7 @@ const Q_List = () => {
                       openCategoryModal(question.question_id, question.category_id);
                     }}
                   >
-                    カテゴリ変更
+                    {t.changecategory || "カテゴリ変更"}
                   </button>
                   <button
                     className="delete-button"
@@ -704,7 +716,7 @@ const Q_List = () => {
                       deleteQuestion(question.question_id);
                     }}
                   >
-                    削除
+                    {t.delete || "削除"}
                   </button>
                 </div>
 
@@ -842,7 +854,7 @@ const Q_List = () => {
           <div className="admin-no-questions">
             <div className="text-gray-400 text-6xl mb-4">📝</div>
             <p>{t.noQuestions || "質問がありません"}</p>
-            <p>このカテゴリには質問が登録されていません。</p>
+            <p>{t.noQuestionsRegisteredInCategory || t.noQuestions || "このカテゴリには質問が登録されていません。"}</p>
           </div>
         )}
       </div>
