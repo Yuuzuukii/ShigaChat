@@ -9,4 +9,10 @@ __pycache__/
 *.py[cod]
 *$py.class
 
-/node_modules
+/node_modules# runtime / generated
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+*.log
+app/app.log

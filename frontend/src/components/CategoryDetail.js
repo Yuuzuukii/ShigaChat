@@ -5,9 +5,44 @@ import {
     API_BASE_URL,
     translations,
     languageLabelToCode,
+    categoryList,
 } from "../config/constants";
 import { redirectToLogin } from "../utils/auth";
 import RichText from "./common/RichText";
+import {
+  IdCard,
+  HeartHandshake,
+  Stethoscope,
+  PiggyBank,
+  Briefcase,
+  GraduationCap,
+  Heart,
+  Baby,
+  Home,
+  Receipt,
+  HelpingHand,
+  Siren,
+  CloudLightning,
+  Tag,
+} from "lucide-react";
+
+// カテゴリアイコンのマッピング（Q_List.jsと同じ）
+const categoryIcons = {
+  "category-zairyu": IdCard,
+  "category-seikatsu": HeartHandshake,
+  "category-iryo": Stethoscope,
+  "category-nenkin": PiggyBank,
+  "category-roudou": Briefcase,
+  "category-kyouiku": GraduationCap,
+  "category-kekkon": Heart,
+  "category-shussan": Baby,
+  "category-jutaku": Home,
+  "category-zeikin": Receipt,
+  "category-fukushi": HelpingHand,
+  "category-jiken": Siren,
+  "category-saigai": CloudLightning,
+  "category-sonota": Tag,
+};
 
 function CategoryDetail() {
     const { categoryId } = useParams();
@@ -185,7 +220,16 @@ function CategoryDetail() {
                     <div className="w-full">
                         {/* カテゴリタイトル */}
                         <div className="mb-8 text-center">
-                            <h1 className="text-3xl font-bold text-blue-800 mb-2">{categoryName}</h1>
+                            {(() => {
+                                const currentCategory = categoryList.find(cat => cat.id === parseInt(categoryId));
+                                const CategoryIcon = currentCategory ? categoryIcons[currentCategory.className] : Tag;
+                                return (
+                                    <div className="flex items-center justify-center gap-3 mb-4">
+                                        <CategoryIcon className="w-8 h-8 text-blue-800" />
+                                        <h1 className="text-3xl font-bold text-blue-800">{categoryName}</h1>
+                                    </div>
+                                );
+                            })()}
                             <div className="w-20 h-1 bg-blue-600 mx-auto rounded-full"></div>
                         </div>
 
