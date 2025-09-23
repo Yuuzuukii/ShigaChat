@@ -148,11 +148,7 @@ def translate(text, source_language, target_language):
         raise HTTPException(status_code=500, detail=f"Translation failed: {str(e)}")
 
 
-def question_translate(
-    question_id: int, 
-    target_language_id: int, 
-    current_user: dict = Depends(get_current_user)
-):
+def question_translate(question_id: int, target_language_id: int, current_user: dict = None):
 
     # 言語コードのマッピング
     translation_language_map = {
@@ -219,11 +215,7 @@ def question_translate(
 
     return {"message": f"質問ID {question_id} の翻訳が言語ID {target_language_id} に保存されました。"}
 
-def answer_translate(
-    answer_id: int, 
-    target_language_id: int, 
-    current_user: dict = Depends(get_current_user)
-):
+def answer_translate(answer_id: int, target_language_id: int, current_user: dict = None):
 
     # 言語コードのマッピング
     translation_language_map = {
