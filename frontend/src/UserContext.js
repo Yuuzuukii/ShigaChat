@@ -28,9 +28,23 @@ export const UserProvider = ({ children }) => {
       .then((res) => {
         if (res.status === 401) {
           console.warn("⚠️ 401 Unauthorized - トークンを削除");
+          // トークン切れの場合は現在のページをリダイレクト用に保存
+          const currentPath = window.location?.pathname + window.location?.search;
+          if (currentPath && currentPath !== "/new" && currentPath !== "/") {
+            localStorage.setItem("redirectAfterLogin", currentPath);
+          }
+          
           setToken(null);
           localStorage.removeItem("token");
           localStorage.removeItem("user");
+          
+          // トークン切れイベントを発火
+          if (typeof window !== "undefined") {
+            window.dispatchEvent(new CustomEvent("tokenExpired", { 
+              detail: { redirectPath: currentPath } 
+            }));
+          }
+          
           throw new Error("認証エラー: トークンが無効です");
         }
         return res.json();
@@ -44,7 +58,7 @@ export const UserProvider = ({ children }) => {
           };
           setUser(userData);
           setLanguage(data.spoken_language);
-          localStorage.setItem("user", JSON.stringify(userData)); // 🔽 ユーザー情報を保存
+          localStorage.setItem("user", JSON.stringify(userData));
         } else {
           throw new Error("ユーザー情報が不完全です");
         }
@@ -52,7 +66,7 @@ export const UserProvider = ({ children }) => {
       .catch((error) => {
         console.error("❌ ユーザー情報の取得に失敗:", error);
         setUser(null);
-        localStorage.removeItem("user"); // 🔽 取得に失敗した場合は削除
+        localStorage.removeItem("user");
       })
       .finally(() => {
         setIsLoading(false);

@@ -1,5 +1,5 @@
-import React, { useContext } from "react";
-import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
+import React, { useContext, useEffect } from "react";
+import { BrowserRouter as Router, Route, Routes, Navigate, useNavigate } from "react-router-dom";
 import Shinki from "./components/Shinki";
 import Navbar from "./components/NavBar";
 import New from "./components/New";
@@ -11,7 +11,28 @@ import Question_Admin from "./components/Admin/Question_Admin";
 import Q_List from "./components/Admin/Q_List";
 import { UserContext } from "./UserContext";
 import {BASE_PATH} from "./config/constants"
+import { redirectToLogin } from "./utils/auth";
 
+// トークン切れイベントハンドラーのコンポーネント
+function TokenExpiredHandler() {
+  const navigate = useNavigate();
+  
+  useEffect(() => {
+    const handleTokenExpired = (event) => {
+      console.warn("🔒 トークンが切れました。ログインページにリダイレクトします。");
+      const redirectPath = event.detail?.redirectPath;
+      redirectToLogin(navigate, redirectPath);
+    };
+    
+    window.addEventListener("tokenExpired", handleTokenExpired);
+    
+    return () => {
+      window.removeEventListener("tokenExpired", handleTokenExpired);
+    };
+  }, [navigate]);
+  
+  return null; // このコンポーネントは何もレンダリングしない
+}
 
 function App() {
   const { user, isLoading } = useContext(UserContext);
@@ -20,6 +41,7 @@ function App() {
 
   return (
     <Router basename = {BASE_PATH}>
+      <TokenExpiredHandler />
       <Routes>
         <Route path="" element={<Navigate to="/new" />} />
         {/* Auth pages are outside Layout */}

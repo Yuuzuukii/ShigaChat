@@ -227,6 +227,29 @@ export default function Home() {
     return () => window.removeEventListener('threadDeleted', onThreadDeleted);
   }, [currentThreadId]);
 
+  // Listen for new chat events from NavBar
+  useEffect(() => {
+    const onStartNewChat = () => {
+      // Clear current chat state and start fresh
+      setCurrentThreadId(null);
+      setMessages([]);
+      setInput("");
+      setErrorMessage("");
+      setActionMessage("");
+      clearCurrentThreadIdLS();
+      
+      // Clear URL parameters
+      const url = new URL(window.location);
+      url.searchParams.delete('tid');
+      window.history.replaceState({}, '', url.toString());
+      
+      console.log('🆕 新しいチャットを開始しました');
+    };
+    
+    window.addEventListener('startNewChat', onStartNewChat);
+    return () => window.removeEventListener('startNewChat', onStartNewChat);
+  }, []);
+
   // Notifications loading
   useEffect(() => {
     if (userId && token) {

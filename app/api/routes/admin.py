@@ -42,26 +42,6 @@ def _ensure_notifications_question_id(conn: sqlite3.Connection):
         if "question_id" not in cols:
             cur.execute("ALTER TABLE notifications ADD COLUMN question_id INTEGER")
             conn.commit()
-            # mark last editor for this question due to answer edit
-            try:
-                _ensure_question_editor_columns(conn)
-                cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
-                )
-                conn.commit()
-            except Exception:
-                pass
-            # mark last editor to operator for this question
-            try:
-                _ensure_question_editor_columns(conn)
-                cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
-                )
-                conn.commit()
-            except Exception:
-                pass
     except Exception:
         pass
 
@@ -734,336 +714,202 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     
 
+# @router.post("/register_question")
+# async def register_question(
+#     request: RegisterQuestionRequest,
+#     current_user: dict = Depends(current_user_info)
+# ):
+#     user_id = current_user["id"]
+#     spoken_language = current_user["spoken_language"]
+#     language_id = language_mapping.get(spoken_language)
+    
+#     with sqlite3.connect(DATABASE) as conn:
+#         cursor = conn.cursor()
+#         japan_time = datetime.utcnow() + timedelta(hours=9)
+#         # 質問を登録
+#         cursor.execute(
+#             """
+#             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
+#             VALUES (?, ?, ?, ?, ?, ?, ?)
+#             """,
+#             (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
+#         )
 
-def save_question_with_category(question: str, category_id: int, user_id: int):
-    """
-    質問をカテゴリとともに保存する関数
-    """
-    try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
-                INSERT INTO question (content, category_id, user_id, time)
-                VALUES (?, ?, ?, ?)
-            """, (question, category_id, user_id, datetime.now()))
-            conn.commit()
-    except sqlite3.Error as e:
-        raise RuntimeError("質問の保存に失敗しました")
-    # routes/admin.py（完全版）
-import sqlite3
-from datetime import datetime, timedelta
-from typing import Optional
+#         question_id = cursor.lastrowid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+#         # 元言語の質問を question_translation に格納
+#         cursor.execute(
+#             """
+#             INSERT INTO question_translation (question_id, language_id, texts)
+#             VALUES (?, ?, ?)
+#             """,
+#             (question_id, language_id, request.content)
+#         )
 
-# 既存の定義を流用する前提:
-# - DATABASE: str
-# - language_mapping = {"日本語":1, "English":2, ...}
-# - current_user_info: FastAPI dependency
-# - RegisterQuestionRequest: Pydantic model (category_id:int, content:str, public:bool, answer_text:str など)
-# - _ensure_question_editor_columns(conn)
-# - _ensure_notifications_question_id(conn)
-# - append_qa_to_vector_index(question_id:int, answer_id:int)
-# - translate(text:str, src_lang_code:str, tgt_lang_code:str) -> str  ← 外部翻訳APIの関数（例: DeepL/Google等）
+#         conn.commit()  # 質問挿入後にコミット
+#         # initialize last editor as creator at creation time
+#         try:
+#             _ensure_question_editor_columns(conn)
+#             cursor.execute(
+#                 "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+#                 (user_id, japan_time, question_id)
+#             )
+#             conn.commit()
+#         except Exception:
+#             pass
 
-router = APIRouter()
+#         # 各言語に翻訳
+#         cursor.execute("SELECT id FROM language")
+#         languages = [row[0] for row in cursor.fetchall()]
+        
+#         for target_lang_id in languages:
+#             try:
+#                 question_translate(question_id, target_lang_id, current_user)
+#             except Exception as e:
+#                 raise HTTPException(status_code=500, detail=f"質問の翻訳に失敗しました: {str(e)}")
+        
+#         # 回答を登録
+#         cursor.execute(
+#             """
+#             INSERT INTO answer (time, language_id)
+#             VALUES (?, ?)
+#             """,
+#             (datetime.utcnow(), language_id)
+#         )
+#         answer_id = cursor.lastrowid
+        
+#         conn.commit()  # 回答挿入後にコミット
+        
+#         # 回答の元言語を登録
+#         cursor.execute(
+#             """
+#             INSERT INTO answer_translation (answer_id, language_id, texts)
+#             VALUES (?, ?, ?)
+#             """,
+#             (answer_id, language_id, request.answer_text)
+#         )
 
-# ---- i18n: 通知メッセージ（ラベル名ベース） ----
-NEW_QUESTION_TRANSLATIONS = {
-    "日本語": "新しい質問が登録されました",
-    "English": "New question has been registered",
-    "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
-    "中文": "新问题已注册",
-    "한국어": "새로운 질문이 등록되었습니다",
-    "Português": "Nova pergunta foi registrada",
-    "Español": "Se ha registrado una nueva pregunta",
-    "Tagalog": "Isang bagong tanong ang nairehistro",
-    "Bahasa Indonesia": "Pertanyaan baru telah terdaftar",
-}
-BY_USER_TRANSLATIONS = {
-    "日本語": "登録者",
-    "English": "by",
-    "Tiếng Việt": "bởi",
-    "中文": "由",
-    "한국어": "登録者",
-    "Português": "por",
-    "Español": "por",
-    "Tagalog": "ni",
-    "Bahasa Indonesia": "oleh",
-}
+#         conn.commit()  # **元言語の回答を挿入した後にコミット**
 
-# ---- 言語解決（コード/ラベルどちらでもOK） ----
-language_code_to_id = {
-    "ja": 1,
-    "en": 2,
-    "vi": 3,
-    "zh": 4,
-    "ko": 5,
-    "pt": 6,
-    "es": 7,
-    "tl": 8,
-    "id": 9,
-}
+#         # 各言語に翻訳
+#         for target_lang_id in languages:
+#             if target_lang_id == language_id:
+#                 continue  # 🔥 元言語はスキップ（すでにINSERT済み）
+#             try:
+#                 answer_translate(answer_id, target_lang_id, current_user)
+#             except Exception as e:
+#                 raise HTTPException(status_code=500, detail=f"回答ID {answer_id} の翻訳に失敗しました: {str(e)}")
+        
+#         # QAテーブルに登録
+#         cursor.execute(
+#             """
+#             INSERT INTO QA (question_id, answer_id)
+#             VALUES (?, ?)
+#             """,
+#             (question_id, answer_id)
+#         )
+        
+#         conn.commit()
 
-def resolve_language_id(spoken_language: str) -> Optional[int]:
-    if not spoken_language:
-        return None
-    s = spoken_language.strip()
-    # ラベル優先（"日本語", "English"...）
-    if s in language_mapping:
-        return language_mapping[s]
-    # コード（"ja","en"...）
-    return language_code_to_id.get(s.lower())
+#         # 📌 通知の先頭メッセージ（言語別）
+#         new_question_translations = {
+#             "日本語": "新しい質問が登録されました",
+#             "English": "New question has been registered",
+#             "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
+#             "中文": "新问题已注册",
+#             "한국어": "새로운 질문이 등록되었습니다",
+#             "Português": "Nova pergunta foi registrada",
+#             "Español": "Se ha registrado una nueva pregunta",
+#             "Tagalog": "Isang bagong tanong ang nairehistro",
+#             "Bahasa Indonesia": "Pertanyaan baru telah terdaftar"
 
-def get_reverse_language_map():
-    # id -> ラベル名（通知用に使う）
-    return {v: k for k, v in language_mapping.items()}
+#         }
+#         # 📌 投稿者（ニックネーム）の表記（言語別）
+#         by_user_translations = {
+#             "日本語": "登録者",
+#             "English": "by",
+#             "Tiếng Việt": "bởi",
+#             "中文": "由",
+#             "한국어": "등록자",
+#             "Português": "por",
+#             "Español": "por",
+#             "Tagalog": "ni",
+#             "Bahasa Indonesia": "oleh"
+#         }
 
-def now_jst():
-    return datetime.utcnow() + timedelta(hours=9)
+#         # 📌 **質問内容のスニペットを通知に追加**
+#         snippet_length = 50  # スニペットの最大長
+        
+#         # `notifications` に通知を追加（全体通知 + question_id）
+#         _ensure_notifications_question_id(conn)
+#         cursor.execute(
+#             """
+#             INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id)
+#             VALUES (?, ?, ?, ?, ?)
+#             """,
+#             (-1, False, datetime.now(), '[]', question_id)
+#         )
+#         notification_id = cursor.lastrowid  # 挿入された通知のID
+#         conn.commit()
 
-# ---- 翻訳コードマッピング（翻訳API用のコードに変換） ----
-_TRANSLATION_LANG_MAP = {
-    "ja": "ja",      # 日本語
-    "en": "en",      # 英語
-    "vi": "vi",      # ベトナム語
-    "zh": "zh-CN",   # 中国語(簡体)
-    "ko": "ko",      # 韓国語
-    "pt": "pt",      # ポルトガル語
-    "es": "es",      # スペイン語
-    "tl": "tl",      # タガログ語
-    "id": "id",      # インドネシア語
-}
+#         # 📌 **通知の翻訳を `question_translation` から取得**
+#         cursor.execute(
+#             """
+#             SELECT language_id, texts FROM question_translation WHERE question_id = ?
+#             """, (question_id,)
+#         )
+#         translations = cursor.fetchall()
 
-def _get_lang_code(conn, lang_id: int) -> str:
-    cur = conn.cursor()
-    cur.execute("SELECT code FROM language WHERE id = ?", (lang_id,))
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail=f"language id {lang_id} not found")
-    return row[0].lower()
+#         # 🔹 各言語のスニペットを `notifications_translation` に格納
+#         for lang_id, text in translations:
+#             snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
+#             # 言語名を取得（"日本語" など）
+#             lang_name = next(key for key, val in language_mapping.items() if val == lang_id)
+#             # メッセージ例: "新しい質問が登録されました（登録者: ニックネーム）: スニペット"
+#             prefix = new_question_translations.get(lang_name, "New question has been registered")
+#             by_label = by_user_translations.get(lang_name, "by")
+#             nickname = current_user.get("name", "user")
+#             translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
 
-def _map_to_translator_code(code: str) -> str:
-    mapped = _TRANSLATION_LANG_MAP.get(code.lower())
-    if not mapped:
-        raise HTTPException(status_code=400, detail=f"unsupported language code: {code}")
-    return mapped
+#             cursor.execute(
+#                 """
+#                 INSERT INTO notifications_translation (notification_id, language_id, messages)
+#                 VALUES (?, ?, ?)
+#                 """,
+#                 (notification_id, lang_id, translated_message),
+#             )
 
-# ---- 実翻訳（翻訳APIの関数 translate を呼ぶ） ----
-def _translate_text(text: str, src_code: str, tgt_code: str) -> str:
-    return translate(text, src_code, tgt_code)  # 既存の翻訳関数を利用（例: DeepL/Google等）
+#         conn.commit()  # 翻訳の挿入を確定
 
-# ---- BG/同期両用: 質問の翻訳をUPSERT ----
-def question_translate_internal(question_id: int, target_language_id: int) -> None:
-    with sqlite3.connect(DATABASE, check_same_thread=False) as conn:
-        cur = conn.cursor()
+#         # ベクトルインデックスへ差分追加（全言語分）
+#         try:
+#             appended = append_qa_to_vector_index(question_id, answer_id)
+#             # optional: could log appended count if a logger is present
+#         except Exception:
+#             # ベクトル更新失敗は致命ではないため処理を続行
+#             pass
 
-        # 元の質問本文と元言語
-        cur.execute(
-            "SELECT content, language_id FROM question WHERE question_id = ?",
-            (question_id,),
-        )
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="question not found")
-        original_content, src_lang_id = row
-
-        if src_lang_id == target_language_id:
-            return  # 同一言語→何もしない
-
-        # 言語コード(DB)→翻訳API用に変換
-        src_code_db = _get_lang_code(conn, src_lang_id)
-        tgt_code_db = _get_lang_code(conn, target_language_id)
-        src_code = _map_to_translator_code(src_code_db)
-        tgt_code = _map_to_translator_code(tgt_code_db)
-
-        translated = _translate_text(original_content, src_code, tgt_code)
-
-        # (question_id, language_id) でUPSERT
-        cur.execute(
-            """
-            INSERT INTO question_translation (question_id, language_id, texts)
-            VALUES (?, ?, ?)
-            ON CONFLICT(question_id, language_id)
-            DO UPDATE SET texts = excluded.texts
-            """,
-            (question_id, target_language_id, translated),
-        )
-        conn.commit()
-
-# ---- BG/同期両用: 回答の翻訳をUPSERT ----
-def answer_translate_internal(answer_id: int, target_language_id: int) -> None:
-    with sqlite3.connect(DATABASE, check_same_thread=False) as conn:
-        cur = conn.cursor()
-
-        # 回答の元言語を answer テーブルから取得
-        cur.execute("SELECT language_id FROM answer WHERE answer_id = ?", (answer_id,))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="answer not found")
-        src_lang_id = row[0]
-
-        if src_lang_id == target_language_id:
-            return  # 同一言語→何もしない
-
-        # 元テキスト（元言語の翻訳レコード＝登録時に作成済みの同言語行）
-        cur.execute(
-            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ? LIMIT 1",
-            (answer_id, src_lang_id),
-        )
-        row = cur.fetchone()
-        if not row:
-            # フォールバック: 最初の翻訳を元文とみなす
-            cur.execute(
-                "SELECT texts FROM answer_translation WHERE answer_id = ? LIMIT 1",
-                (answer_id,),
-            )
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="source answer text not found")
-        original_text = row[0]
-
-        # 言語コード(DB)→翻訳API用に変換
-        src_code_db = _get_lang_code(conn, src_lang_id)
-        tgt_code_db = _get_lang_code(conn, target_language_id)
-        src_code = _map_to_translator_code(src_code_db)
-        tgt_code = _map_to_translator_code(tgt_code_db)
-
-        translated = _translate_text(original_text, src_code, tgt_code)
-
-        # (answer_id, language_id) でUPSERT
-        cur.execute(
-            """
-            INSERT INTO answer_translation (answer_id, language_id, texts)
-            VALUES (?, ?, ?)
-            ON CONFLICT(answer_id, language_id)
-            DO UPDATE SET texts = excluded.texts
-            """,
-            (answer_id, target_language_id, translated),
-        )
-        conn.commit()
-
-# ---- 通知翻訳の不足分を埋める ----
-def fill_missing_notification_translations(notification_id: int, question_id: int, nickname: str, snippet_length: int = 50):
-    reverse_map = get_reverse_language_map()
-    with sqlite3.connect(DATABASE, check_same_thread=False) as conn:
-        cur = conn.cursor()
-        cur.execute(
-            "SELECT language_id FROM notifications_translation WHERE notification_id = ?",
-            (notification_id,),
-        )
-        already = {row[0] for row in cur.fetchall()}
-        cur.execute(
-            "SELECT language_id, texts FROM question_translation WHERE question_id = ?",
-            (question_id,),
-        )
-        for lang_id, text in cur.fetchall():
-            if lang_id in already:
-                continue
-            lang_name = reverse_map.get(lang_id, "English")
-            prefix = NEW_QUESTION_TRANSLATIONS.get(lang_name, NEW_QUESTION_TRANSLATIONS["English"])
-            by_label = BY_USER_TRANSLATIONS.get(lang_name, BY_USER_TRANSLATIONS["English"])
-            snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
-            msg = f"{prefix}（{by_label}: {nickname}）: {snippet}"
-            cur.execute(
-                """
-                INSERT INTO notifications_translation (notification_id, language_id, messages)
-                VALUES (?, ?, ?)
-                """,
-                (notification_id, lang_id, msg),
-            )
-        conn.commit()
+#     return {
+#         "question_id": question_id,
+#         "question_text": request.content,
+#         "answer_id": answer_id,
+#         "answer_text": request.answer_text,
+#     }
 
 
-# ---- 実翻訳（translate() は既存の外部API呼び出し関数） ----
-_TRANSLATION_LANG_MAP = {
-    "ja": "ja", "en": "en", "vi": "vi", "zh": "zh-CN",
-    "ko": "ko", "pt": "pt", "es": "es", "tl": "tl", "id": "id",
-}
+# ==== background workers (add) ====
 
-def _get_lang_code(conn, lang_id: int) -> str:
-    cur = conn.cursor()
-    cur.execute("SELECT code FROM language WHERE id = ?", (lang_id,))
-    row = cur.fetchone()
-    if not row:
-        raise HTTPException(status_code=404, detail=f"language id {lang_id} not found")
-    return row[0].lower()
-
-def _map_to_translator_code(code: str) -> str:
-    mapped = _TRANSLATION_LANG_MAP.get(code.lower())
-    if not mapped:
-        raise HTTPException(status_code=400, detail=f"unsupported language code: {code}")
-    return mapped
-
-def question_translate_internal(question_id: int, target_language_id: int) -> None:
-    with sqlite3.connect(DATABASE, check_same_thread=False) as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT content, language_id FROM question WHERE question_id = ?", (question_id,))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="question not found")
-        src_text, src_lang_id = row
-        if src_lang_id == target_language_id:
-            return
-        src_code = _map_to_translator_code(_get_lang_code(conn, src_lang_id))
-        tgt_code = _map_to_translator_code(_get_lang_code(conn, target_language_id))
-        translated = translate(src_text, src_code, tgt_code)
-        cur.execute("""
-            INSERT INTO question_translation (question_id, language_id, texts)
-            VALUES (?, ?, ?)
-            ON CONFLICT(question_id, language_id) DO UPDATE SET texts = excluded.texts
-        """, (question_id, target_language_id, translated))
-        conn.commit()
-
-def answer_translate_internal(answer_id: int, target_language_id: int) -> None:
-    with sqlite3.connect(DATABASE, check_same_thread=False) as conn:
-        cur = conn.cursor()
-        cur.execute("SELECT language_id FROM answer WHERE id = ? LIMIT 1", (answer_id,))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="answer not found")
-        src_lang_id = row[0]
-        if src_lang_id == target_language_id:
-            return
-        # 元言語の回答本文を取得（登録時に入れた同言語行）
-        cur.execute("""
-            SELECT texts FROM answer_translation
-            WHERE answer_id = ? AND language_id = ? LIMIT 1
-        """, (answer_id, src_lang_id))
-        row = cur.fetchone()
-        if not row:
-            cur.execute("SELECT texts FROM answer_translation WHERE answer_id = ? LIMIT 1", (answer_id,))
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(status_code=404, detail="source answer text not found")
-        src_text = row[0]
-        src_code = _map_to_translator_code(_get_lang_code(conn, src_lang_id))
-        tgt_code = _map_to_translator_code(_get_lang_code(conn, target_language_id))
-        translated = translate(src_text, src_code, tgt_code)
-        cur.execute("""
-            INSERT INTO answer_translation (answer_id, language_id, texts)
-            VALUES (?, ?, ?)
-            ON CONFLICT(answer_id, language_id) DO UPDATE SET texts = excluded.texts
-        """, (answer_id, target_language_id, translated))
-        conn.commit()
-
-# ---- BGラッパ（例外は握りつぶし: 起動やレスポンスに影響させない） ----
 def _bg_question_translate(question_id: int, target_lang_id: int):
     try:
-        question_translate_internal(question_id, target_lang_id)   # ← 差し替え
-    except Exception as e:
-        print(f"[bg] question_translate_internal failed: {e}")
+        # current_user を参照していないので、ダミーでOK
+        question_translate(question_id, target_lang_id, current_user={"id": 0})
+    except Exception:
+        # ここでログを出すなら logger.exception(...) など
+        pass
 
-def _bg_answer_translate(answer_id: int, target_lang_id: int):
+def _bg_answer_translate(answer_id: int, target_lang_id: int, question_id: int = None):
     try:
-        answer_translate_internal(answer_id, target_lang_id)       # ← 差し替え
-    except Exception as e:
-        print(f"[bg] answer_translate_internal failed: {e}")
-
-
-def _bg_fill_notifications(notification_id: int, question_id: int, nickname: str):
-    try:
-        fill_missing_notification_translations(notification_id, question_id, nickname)
+        answer_translate(answer_id, target_lang_id, current_user={"id": 0})
     except Exception:
         pass
 
@@ -1113,22 +959,53 @@ async def register_question(
         except Exception:
             pass
 
-        # 回答（元言語のみ）
-        cur.execute(
-            "INSERT INTO answer (time, language_id) VALUES (?, ?)",
-            (jst, language_id),
+        # --- 各言語への翻訳は非同期投入に切り替え ---
+        cursor.execute("SELECT id FROM language")
+        languages = [row[0] for row in cursor.fetchall()]
+
+        queued_q_langs = []
+        for target_lang_id in languages:
+            if target_lang_id == language_id:
+                continue  # 元言語は既に入っているのでスキップ
+            if bg:
+                bg.add_task(_bg_question_translate, question_id, target_lang_id)
+                queued_q_langs.append(target_lang_id)
+
+        # --- 回答（元言語）を登録（同期） ---
+        cursor.execute(
+            """
+            INSERT INTO answer (time, language_id)
+            VALUES (?, ?)
+            """,
+            (datetime.utcnow(), language_id)
         )
-        answer_id = cur.lastrowid
-        cur.execute(
-            "INSERT INTO answer_translation (answer_id, language_id, texts) VALUES (?, ?, ?)",
-            (answer_id, language_id, request.answer_text),
+        answer_id = cursor.lastrowid
+        conn.commit()
+
+        cursor.execute(
+            """
+            INSERT INTO answer_translation (answer_id, language_id, texts)
+            VALUES (?, ?, ?)
+            """,
+            (answer_id, language_id, request.answer_text)
         )
+        conn.commit()
+
+        # --- 回答の各言語翻訳も非同期投入 ---
+        queued_a_langs = []
+        for target_lang_id in languages:
+            if target_lang_id == language_id:
+                continue
+            if bg:
+                bg.add_task(_bg_answer_translate, answer_id, target_lang_id)
+                queued_a_langs.append(target_lang_id)
 
         # QAリンク
         cur.execute(
             "INSERT INTO QA (question_id, answer_id) VALUES (?, ?)",
             (question_id, answer_id),
         )
+        conn.commit()
 
         # 通知（まずは元言語のみ）
         _ensure_notifications_question_id(conn)

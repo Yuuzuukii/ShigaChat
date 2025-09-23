@@ -87,7 +87,8 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
 
     const requestData = { id: notification.id };
 
-    const response = await fetch(`${API_BASE_URL}/notification/notifications/read`, {
+    // 既読処理と遷移を並行実行
+    const markReadPromise = fetch(`${API_BASE_URL}/notification/notifications/read`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
@@ -95,27 +96,29 @@ export const handleNotificationMove = async (notification, navigate, token, fetc
       },
       body: JSON.stringify(requestData),
     });
-    if (response.status === 401) {
-      if (navigate) redirectToLogin(navigate);
-      return;
-    }
-    if (!response.ok) throw new Error("通知の既読処理に失敗しました");
 
-    // Navigate to Question Management (admin list by category)
-    const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
+    const categoryPromise = fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
-    if (categoryRes.status === 401) {
+
+    // 並行実行
+    const [markReadResponse, categoryResponse] = await Promise.all([markReadPromise, categoryPromise]);
+
+    if (markReadResponse.status === 401 || categoryResponse.status === 401) {
       if (navigate) redirectToLogin(navigate);
       return;
     }
-    if (!categoryRes.ok) {
+    if (!markReadResponse.ok) throw new Error("通知の既読処理に失敗しました");
+
+    if (!categoryResponse.ok) {
       // Question deleted or category missing: just refresh notifications (already marked read)
       await fetchNotifications();
       return;
     }
-    const categoryData = await categoryRes.json();
+    const categoryData = await categoryResponse.json();
     const categoryId = categoryData.category_id;
+    
+    // 通知を更新してから遷移
     await fetchNotifications();
     if (categoryId) {
       navigate(`/admin/category/${categoryId}?id=${questionId}`);
@@ -137,29 +140,31 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
       return m ? parseInt(m[1], 10) : null;
     })();
     if (!questionId) return;
-    // 先に既読化しておく（対象が消えていても通知を閉じるため）
-    const markReadReq = fetch(`${API_BASE_URL}/notification/notifications/global/read`, {
+    
+    // 既読処理とカテゴリ取得を並行実行
+    const markReadPromise = fetch(`${API_BASE_URL}/notification/notifications/global/read`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ id: notification.id }),
     });
 
-    // カテゴリ取得（存在しない場合はスキップして通知だけ閉じる）
-    const categoryRes = await fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
+    const categoryPromise = fetch(`${API_BASE_URL}/category/get_category_by_question?question_id=${questionId}`, {
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     });
-    if (categoryRes.status === 401) {
+
+    // 並行実行
+    const [markReadResponse, categoryResponse] = await Promise.all([markReadPromise, categoryPromise]);
+
+    if (categoryResponse.status === 401) {
       if (navigate) redirectToLogin(navigate);
       return;
     }
 
-    await markReadReq.catch(() => {});
-
-    if (!categoryRes.ok) {
+    if (!categoryResponse.ok) {
       await fetchNotifications();
       return; // 削除済みなど。通知だけ消す
     }
-    const categoryData = await categoryRes.json();
+    const categoryData = await categoryResponse.json();
     const categoryId = categoryData.category_id;
     await fetchNotifications();
     if (categoryId) navigate(`/admin/category/${categoryId}?id=${questionId}`);

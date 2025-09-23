@@ -132,8 +132,8 @@ function Keyword() {
   };
 
   return (
-    <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
-      <div className="h-full flex justify-center ">
+    <div className="min-h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+      <div className="min-h-full flex justify-center">
         <div
           className={`relative z-10 w-full mx-auto max-w-4xl px-4 py-6 text-zinc-800 transition-opacity duration-500 ${
             mounted ? "opacity-100" : "opacity-0"
