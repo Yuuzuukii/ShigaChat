@@ -246,13 +246,13 @@ const Q_List = () => {
     
     if (!targetQuestionId || !questions || questions.length === 0) return;
     
-    // 少し遅延してスクロール（DOM描画完了を待つ）
+    // スクロール処理の実行
     const scrollTimer = setTimeout(() => {
       const el = document.getElementById(`admin-question-${targetQuestionId}`);
       console.log("Looking for element with ID:", `admin-question-${targetQuestionId}`, "Found:", !!el);
       
       if (el) {
-        // まず自動的に該当質問の回答を展開
+        // まず該当質問の回答を展開
         try { 
           setVisibleAnswerId(String(targetQuestionId)); 
           console.log("Set visible answer ID:", targetQuestionId);
@@ -260,85 +260,111 @@ const Q_List = () => {
           console.warn("Failed to set visible answer ID:", e);
         }
         
-        // 回答展開後にスクロール処理を実行（さらに遅延）
-        setTimeout(() => {
-          // 複数のスクロール方法を試行
-          const rect = el.getBoundingClientRect();
-          const elementTop = rect.top + window.pageYOffset;
-          const offset = 120; // ヘッダー分のオフセット
-          const scrollPosition = Math.max(0, elementTop - offset);
+        // 改善されたスクロール処理
+        const scrollToElement = () => {
+          console.log("Executing scroll to element");
           
-          console.log("Element position:", {
-            elementTop,
-            offset,
-            scrollPosition,
-            currentScroll: window.pageYOffset
+          // メインコンテンツエリアを取得
+          const mainContent = document.querySelector('main');
+          if (!mainContent) {
+            console.warn("Main content area not found, falling back to window scroll");
+            fallbackWindowScroll();
+            return;
+          }
+          
+          // 要素の位置を正確に計算
+          const elementRect = el.getBoundingClientRect();
+          const mainRect = mainContent.getBoundingClientRect();
+          
+          // メインコンテンツ内での相対位置を計算
+          const relativeTop = elementRect.top - mainRect.top;
+          const currentScrollTop = mainContent.scrollTop;
+          const targetScrollPosition = currentScrollTop + relativeTop - 60; // 60pxのマージン
+          
+          console.log("Main content scroll calculation:", {
+            elementTop: elementRect.top,
+            mainTop: mainRect.top,
+            relativeTop,
+            currentScrollTop,
+            targetScrollPosition
           });
           
-          // Method 1: window.scrollTo
-          window.scrollTo({ 
-            top: scrollPosition, 
+          // メインコンテンツエリア内でのスムーススクロール
+          mainContent.scrollTo({ 
+            top: Math.max(0, targetScrollPosition), 
             behavior: "smooth" 
           });
           
-          // スクロール完了確認
-          let scrollCheckCount = 0;
-          const checkScroll = () => {
-            scrollCheckCount++;
-            const currentScroll = window.pageYOffset || document.documentElement.scrollTop;
-            console.log(`Scroll check ${scrollCheckCount}: current=${currentScroll}, target=${scrollPosition}`);
-            
-            if (scrollCheckCount < 10 && Math.abs(currentScroll - scrollPosition) > 20) {
-              setTimeout(checkScroll, 100);
-            } else if (scrollCheckCount >= 10 && Math.abs(currentScroll - scrollPosition) > 50) {
-              console.log("Force scrolling with scrollIntoView");
-              el.scrollIntoView({ 
-                behavior: "smooth", 
-                block: "start",
-                inline: "nearest"
-              });
-            }
-          };
-          setTimeout(checkScroll, 100);
+          // ハイライト効果
+          applyHighlight();
+        };
+        
+        // フォールバック：ウィンドウスクロール
+        const fallbackWindowScroll = () => {
+          const rect = el.getBoundingClientRect();
+          const elementTop = rect.top + window.pageYOffset;
+          // サイドバー + ヘッダーの高さを考慮
+          const headerHeight = 72; // 4.5rem
+          const sidebarOffset = 0; // サイドバーはmarginLeftで調整済み
+          const additionalOffset = 60; // 余裕を持ったマージン
+          const totalOffset = headerHeight + sidebarOffset + additionalOffset;
+          const targetScrollPosition = Math.max(0, elementTop - totalOffset);
           
-          // Method 2: 1秒後にscrollIntoViewでフォールバック
-          setTimeout(() => {
-            const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop;
-            const targetScrollTop = scrollPosition;
-            
-            // スクロールが正しく実行されていない場合のフォールバック
-            if (Math.abs(currentScrollTop - targetScrollTop) > 50) {
-              console.log("Fallback scrolling with scrollIntoView");
-              el.scrollIntoView({ 
-                behavior: "smooth", 
-                block: "start",
-                inline: "nearest"
-              });
-            }
-          }, 1000);
+          console.log("Window scroll fallback:", {
+            rectTop: rect.top,
+            elementTop,
+            totalOffset,
+            targetScrollPosition
+          });
           
-          // ハイライト効果を追加
+          window.scrollTo({ 
+            top: targetScrollPosition, 
+            behavior: "smooth" 
+          });
+          
+          // ハイライト効果
+          applyHighlight();
+        };
+        
+        // ハイライト効果を適用する共通関数
+        const applyHighlight = () => {
           el.style.transition = "all 0.3s ease";
           el.style.boxShadow = "0 0 20px rgba(59, 130, 246, 0.5)";
           el.style.backgroundColor = "rgba(59, 130, 246, 0.1)";
           el.style.border = "2px solid rgba(59, 130, 246, 0.3)";
+          el.style.borderRadius = "8px";
           
-          // ハイライトを一定時間後に削除
+          // ハイライトを削除
           setTimeout(() => {
             el.style.boxShadow = "";
             el.style.backgroundColor = "";
             el.style.border = "";
-          }, 4000);
+            el.style.borderRadius = "";
+          }, 3000);
+        };
+        
+        // まずメインコンテンツスクロールを試行
+        scrollToElement();
+        
+        // 500ms後にスクロール結果を確認し、必要に応じて再調整
+        setTimeout(() => {
+          const rect = el.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          const isVisible = rect.top >= 72 && rect.bottom <= viewportHeight;
           
-        }, 200); // 回答展開後の遅延
+          if (!isVisible) {
+            console.log("Element not properly visible, attempting fallback scroll");
+            fallbackWindowScroll();
+          }
+        }, 500);
         
       } else {
         console.warn(`Element with ID admin-question-${targetQuestionId} not found`);
-        // 全ての質問要素のIDをログ出力してデバッグ
+        // デバッグ用：利用可能な質問要素を確認
         const allQuestionElements = document.querySelectorAll('[id^="admin-question-"]');
         console.log("Available question IDs:", Array.from(allQuestionElements).map(el => el.id));
       }
-    }, 500); // 初期遅延を増加
+    }, 150); // 少し長めの遅延でDOMの安定を待つ
     
     return () => clearTimeout(scrollTimer);
   }, [targetQuestionId, questions]);
@@ -785,12 +811,16 @@ const Q_List = () => {
             </div>
 
             {questions.length > 0 ? (
-              <div className="w-full space-y-6 mb-20">
+              <div className="w-full space-y-6">
                 {questions.map((question) => (
                   <div
                     key={question.question_id}
                     id={`admin-question-${question.question_id}`}
                     className="cursor-pointer rounded-lg bg-zinc-50 p-6 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm min-h-[120px]"
+                    style={{
+                      scrollMarginTop: '100px',
+                      scrollPaddingTop: '100px'
+                    }}
                   >
                     <div
                       className="w-full"
@@ -1013,10 +1043,10 @@ const Q_List = () => {
           </div>
 
           {/* 戻るボタン */}
-          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="mt-4 text-center">
             <button 
               onClick={() => navigate && navigate("/admin/QuestionAdmin")}
-              className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
+              className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2 mx-auto"
             >
               <ArrowLeft className="w-5 h-5" />
               {t.backButton || "戻る"}

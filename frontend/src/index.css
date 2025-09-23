@@ -7,3 +7,15 @@ html, body, #root {
 body {
   margin: 0;
 }
+
+/* Improve scroll behavior for anchor navigation */
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}
+
+/* Ensure proper scroll behavior for main content */
+main {
+  scroll-behavior: smooth;
+  scroll-padding-top: 100px;
+}

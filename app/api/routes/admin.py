@@ -42,26 +42,6 @@ def _ensure_notifications_question_id(conn: sqlite3.Connection):
         if "question_id" not in cols:
             cur.execute("ALTER TABLE notifications ADD COLUMN question_id INTEGER")
             conn.commit()
-            # mark last editor for this question due to answer edit
-            try:
-                _ensure_question_editor_columns(conn)
-                cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
-                )
-                conn.commit()
-            except Exception:
-                pass
-            # mark last editor to operator for this question
-            try:
-                _ensure_question_editor_columns(conn)
-                cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
-                )
-                conn.commit()
-            except Exception:
-                pass
     except Exception:
         pass
 
@@ -903,17 +883,53 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
 
 # ==== background workers (add) ====
 
-def _bg_question_translate(question_id: int, target_lang_id: int):
+# ==== background workers (add) ====
+
+def _update_vectors_if_all_translations_ready(question_id: int, answer_id: int):
+    """
+    質問と回答の全言語翻訳が揃った場合のみベクトルインデックスを更新
+    """
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            
+            # 全言語数を取得
+            cursor.execute("SELECT COUNT(*) FROM language")
+            total_languages = cursor.fetchone()[0]
+            
+            # 質問の翻訳数を確認
+            cursor.execute("SELECT COUNT(*) FROM question_translation WHERE question_id = ?", (question_id,))
+            question_translations = cursor.fetchone()[0]
+            
+            # 回答の翻訳数を確認
+            cursor.execute("SELECT COUNT(*) FROM answer_translation WHERE answer_id = ?", (answer_id,))
+            answer_translations = cursor.fetchone()[0]
+            
+            # 全言語の翻訳が完了している場合のみベクトル更新
+            if question_translations >= total_languages and answer_translations >= total_languages:
+                append_qa_to_vector_index(question_id, answer_id)
+    except Exception:
+        pass
+
+def _bg_question_translate(question_id: int, target_lang_id: int, answer_id: int = None):
     try:
         # current_user を参照していないので、ダミーでOK
         question_translate(question_id, target_lang_id, current_user={"id": 0})
+        
+        # 質問翻訳完了後、全翻訳が揃った場合のみベクトルを更新
+        if answer_id:
+            _update_vectors_if_all_translations_ready(question_id, answer_id)
     except Exception:
         # ここでログを出すなら logger.exception(...) など
         pass
 
-def _bg_answer_translate(answer_id: int, target_lang_id: int):
+def _bg_answer_translate(answer_id: int, target_lang_id: int, question_id: int = None):
     try:
         answer_translate(answer_id, target_lang_id, current_user={"id": 0})
+        
+        # 回答翻訳完了後、全翻訳が揃った場合のみベクトルを更新
+        if question_id:
+            _update_vectors_if_all_translations_ready(question_id, answer_id)
     except Exception:
         pass
 
@@ -963,18 +979,6 @@ async def register_question(
         except Exception:
             pass
 
-        # --- 各言語への翻訳は非同期投入に切り替え ---
-        cursor.execute("SELECT id FROM language")
-        languages = [row[0] for row in cursor.fetchall()]
-
-        queued_q_langs = []
-        for target_lang_id in languages:
-            if target_lang_id == language_id:
-                continue  # 元言語は既に入っているのでスキップ
-            if bg:
-                bg.add_task(_bg_question_translate, question_id, target_lang_id)
-                queued_q_langs.append(target_lang_id)
-
         # --- 回答（元言語）を登録（同期） ---
         cursor.execute(
             """
@@ -995,13 +999,26 @@ async def register_question(
         )
         conn.commit()
 
+        # --- 各言語への翻訳は非同期投入に切り替え ---
+        cursor.execute("SELECT id FROM language")
+        languages = [row[0] for row in cursor.fetchall()]
+
+        # 質問の各言語翻訳を非同期投入
+        queued_q_langs = []
+        for target_lang_id in languages:
+            if target_lang_id == language_id:
+                continue  # 元言語は既に入っているのでスキップ
+            if bg:
+                bg.add_task(_bg_question_translate, question_id, target_lang_id, answer_id)
+                queued_q_langs.append(target_lang_id)
+
         # --- 回答の各言語翻訳も非同期投入 ---
         queued_a_langs = []
         for target_lang_id in languages:
             if target_lang_id == language_id:
                 continue
             if bg:
-                bg.add_task(_bg_answer_translate, answer_id, target_lang_id)
+                bg.add_task(_bg_answer_translate, answer_id, target_lang_id, question_id)
                 queued_a_langs.append(target_lang_id)
 
         # --- QAリンク作成（同期） ---
@@ -1013,6 +1030,32 @@ async def register_question(
             (question_id, answer_id)
         )
         conn.commit()
+
+        # 📌 通知の先頭メッセージ（言語別）
+        new_question_translations = {
+            "日本語": "新しい質問が登録されました",
+            "English": "New question has been registered",
+            "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
+            "中文": "新问题已注册",
+            "한국어": "새로운 질문이 등록되었습니다",
+            "Português": "Nova pergunta foi registrada",
+            "Español": "Se ha registrado una nueva pregunta",
+            "Tagalog": "Ang bagong tanong ay narehistro na",
+            "Bahasa Indonesia": "Pertanyaan baru telah didaftarkan"
+        }
+        
+        # 📌 投稿者（ニックネーム）の表記（言語別）
+        by_user_translations = {
+            "日本語": "登録者",
+            "English": "by",
+            "Tiếng Việt": "bởi",
+            "中文": "由",
+            "한국어": "등록자",
+            "Português": "por",
+            "Español": "por",
+            "Tagalog": "ni",
+            "Bahasa Indonesia": "oleh"
+        }
 
         # --- 通知（今ある翻訳だけで作成。後で裏タスクで増補してもOK） ---
         _ensure_notifications_question_id(conn)

@@ -644,7 +644,15 @@ export default function Navbar({ children }) {
       )}
 
       {/* Page content */}
-      <main className="h-screen overflow-auto" style={{ marginLeft: isDrawerOpen ? '18rem' : '3.5rem', paddingTop: '4.5rem', transition: 'margin-left 300ms ease' }}>
+      <main 
+        className="h-screen overflow-auto" 
+        style={{ 
+          marginLeft: isDrawerOpen ? '18rem' : '3.5rem', 
+          paddingTop: '4.5rem', 
+          transition: 'margin-left 300ms ease',
+          scrollBehavior: 'smooth'
+        }}
+      >
         <Outlet />
       </main>
 
