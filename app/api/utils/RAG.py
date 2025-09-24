@@ -24,7 +24,7 @@ class LanguageDetectionError(ValueError):
 
 
 class UnsupportedLanguageError(ValueError):
-    """対応外の言語が検出された（許可: JA/EN/VI/ZH/KO）"""
+    """対応外の言語が検出された（許可: JA/EN/VI/ZH/KO/PT/ES/TL/ID）"""
 
 # ----------------------------------------------------------------------------
 # Setup
@@ -37,7 +37,7 @@ client = OpenAI(api_key=api_key)
 VECTOR_DIR = Path("./api/utils/vectors")
 VECTOR_DIR.mkdir(parents=True, exist_ok=True)
 
-ALLOWED_ISO = {"ja", "en", "vi", "zh", "ko"}
+ALLOWED_ISO = {"ja", "en", "vi", "zh", "ko", "pt", "es", "tl", "id"}
 
 # ----------------------------------------------------------------------------
 # Lang detection
@@ -512,7 +512,6 @@ def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
 
 
 def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
-    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
         "You are an assistant that answers factually and concisely based solely on information about 'Shiga International Association'."
         " You must provide source IDs to support each sentence in your answer. Output only the specified JSON. Do not reveal your thought process.\n\n"
@@ -526,11 +525,12 @@ def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[Current Question]\n{question_text}\n\n"
     prompt += (
         "Requirements:\n"
-        "- Create your answer based on the given context.\n"
+        "- Create your answer based on the given context and the conversation summary.\n"
         "- Add at least one source ID [S#] to each sentence.\n"
         "- List only actually used sources in used_source_ids (exclude unused ones).\n"
         "- Optionally include exact quotes in evidence.quotes.\n"
-        "- If insufficient evidence, state 'Insufficient evidence.'.\n"
+        "- Sources are limited to the given RAG context and conversation history. "
+        "If the fact is not present, state 'Not found in the original source.'.\n"
         "- For readability, use line breaks, paragraphs (blank lines), and bullet points (-, 1.) to organize content.\n"
         "- Output strictly according to the following JSON format and nothing else:\n"
         "{\n  \"answer\": \"Each sentence with [S1] style source ID citations\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"exact quote\"]} ]\n}\n"
@@ -539,7 +539,6 @@ def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
 
 
 def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
-    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
         "Bạn là trợ lý trả lời dựa trên thực tế và ngắn gọn chỉ dựa trên thông tin về 'Hiệp hội Quốc tế Shiga'."
         " Bạn phải cung cấp mã nguồn để hỗ trợ mỗi câu trong câu trả lời. Chỉ xuất JSON được chỉ định. Không tiết lộ quá trình suy nghĩ.\n\n"
@@ -553,11 +552,11 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[Câu hỏi hiện tại]\n{question_text}\n\n"
     prompt += (
         "Yêu cầu:\n"
-        "- Tạo câu trả lời dựa trên ngữ cảnh đã cho.\n"
+        "- Tạo câu trả lời dựa trên ngữ cảnh đã cho và tóm tắt hội thoại.\n"
         "- Thêm ít nhất một mã nguồn [S#] vào mỗi câu.\n"
         "- Chỉ liệt kê các nguồn thực sự đã sử dụng trong used_source_ids (loại trừ những nguồn chưa sử dụng).\n"
         "- Tùy chọn: bao gồm trích dẫn chính xác trong evidence.quotes.\n"
-        "- Nếu thiếu bằng chứng, nêu rõ 'Thiếu bằng chứng.'.\n"
+        "- Nguồn chỉ giới hạn ở ngữ cảnh RAG và hội thoại. Nếu thông tin không có, hãy nêu rõ 'Không tìm thấy trong nguyên bản.'.\n"
         "- Để dễ đọc, sử dụng xuống dòng, đoạn văn (dòng trống) và gạch đầu dòng (-, 1.) để tổ chức nội dung.\n"
         "- Xuất chính xác theo định dạng JSON sau và không gì khác:\n"
         "{\n  \"answer\": \"Mỗi câu với trích dẫn mã nguồn kiểu [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn chính xác\"]} ]\n}\n"
@@ -566,7 +565,6 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
 
 
 def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
-    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
         "你是基于事实简洁回答的助手，仅依据关于'滋贺县国际协会'的信息。"
         " 你必须为回答中的每句话提供来源ID作为依据。只输出指定的JSON，不要输出思考过程。\n\n"
@@ -580,11 +578,11 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n【当前问题】\n{question_text}\n\n"
     prompt += (
         "要求：\n"
-        "- 基于给定的上下文创建回答。\n"
+        "- 基于给定的上下文和对话摘要创建回答。\n"
         "- 为每句话添加至少一个来源ID [S#]。\n"
         "- 在used_source_ids中仅列出实际使用的来源（排除未使用的）。\n"
         "- 可选：在evidence.quotes中包含原文引文。\n"
-        "- 若证据不足，请说明'证据不足。'\n"
+        "- 证据仅限于提供的RAG上下文和对话。如果资料中不存在，请说明 '原典中未找到'.\n"
         "- 为了可读性，使用换行、段落（空行）和项目符号（-、1.）来组织内容。\n"
         "- 严格按照以下JSON格式输出，不要输出其他内容：\n"
         "{\n  \"answer\": \"每句话带有[S1]样式的来源ID引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
@@ -593,7 +591,6 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
 
 
 def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
-    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
         "당신은 '시가현 국제협회'에 관한 정보만을 근거로 사실에 기반하여 간결하게 답변하는 어시스턴트입니다."
         " 답변의 각 문장을 반드시 출처ID로 근거를 제시해야 합니다. 출력은 지정된 JSON만 허용됩니다. 사고 과정은 출력하지 마세요.\n\n"
@@ -607,14 +604,121 @@ def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[현재 질문]\n{question_text}\n\n"
     prompt += (
         "요건:\n"
-        "- 주어진 컨텍스트를 참고하여 답변을 작성하세요.\n"
+        "- 주어진 컨텍스트와 대화 요약을 참고하여 답변을 작성하세요.\n"
         "- 각 문장에 최소 1개의 출처ID [S#]를 부여하세요.\n"
         "- 실제로 사용한 출처만 used_source_ids에 열거하세요 (미사용은 포함하지 않음).\n"
         "- 가능하면 근거 부분을 evidence.quotes에 원문 발췌로 포함하세요 (선택사항).\n"
-        "- 근거가 부족한 경우 '충분한 근거가 없습니다'라고 진술하세요.\n"
+        "- 근거는 제공된 RAG 컨텍스트와 대화 내용에 한정됩니다. 존재하지 않는 경우 '원전에 확인되지 않았습니다'라고 진술하세요.\n"
         "- 가독성을 위해 줄바꿈이나 단락(빈 줄), 글머리표(-, 1.)로 정리하세요.\n"
         "- 출력은 다음 JSON에 엄격히 준수하고, 이 외에는 아무것도 출력하지 마세요:\n"
         "{\n  \"answer\": \"문장 끝마다 [S1]과 같이 출처ID를 부여\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"원문 발췌\"]} ]\n}\n"
+    )
+    return prompt
+
+def _build_prompt_pt(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = (
+        "Você é um assistente que responde de forma factual e concisa com base apenas nas informações sobre a 'Associação Internacional de Shiga'. "
+        "Forneça IDs de fonte para sustentar cada frase da resposta. Saída somente no JSON especificado. Não revele seu processo de pensamento.\n\n"
+    )
+    prompt += "[Contexto (candidatos a fontes)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
+    prompt += "\n[Histórico da Conversa]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"Usuário{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Pergunta Atual]\n{question_text}\n\n"
+    prompt += (
+        "Requisitos:\n"
+        "- Elabore a resposta com base no contexto fornecido e no resumo da conversa.\n"
+        "- Adicione pelo menos um ID de fonte [S#] a cada frase.\n"
+        "- Liste apenas as fontes realmente utilizadas em used_source_ids (exclua as não utilizadas).\n"
+        "- Opcional: inclua citações exatas em evidence.quotes.\n"
+        "- As fontes limitam-se ao contexto RAG fornecido e ao histórico/resumo da conversa. "
+        "Se o fato não estiver presente, declare: 'Não foi encontrado na fonte original.'.\n"
+        "- Para legibilidade, use quebras de linha, parágrafos (linhas em branco) e marcadores (-, 1.).\n"
+        "- Saída estritamente no seguinte formato JSON e nada mais:\n"
+        "{\n  \"answer\": \"Cada frase com citações de ID de fonte no estilo [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"citação exata\"]} ]\n}\n"
+    )
+    return prompt
+
+
+def _build_prompt_es(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = (
+        "Eres un asistente que responde de forma fáctica y concisa basándose únicamente en información sobre la 'Asociación Internacional de Shiga'. "
+        "Debes proporcionar IDs de fuente para sustentar cada frase de tu respuesta. Salida solo en el JSON especificado. No reveles tu proceso de pensamiento.\n\n"
+    )
+    prompt += "[Contexto (fuentes candidatas)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
+    prompt += "\n[Historial de Conversación]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"Usuario{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Pregunta Actual]\n{question_text}\n\n"
+    prompt += (
+        "Requisitos:\n"
+        "- Crea tu respuesta basándote en el contexto proporcionado y en el resumen del diálogo.\n"
+        "- Añade al menos un ID de fuente [S#] a cada frase.\n"
+        "- Enumera solo las fuentes realmente usadas en used_source_ids (excluye las no usadas).\n"
+        "- Opcionalmente incluye citas textuales en evidence.quotes.\n"
+        "- Las fuentes se limitan al contexto RAG dado y al historial/resumen de la conversación. "
+        "Si el hecho no está presente, indica: 'No se encontró en la fuente original.'.\n"
+        "- Para mejorar la lectura, usa saltos de línea, párrafos (líneas en blanco) y viñetas (-, 1.).\n"
+        "- Salida estrictamente según el siguiente JSON y nada más:\n"
+        "{\n  \"answer\": \"Cada frase con citas de ID de fuente estilo [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"cita textual\"]} ]\n}\n"
+    )
+    return prompt
+
+
+def _build_prompt_tl(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = (
+        "Ikaw ay isang assistant na sumasagot nang makatotohanan at maikli batay lamang sa impormasyon tungkol sa 'Shiga International Association'. "
+        "Dapat kang magbigay ng source ID para suportahan ang bawat pangungusap. JSON lang ang ilalabas. Huwag ilahad ang iyong thought process.\n\n"
+    )
+    prompt += "[Konteksto (mga posibleng pinagmulan)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
+    prompt += "\n[Talaan ng Usapan]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"Gumagamit{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Kasalukuyang Tanong]\n{question_text}\n\n"
+    prompt += (
+        "Mga Kinakailangan:\n"
+        "- Gawin ang sagot batay sa ibinigay na konteksto at buod ng usapan.\n"
+        "- Maglagay ng kahit isang source ID [S#] sa bawat pangungusap.\n"
+        "- Ilahad lamang ang aktuwal na nagamit na sources sa used_source_ids (huwag isama ang hindi nagamit).\n"
+        "- Opsyonal: isama ang eksaktong sipi sa evidence.quotes.\n"
+        "- Limitado ang ebidensiya sa ibinigay na RAG context at kasaysayan/buod ng usapan. "
+        "Kung wala ang katotohanan sa mga iyon, ilahad: 'Hindi natagpuan sa orihinal na sanggunian.'.\n"
+        "- Para sa pagiging mabasa, gumamit ng mga line break, talata (blankong linya), at bullet points (-, 1.).\n"
+        "- Ilabas nang eksakto ayon sa sumusunod na JSON at wala nang iba pa:\n"
+        "{\n  \"answer\": \"Bawat pangungusap ay may citation na [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"eksaktong sipi\"]} ]\n}\n"
+    )
+    return prompt
+
+
+def _build_prompt_id(question_text: str, rag_qa: list, history_qa: list) -> str:
+    prompt = (
+        "Anda adalah asisten yang menjawab secara faktual dan ringkas hanya berdasarkan informasi tentang 'Asosiasi Internasional Shiga'. "
+        "Anda harus mencantumkan ID sumber untuk mendukung setiap kalimat. Keluarkan hanya JSON yang ditentukan. Jangan ungkapkan proses berpikir Anda.\n\n"
+    )
+    prompt += "[Konteks (kandidat sumber)]\n"
+    for qa in rag_qa:
+        prompt += f"{qa['sid']}: {{question: \"{qa['question']}\", answer: \"{qa['answer']}\"}}\n"
+    prompt += "\n[Riwayat Percakapan]\n"
+    for i, (q, a) in enumerate(history_qa, 1):
+        prompt += f"Pengguna{i}: {q}\nBot{i}: {a}\n"
+    prompt += f"\n[Pertanyaan Saat Ini]\n{question_text}\n\n"
+    prompt += (
+        "Persyaratan:\n"
+        "- Buat jawaban berdasarkan konteks yang diberikan dan ringkasan percakapan.\n"
+        "- Tambahkan setidaknya satu ID sumber [S#] pada setiap kalimat.\n"
+        "- Cantumkan hanya sumber yang benar-benar digunakan di used_source_ids (kecualikan yang tidak digunakan).\n"
+        "- Opsional: sertakan kutipan persis di evidence.quotes.\n"
+        "- Sumber dibatasi pada konteks RAG yang diberikan dan riwayat/ringkasan percakapan. "
+        "Jika fakta tidak ada di sana, nyatakan: 'Tidak ditemukan dalam sumber asli.'.\n"
+        "- Demi keterbacaan, gunakan pemisah baris, paragraf (baris kosong), dan bullet (-, 1.).\n"
+        "- Keluaran harus mengikuti format JSON berikut secara ketat dan tidak ada yang lain:\n"
+        "{\n  \"answer\": \"Setiap kalimat dengan sitasi ID sumber gaya [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"kutipan persis\"]} ]\n}\n"
     )
     return prompt
 
@@ -625,6 +729,10 @@ _PROMPT_BUILDERS = {
     "vi": _build_prompt_vi,
     "zh": _build_prompt_zh,
     "ko": _build_prompt_ko,
+    "pt": _build_prompt_pt,
+    "es": _build_prompt_es,
+    "tl": _build_prompt_tl,
+    "id": _build_prompt_id,
 }
 
 # ----------------------------------------------------------------------------

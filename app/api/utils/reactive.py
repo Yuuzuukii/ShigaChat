@@ -99,7 +99,7 @@ DETECT_LANG_PATTERNS = [
 # ---- Language hints (target selection) -----------------------------------
 
 LANG_HINTS = {
-    # ja -> en/ja/vi/zh/ko
+    # ja -> en/ja/vi/zh/ko/pt/es/tl/id
     "英語": "en",
     "えいご": "en",
     "日本語": "ja",
@@ -107,12 +107,20 @@ LANG_HINTS = {
     "ベトナム語": "vi",
     "中国語": "zh",
     "韓国語": "ko",
+    "ポルトガル語": "pt",
+    "スペイン語": "es",
+    "タガログ語": "tl",
+    "インドネシア語": "id",
     # en
     "english": "en",
     "japanese": "ja",
     "vietnamese": "vi",
     "chinese": "zh",
     "korean": "ko",
+    "portuguese": "pt",
+    "spanish": "es",
+    "tagalog": "tl",
+    "indonesian": "id",
 }
 
 # ---- Utilities -----------------------------------------------------------
