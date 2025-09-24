@@ -698,248 +698,10 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     
 
-# @router.post("/register_question")
-# async def register_question(
-#     request: RegisterQuestionRequest,
-#     current_user: dict = Depends(current_user_info)
-# ):
-#     user_id = current_user["id"]
-#     spoken_language = current_user["spoken_language"]
-#     language_id = language_mapping.get(spoken_language)
-    
-#     with sqlite3.connect(DATABASE) as conn:
-#         cursor = conn.cursor()
-#         japan_time = datetime.utcnow() + timedelta(hours=9)
-#         # 質問を登録
-#         cursor.execute(
-#             """
-#             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
-#             VALUES (?, ?, ?, ?, ?, ?, ?)
-#             """,
-#             (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
-#         )
-
-#         question_id = cursor.lastrowid
-
-#         # 元言語の質問を question_translation に格納
-#         cursor.execute(
-#             """
-#             INSERT INTO question_translation (question_id, language_id, texts)
-#             VALUES (?, ?, ?)
-#             """,
-#             (question_id, language_id, request.content)
-#         )
-
-#         conn.commit()  # 質問挿入後にコミット
-#         # initialize last editor as creator at creation time
-#         try:
-#             _ensure_question_editor_columns(conn)
-#             cursor.execute(
-#                 "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-#                 (user_id, japan_time, question_id)
-#             )
-#             conn.commit()
-#         except Exception:
-#             pass
-
-#         # 各言語に翻訳
-#         cursor.execute("SELECT id FROM language")
-#         languages = [row[0] for row in cursor.fetchall()]
-        
-#         for target_lang_id in languages:
-#             try:
-#                 question_translate(question_id, target_lang_id, current_user)
-#             except Exception as e:
-#                 raise HTTPException(status_code=500, detail=f"質問の翻訳に失敗しました: {str(e)}")
-        
-#         # 回答を登録
-#         cursor.execute(
-#             """
-#             INSERT INTO answer (time, language_id)
-#             VALUES (?, ?)
-#             """,
-#             (datetime.utcnow(), language_id)
-#         )
-#         answer_id = cursor.lastrowid
-        
-#         conn.commit()  # 回答挿入後にコミット
-        
-#         # 回答の元言語を登録
-#         cursor.execute(
-#             """
-#             INSERT INTO answer_translation (answer_id, language_id, texts)
-#             VALUES (?, ?, ?)
-#             """,
-#             (answer_id, language_id, request.answer_text)
-#         )
-
-#         conn.commit()  # **元言語の回答を挿入した後にコミット**
-
-#         # 各言語に翻訳
-#         for target_lang_id in languages:
-#             if target_lang_id == language_id:
-#                 continue  # 🔥 元言語はスキップ（すでにINSERT済み）
-#             try:
-#                 answer_translate(answer_id, target_lang_id, current_user)
-#             except Exception as e:
-#                 raise HTTPException(status_code=500, detail=f"回答ID {answer_id} の翻訳に失敗しました: {str(e)}")
-        
-#         # QAテーブルに登録
-#         cursor.execute(
-#             """
-#             INSERT INTO QA (question_id, answer_id)
-#             VALUES (?, ?)
-#             """,
-#             (question_id, answer_id)
-#         )
-        
-#         conn.commit()
-
-#         # 📌 通知の先頭メッセージ（言語別）
-#         new_question_translations = {
-#             "日本語": "新しい質問が登録されました",
-#             "English": "New question has been registered",
-#             "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
-#             "中文": "新问题已注册",
-#             "한국어": "새로운 질문이 등록되었습니다",
-#             "Português": "Nova pergunta foi registrada",
-#             "Español": "Se ha registrado una nueva pregunta",
-#             "Tagalog": "Isang bagong tanong ang nairehistro",
-#             "Bahasa Indonesia": "Pertanyaan baru telah terdaftar"
-
-#         }
-#         # 📌 投稿者（ニックネーム）の表記（言語別）
-#         by_user_translations = {
-#             "日本語": "登録者",
-#             "English": "by",
-#             "Tiếng Việt": "bởi",
-#             "中文": "由",
-#             "한국어": "등록자",
-#             "Português": "por",
-#             "Español": "por",
-#             "Tagalog": "ni",
-#             "Bahasa Indonesia": "oleh"
-#         }
-
-#         # 📌 **質問内容のスニペットを通知に追加**
-#         snippet_length = 50  # スニペットの最大長
-        
-#         # `notifications` に通知を追加（全体通知 + question_id）
-#         _ensure_notifications_question_id(conn)
-#         cursor.execute(
-#             """
-#             INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id)
-#             VALUES (?, ?, ?, ?, ?)
-#             """,
-#             (-1, False, datetime.now(), '[]', question_id)
-#         )
-#         notification_id = cursor.lastrowid  # 挿入された通知のID
-#         conn.commit()
-
-#         # 📌 **通知の翻訳を `question_translation` から取得**
-#         cursor.execute(
-#             """
-#             SELECT language_id, texts FROM question_translation WHERE question_id = ?
-#             """, (question_id,)
-#         )
-#         translations = cursor.fetchall()
-
-#         # 🔹 各言語のスニペットを `notifications_translation` に格納
-#         for lang_id, text in translations:
-#             snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
-#             # 言語名を取得（"日本語" など）
-#             lang_name = next(key for key, val in language_mapping.items() if val == lang_id)
-#             # メッセージ例: "新しい質問が登録されました（登録者: ニックネーム）: スニペット"
-#             prefix = new_question_translations.get(lang_name, "New question has been registered")
-#             by_label = by_user_translations.get(lang_name, "by")
-#             nickname = current_user.get("name", "user")
-#             translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
-
-#             cursor.execute(
-#                 """
-#                 INSERT INTO notifications_translation (notification_id, language_id, messages)
-#                 VALUES (?, ?, ?)
-#                 """,
-#                 (notification_id, lang_id, translated_message),
-#             )
-
-#         conn.commit()  # 翻訳の挿入を確定
-
-#         # ベクトルインデックスへ差分追加（全言語分）
-#         try:
-#             appended = append_qa_to_vector_index(question_id, answer_id)
-#             # optional: could log appended count if a logger is present
-#         except Exception:
-#             # ベクトル更新失敗は致命ではないため処理を続行
-#             pass
-
-#     return {
-#         "question_id": question_id,
-#         "question_text": request.content,
-#         "answer_id": answer_id,
-#         "answer_text": request.answer_text,
-#     }
-
-
-# ==== background workers (add) ====
-
-# ==== background workers (add) ====
-
-def _update_vectors_if_all_translations_ready(question_id: int, answer_id: int):
-    """
-    質問と回答の全言語翻訳が揃った場合のみベクトルインデックスを更新
-    """
-    try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            
-            # 全言語数を取得
-            cursor.execute("SELECT COUNT(*) FROM language")
-            total_languages = cursor.fetchone()[0]
-            
-            # 質問の翻訳数を確認
-            cursor.execute("SELECT COUNT(*) FROM question_translation WHERE question_id = ?", (question_id,))
-            question_translations = cursor.fetchone()[0]
-            
-            # 回答の翻訳数を確認
-            cursor.execute("SELECT COUNT(*) FROM answer_translation WHERE answer_id = ?", (answer_id,))
-            answer_translations = cursor.fetchone()[0]
-            
-            # 全言語の翻訳が完了している場合のみベクトル更新
-            if question_translations >= total_languages and answer_translations >= total_languages:
-                append_qa_to_vector_index(question_id, answer_id)
-    except Exception:
-        pass
-
-def _bg_question_translate(question_id: int, target_lang_id: int, answer_id: int = None):
-    try:
-        # current_user を参照していないので、ダミーでOK
-        question_translate(question_id, target_lang_id, current_user={"id": 0})
-        
-        # 質問翻訳完了後、全翻訳が揃った場合のみベクトルを更新
-        if answer_id:
-            _update_vectors_if_all_translations_ready(question_id, answer_id)
-    except Exception:
-        # ここでログを出すなら logger.exception(...) など
-        pass
-
-def _bg_answer_translate(answer_id: int, target_lang_id: int, question_id: int = None):
-    try:
-        answer_translate(answer_id, target_lang_id, current_user={"id": 0})
-        
-        # 回答翻訳完了後、全翻訳が揃った場合のみベクトルを更新
-        if question_id:
-            _update_vectors_if_all_translations_ready(question_id, answer_id)
-    except Exception:
-        pass
-
-# ==== end workers ====
-
 @router.post("/register_question")
 async def register_question(
     request: RegisterQuestionRequest,
-    current_user: dict = Depends(current_user_info),
-    bg: BackgroundTasks = None,  # ← 追加
+    current_user: dict = Depends(current_user_info)
 ):
     user_id = current_user["id"]
     spoken_language = current_user["spoken_language"]
@@ -948,8 +710,7 @@ async def register_question(
     with sqlite3.connect(DATABASE) as conn:
         cursor = conn.cursor()
         japan_time = datetime.utcnow() + timedelta(hours=9)
-
-        # --- 質問（元言語）を登録（従来通り同期） ---
+        # 質問を登録
         cursor.execute(
             """
             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
@@ -957,8 +718,10 @@ async def register_question(
             """,
             (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
         )
+
         question_id = cursor.lastrowid
 
+        # 元言語の質問を question_translation に格納
         cursor.execute(
             """
             INSERT INTO question_translation (question_id, language_id, texts)
@@ -966,9 +729,9 @@ async def register_question(
             """,
             (question_id, language_id, request.content)
         )
-        conn.commit()
 
-        # 最終編集者メタ（従来通り）
+        conn.commit()  # 質問挿入後にコミット
+        # initialize last editor as creator at creation time
         try:
             _ensure_question_editor_columns(conn)
             cursor.execute(
@@ -979,7 +742,17 @@ async def register_question(
         except Exception:
             pass
 
-        # --- 回答（元言語）を登録（同期） ---
+        # 各言語に翻訳
+        cursor.execute("SELECT id FROM language")
+        languages = [row[0] for row in cursor.fetchall()]
+        
+        for target_lang_id in languages:
+            try:
+                question_translate(question_id, target_lang_id, current_user)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"質問の翻訳に失敗しました: {str(e)}")
+        
+        # 回答を登録
         cursor.execute(
             """
             INSERT INTO answer (time, language_id)
@@ -988,8 +761,10 @@ async def register_question(
             (datetime.utcnow(), language_id)
         )
         answer_id = cursor.lastrowid
-        conn.commit()
-
+        
+        conn.commit()  # 回答挿入後にコミット
+        
+        # 回答の元言語を登録
         cursor.execute(
             """
             INSERT INTO answer_translation (answer_id, language_id, texts)
@@ -997,31 +772,19 @@ async def register_question(
             """,
             (answer_id, language_id, request.answer_text)
         )
-        conn.commit()
 
-        # --- 各言語への翻訳は非同期投入に切り替え ---
-        cursor.execute("SELECT id FROM language")
-        languages = [row[0] for row in cursor.fetchall()]
+        conn.commit()  # **元言語の回答を挿入した後にコミット**
 
-        # 質問の各言語翻訳を非同期投入
-        queued_q_langs = []
+        # 各言語に翻訳
         for target_lang_id in languages:
             if target_lang_id == language_id:
-                continue  # 元言語は既に入っているのでスキップ
-            if bg:
-                bg.add_task(_bg_question_translate, question_id, target_lang_id, answer_id)
-                queued_q_langs.append(target_lang_id)
-
-        # --- 回答の各言語翻訳も非同期投入 ---
-        queued_a_langs = []
-        for target_lang_id in languages:
-            if target_lang_id == language_id:
-                continue
-            if bg:
-                bg.add_task(_bg_answer_translate, answer_id, target_lang_id, question_id)
-                queued_a_langs.append(target_lang_id)
-
-        # --- QAリンク作成（同期） ---
+                continue  # 🔥 元言語はスキップ（すでにINSERT済み）
+            try:
+                answer_translate(answer_id, target_lang_id, current_user)
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"回答ID {answer_id} の翻訳に失敗しました: {str(e)}")
+        
+        # QAテーブルに登録
         cursor.execute(
             """
             INSERT INTO QA (question_id, answer_id)
@@ -1029,6 +792,7 @@ async def register_question(
             """,
             (question_id, answer_id)
         )
+        
         conn.commit()
 
         # 📌 通知の先頭メッセージ（言語別）
@@ -1040,10 +804,10 @@ async def register_question(
             "한국어": "새로운 질문이 등록되었습니다",
             "Português": "Nova pergunta foi registrada",
             "Español": "Se ha registrado una nueva pregunta",
-            "Tagalog": "Ang bagong tanong ay narehistro na",
-            "Bahasa Indonesia": "Pertanyaan baru telah didaftarkan"
+            "Tagalog": "Isang bagong tanong ang nairehistro",
+            "Bahasa Indonesia": "Pertanyaan baru telah terdaftar"
+
         }
-        
         # 📌 投稿者（ニックネーム）の表記（言語別）
         by_user_translations = {
             "日本語": "登録者",
@@ -1057,7 +821,10 @@ async def register_question(
             "Bahasa Indonesia": "oleh"
         }
 
-        # --- 通知（今ある翻訳だけで作成。後で裏タスクで増補してもOK） ---
+        # 📌 **質問内容のスニペットを通知に追加**
+        snippet_length = 50  # スニペットの最大長
+        
+        # `notifications` に通知を追加（全体通知 + question_id）
         _ensure_notifications_question_id(conn)
         cursor.execute(
             """
@@ -1066,24 +833,28 @@ async def register_question(
             """,
             (-1, False, datetime.now(), '[]', question_id)
         )
-        notification_id = cursor.lastrowid
+        notification_id = cursor.lastrowid  # 挿入された通知のID
         conn.commit()
 
-        # この時点では元言語の question_translation しか無い可能性がある
+        # 📌 **通知の翻訳を `question_translation` から取得**
         cursor.execute(
-            "SELECT language_id, texts FROM question_translation WHERE question_id = ?",
-            (question_id,)
+            """
+            SELECT language_id, texts FROM question_translation WHERE question_id = ?
+            """, (question_id,)
         )
         translations = cursor.fetchall()
 
-        snippet_length = 50
+        # 🔹 各言語のスニペットを `notifications_translation` に格納
         for lang_id, text in translations:
             snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
+            # 言語名を取得（"日本語" など）
             lang_name = next(key for key, val in language_mapping.items() if val == lang_id)
+            # メッセージ例: "新しい質問が登録されました（登録者: ニックネーム）: スニペット"
             prefix = new_question_translations.get(lang_name, "New question has been registered")
             by_label = by_user_translations.get(lang_name, "by")
             nickname = current_user.get("name", "user")
             translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
+
             cursor.execute(
                 """
                 INSERT INTO notifications_translation (notification_id, language_id, messages)
@@ -1091,20 +862,22 @@ async def register_question(
                 """,
                 (notification_id, lang_id, translated_message),
             )
-        conn.commit()
 
-        # （必要なら）不足言語の通知メッセージを後で埋める裏タスクを別途用意して add_task してもOK
+        conn.commit()  # 翻訳の挿入を確定
 
+        # ベクトルインデックスへ差分追加（全言語分）
         try:
             appended = append_qa_to_vector_index(question_id, answer_id)
+            # optional: could log appended count if a logger is present
         except Exception:
+            # ベクトル更新失敗は致命ではないため処理を続行
             pass
 
     return {
         "question_id": question_id,
         "question_text": request.content,
         "answer_id": answer_id,
-        "answer_text": request.answer_text
+        "answer_text": request.answer_text,
     }
 
 def save_question_with_category(question: str, category_id: int, user_id: int):
