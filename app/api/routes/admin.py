@@ -677,7 +677,11 @@ def change_public(request: dict, current_user: dict = Depends(current_user_info)
                     "English": f"The visibility of your question has been changed to \"{status_text}\" by the administrator. (ID: {question_id}) ",
                     "Tiếng Việt": f"Cài đặt quyền riêng tư của câu hỏi của bạn đã được quản trị viên thay đổi thành \"{status_text}\".(ID: {question_id}) ",
                     "中文": f"您的问题的可见性已被管理员更改为 \"{status_text}\"。（ID: {question_id}）",
-                    "한국어": f"귀하의 질문 의 공개 설정이 관리자 에 의해 \"{status_text}\"(으)로 변경되었습니다.(ID: {question_id})"
+                    "한국어": f"귀하의 질문 의 공개 설정이 관리자 에 의해 \"{status_text}\"(으)로 변경되었습니다.(ID: {question_id})",
+                    "Português": f"A visibilidade da sua pergunta foi alterada para \"{status_text}\" pelo administrador. (ID: {question_id}) ",
+                    "Español": f"La visibilidad de su pregunta ha sido cambiada a \"{status_text}\" por el administrador. (ID: {question_id}) ",
+                    "Tagalog": f"Ang visibility ng iyong tanong ay binago sa \"{status_text}\" ng administrador. (ID: {question_id}) ",
+                    "Bahasa Indonesia": f"Visibilitas pertanyaan Anda telah diubah menjadi \"{status_text}\" oleh administrator. (ID: {question_id}) "
                 }
 
                 # 各言語の翻訳を `notifications_translation` に追加
