@@ -13,8 +13,6 @@ import faiss
 from tqdm import tqdm
 from config import DATABASE
 from openai import OpenAI
-from langchain_community.chat_models import ChatOpenAI
-from langchain.schema import HumanMessage
 from lingua import Language, LanguageDetectorBuilder
 
 # ----------------------------------------------------------------------------
@@ -489,7 +487,7 @@ def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, Dict[str,
 def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
     # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
-        "あなたは根拠付きで回答するアシスタントです。与えられたQ&Aコンテキスト以外の情報は使わず、"
+        "あなたは『滋賀県国際協会』に関する情報のみを根拠に、事実ベースで簡潔に回答するアシスタントです。\n"
         "回答の各文を必ず出典IDで根拠づけてください。出力は指示したJSONのみ。思考過程は出力しないでください。\n\n"
     )
     prompt += "【コンテキスト（出典候補）】\n"
@@ -501,11 +499,11 @@ def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n【現在の質問】\n{question_text}\n\n"
     prompt += (
         "要件:\n"
-        "- 回答は与えたコンテキストのみから作成。\n"
+        "- 回答は与えたコンテキストを参考に作成してください。\n"
         "- 各文に少なくとも1つの出典ID [S#] を付与。\n"
         "- 実際に使った出典だけを used_source_ids に列挙（未使用は含めない）。\n"
         "- 可能なら根拠箇所を evidence.quotes に原文抜粋として含める（任意）。\n"
-        "- 根拠が不足する場合は『十分な根拠がありません』と述べる。\n"
+        "- ・根拠は与えられた資料（RAGコンテキスト）と会話の要約のみ。そこにない事実は『原典で確認できませんでした』と述べる。\n"
         "- 読みやすさのため、改行や段落（空行）・箇条書き（- や 1.）で整理する。\n"
         "- 出力は次のJSONに厳密準拠し、これ以外は何も出力しない:\n"
         "{\n  \"answer\": \"文末ごとに [S1] のように出典IDを付与\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文抜粋\"]} ]\n}\n"
@@ -514,9 +512,10 @@ def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
 
 
 def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
+    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
-        "You answer with citations only from the provided Q&A context."
-        " Every sentence must include at least one source ID. Output ONLY the JSON specified; do not reveal chain-of-thought.\n\n"
+        "You are an assistant that answers factually and concisely based solely on information about 'Shiga International Association'."
+        " You must provide source IDs to support each sentence in your answer. Output only the specified JSON. Do not reveal your thought process.\n\n"
     )
     prompt += "[Context (source candidates)]\n"
     for qa in rag_qa:
@@ -527,22 +526,23 @@ def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[Current Question]\n{question_text}\n\n"
     prompt += (
         "Requirements:\n"
-        "- Use ONLY the given context.\n"
+        "- Create your answer based on the given context.\n"
         "- Add at least one source ID [S#] to each sentence.\n"
-        "- List only actually used sources in used_source_ids.\n"
+        "- List only actually used sources in used_source_ids (exclude unused ones).\n"
         "- Optionally include exact quotes in evidence.quotes.\n"
         "- If insufficient evidence, state 'Insufficient evidence.'.\n"
-        "- For readability, structure with paragraphs/line breaks and bullet points (-, 1.) where helpful.\n"
-        "- Output exactly this JSON and nothing else:\n"
-        "{\n  \"answer\": \"Sentences with [S1] style citations\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"verbatim quote\"]} ]\n}\n"
+        "- For readability, use line breaks, paragraphs (blank lines), and bullet points (-, 1.) to organize content.\n"
+        "- Output strictly according to the following JSON format and nothing else:\n"
+        "{\n  \"answer\": \"Each sentence with [S1] style source ID citations\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"exact quote\"]} ]\n}\n"
     )
     return prompt
 
 
 def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
+    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
-        "Bạn phải trả lời kèm trích dẫn chỉ từ ngữ cảnh Q&A đã cung cấp."
-        " Mỗi câu phải có ít nhất một mã nguồn [S#]. Chỉ xuất JSON theo mẫu, không tiết lộ quá trình suy nghĩ.\n\n"
+        "Bạn là trợ lý trả lời dựa trên thực tế và ngắn gọn chỉ dựa trên thông tin về 'Hiệp hội Quốc tế Shiga'."
+        " Bạn phải cung cấp mã nguồn để hỗ trợ mỗi câu trong câu trả lời. Chỉ xuất JSON được chỉ định. Không tiết lộ quá trình suy nghĩ.\n\n"
     )
     prompt += "[Ngữ cảnh (nguồn tham khảo)]\n"
     for qa in rag_qa:
@@ -553,22 +553,23 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[Câu hỏi hiện tại]\n{question_text}\n\n"
     prompt += (
         "Yêu cầu:\n"
-        "- Chỉ dùng ngữ cảnh đã cho.\n"
-        "- Thêm [S#] vào mỗi câu.\n"
-        "- Chỉ liệt kê nguồn đã dùng trong used_source_ids.\n"
-        "- Tùy chọn: evidence.quotes trích nguyên văn.\n"
+        "- Tạo câu trả lời dựa trên ngữ cảnh đã cho.\n"
+        "- Thêm ít nhất một mã nguồn [S#] vào mỗi câu.\n"
+        "- Chỉ liệt kê các nguồn thực sự đã sử dụng trong used_source_ids (loại trừ những nguồn chưa sử dụng).\n"
+        "- Tùy chọn: bao gồm trích dẫn chính xác trong evidence.quotes.\n"
         "- Nếu thiếu bằng chứng, nêu rõ 'Thiếu bằng chứng.'.\n"
-        "- Để dễ đọc, hãy trình bày bằng đoạn xuống dòng và gạch đầu dòng (-, 1.) khi phù hợp.\n"
-        "- Chỉ xuất đúng JSON sau:\n"
-        "{\n  \"answer\": \"Mỗi câu có trích dẫn [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn\"]} ]\n}\n"
+        "- Để dễ đọc, sử dụng xuống dòng, đoạn văn (dòng trống) và gạch đầu dòng (-, 1.) để tổ chức nội dung.\n"
+        "- Xuất chính xác theo định dạng JSON sau và không gì khác:\n"
+        "{\n  \"answer\": \"Mỗi câu với trích dẫn mã nguồn kiểu [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn chính xác\"]} ]\n}\n"
     )
     return prompt
 
 
 def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
+    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
-        "你必须仅使用提供的Q&A作为依据作答。每句话都必须附上至少一个来源ID [S#]。"
-        " 只输出指定的JSON，不要输出思考过程。\n\n"
+        "你是基于事实简洁回答的助手，仅依据关于'滋贺县国际协会'的信息。"
+        " 你必须为回答中的每句话提供来源ID作为依据。只输出指定的JSON，不要输出思考过程。\n\n"
     )
     prompt += "【上下文（候选来源）】\n"
     for qa in rag_qa:
@@ -579,22 +580,23 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n【当前问题】\n{question_text}\n\n"
     prompt += (
         "要求：\n"
-        "- 仅使用提供的上下文。\n"
-        "- 每句话后附 [S#]。\n"
-        "- used_source_ids 仅列出实际使用的来源。\n"
-        "- 可选：在 evidence.quotes 中加入原文引文。\n"
-        "- 若证据不足，请说明‘证据不足。’\n"
-        "- 为了可读性，请使用段落/换行，并在合适处使用项目符号（-、1.）。\n"
-        "- 只输出如下 JSON：\n"
-        "{\n  \"answer\": \"每句含 [S1] 引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
+        "- 基于给定的上下文创建回答。\n"
+        "- 为每句话添加至少一个来源ID [S#]。\n"
+        "- 在used_source_ids中仅列出实际使用的来源（排除未使用的）。\n"
+        "- 可选：在evidence.quotes中包含原文引文。\n"
+        "- 若证据不足，请说明'证据不足。'\n"
+        "- 为了可读性，使用换行、段落（空行）和项目符号（-、1.）来组织内容。\n"
+        "- 严格按照以下JSON格式输出，不要输出其他内容：\n"
+        "{\n  \"answer\": \"每句话带有[S1]样式的来源ID引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
     )
     return prompt
 
 
 def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
+    # rag_qa の各要素は {sid:"S#", question, answer} を想定
     prompt = (
-        "당신은 근거를 명시해 답변하는 어시스턴트입니다. 제공된 Q&A 외 정보는 사용하지 말고,"
-        " 각 문장 끝에 최소 1개의 출처 ID를 붙이세요. 출력은 지정된 JSON만 허용됩니다.\n\n"
+        "당신은 '시가현 국제협회'에 관한 정보만을 근거로 사실에 기반하여 간결하게 답변하는 어시스턴트입니다."
+        " 답변의 각 문장을 반드시 출처ID로 근거를 제시해야 합니다. 출력은 지정된 JSON만 허용됩니다. 사고 과정은 출력하지 마세요.\n\n"
     )
     prompt += "[컨텍스트(출처 후보)]\n"
     for qa in rag_qa:
@@ -605,14 +607,14 @@ def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += f"\n[현재 질문]\n{question_text}\n\n"
     prompt += (
         "요건:\n"
-        "- 제공된 컨텍스트만 사용.\n"
-        "- 각 문장에 [S#] 추가.\n"
-        "- 실제 사용한 출처만 used_source_ids에 나열.\n"
-        "- evidence.quotes에 원문 인용(선택).\n"
-        "- 증거가 부족하면 ‘증거가 충분하지 않습니다’ 명시.\n"
-        "- 가독성을 위해 단락/줄바꿈을 사용하고 필요 시 글머리표(-, 1.)로 정리.\n"
-        "- 다음 JSON만 출력:\n"
-        "{\n  \"answer\": \"문장마다 [S1] 참고 표시\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"원문 인용\"]} ]\n}\n"
+        "- 주어진 컨텍스트를 참고하여 답변을 작성하세요.\n"
+        "- 각 문장에 최소 1개의 출처ID [S#]를 부여하세요.\n"
+        "- 실제로 사용한 출처만 used_source_ids에 열거하세요 (미사용은 포함하지 않음).\n"
+        "- 가능하면 근거 부분을 evidence.quotes에 원문 발췌로 포함하세요 (선택사항).\n"
+        "- 근거가 부족한 경우 '충분한 근거가 없습니다'라고 진술하세요.\n"
+        "- 가독성을 위해 줄바꿈이나 단락(빈 줄), 글머리표(-, 1.)로 정리하세요.\n"
+        "- 출력은 다음 JSON에 엄격히 준수하고, 이 외에는 아무것도 출력하지 마세요:\n"
+        "{\n  \"answer\": \"문장 끝마다 [S1]과 같이 출처ID를 부여\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"원문 발췌\"]} ]\n}\n"
     )
     return prompt
 
@@ -629,8 +631,37 @@ _PROMPT_BUILDERS = {
 # LLM helpers
 # ----------------------------------------------------------------------------
 
-def _llm(model: str = "gpt-4.1-mini", timeout_s: int = 20) -> ChatOpenAI:
-    return ChatOpenAI(model=model, temperature=0.2, request_timeout=timeout_s)
+def _responses_text(
+    prompt: str,
+    *,
+    model: str = "gpt-5-mini",
+    max_output_tokens: int = 800,
+    timeout_s: int = 90,
+    response_schema: Optional[dict] = None,
+) -> str:
+    client_req = client.with_options(timeout=timeout_s)
+    # 提供されたコードの形式に合わせる（max_output_tokensは除外）
+    messages = [{"role": "user", "content": prompt}]
+    kwargs = dict(
+        model=model,
+        input=messages,
+    )
+    if response_schema:
+        kwargs["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": "sourced_answer",
+                "schema": response_schema,
+                "strict": True,
+            },
+        }
+    try:
+        resp = client_req.responses.create(**kwargs)
+        result = resp.output_text if hasattr(resp, "output_text") else ""
+        return (result or "").strip()
+    except Exception as e:
+        print(f"API error: {e}")
+        return ""
 
 
 def _clip_history(history_qa: List[Tuple[str, str]], k: int) -> List[Tuple[str, str]]:
@@ -646,7 +677,7 @@ def generate_answer_with_llm(
     history_qa: List[Tuple[str, str]],
     *,
     lang: Optional[str] = None,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
     max_history_in_prompt: int = 6,
 ) -> Dict[str, Any]:
     """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
@@ -667,8 +698,7 @@ def generate_answer_with_llm(
     clipped_hist = _clip_history(history_qa, max_history_in_prompt)
 
     prompt = builder(question_text, rag_with_sid, clipped_hist)
-    resp = _llm(model=model).invoke([HumanMessage(content=prompt)])
-    content = (resp.content or "").strip()
+    content = _responses_text(prompt, model=model, max_output_tokens=800, timeout_s=90)
 
     try:
         data = json.loads(content)
@@ -687,7 +717,7 @@ def answer_with_rag(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
 ) -> Dict[str, Any]:
     """Retrieve → generate. 統一フォーマットで返す。"""
     lang = "ja"
@@ -761,10 +791,10 @@ def answer_with_rag(
             ),
         }
         fallback_prompt = fallback_texts.get(lang, fallback_texts["ja"])  # 安全フォールバック
-        resp = _llm(model=model).invoke([HumanMessage(content=fallback_prompt)])
+        text = _responses_text(fallback_prompt, model=model, max_output_tokens=400, timeout_s=60)
         return {
             "type": "rag",
-            "text": resp.content.strip(),
+            "text": text.strip(),
             "meta": {
                 "lang": lang,
                 "references": [],
@@ -829,7 +859,7 @@ def orchestrate(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-4.1-mini",
+    model: str = "gpt-5-mini",
     reactive_default_lang: str = "ja",
 ) -> Dict[str, Any]:
     """Front agent → (必要時) RAG の逐次フロー。
@@ -867,21 +897,3 @@ def orchestrate(
             "text": "内部エラーが発生しました。時間をおいて再試行してください。",
             "meta": {"reason": repr(e)},
         }
-
-    """
-    検出言語に合わせてプロンプトを切り替え、LLMへ投げる。
-    ※ rag() 側でも言語検出・検証は済んでいるが、ここでも再判定して出力言語を確実化する。
-    """
-    # 言語判定（未対応/検出不可は上位へ例外伝播）
-    lang = detect_lang(question_text)  # 'ja'|'en'|'vi'|'zh'|'ko'
-
-    # ビルダー取得（理論上必ず存在するはずだが保険）
-    builder = _PROMPT_BUILDERS.get(lang)
-    if builder is None:
-        raise UnsupportedLanguageError(f"未対応の言語が検出されました: {lang}")
-
-    prompt = builder(question_text, rag_qa, history_qa)
-
-    llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.3)
-    response = llm.invoke([HumanMessage(content=prompt)])
-    return response.content.strip()

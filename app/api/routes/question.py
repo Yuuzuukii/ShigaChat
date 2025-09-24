@@ -200,7 +200,7 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             history_qa=history_qa,
             similarity_threshold=sim_th,
             max_history_in_prompt=6,
-            model="gpt-4.1-mini",
+            model="gpt-5-mini",
         )
 
         # RAG専用応答を展開
