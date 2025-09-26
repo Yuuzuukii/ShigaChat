@@ -460,11 +460,11 @@ export default function Navbar({ children }) {
               </Link>
               <div className="flex items-center gap-2">
                 <a href="https://www.s-i-a.or.jp" target="_blank" rel="noopener noreferrer" aria-label="SIA website">
-                  <img src="/sia.png" alt="SIA" className="h-9 w-auto rounded-md object-contain" />
+                  <img src="./sia.png" alt="SIA" className="h-9 w-auto rounded-md object-contain" />
                 </a>
                 <span className="text-zinc-400">×</span>
                 <a href="https://www.si-lab.org/index-ja.html" target="_blank" rel="noopener noreferrer" aria-label="SI-LAB website">
-                  <img src="/silab.png" alt="SILAB" className="h-12 w-auto rounded-md object-contain" />
+                  <img src="./silab.png" alt="SILAB" className="h-12 w-auto rounded-md object-contain" />
                 </a>
               </div>
             </div>
