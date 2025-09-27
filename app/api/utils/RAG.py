@@ -369,15 +369,54 @@ def generate_and_save_vectors():
 # Retrieval
 # ----------------------------------------------------------------------------
 
-def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, Dict[str, Any]]:
+def _generate_conversation_summary(history_qa: List[Tuple[str, str]], lang: str = "ja") -> str:
+    """
+    会話履歴から検索用の要約文を生成する
+    既存のreactive.pyのsummarize_text関数を活用
+    """
+    if not history_qa or len(history_qa) == 0:
+        return ""
+    
+    # 会話履歴が短すぎる場合は要約しない
+    if len(history_qa) < 2:
+        return ""
+    
+    # 会話履歴をテキストに変換（最新3件のみ）
+    conversation_text = ""
+    for i, (q, a) in enumerate(history_qa[-3:], 1):
+        conversation_text += f"Q{i}: {q}\nA{i}: {a}\n"
+    
+    try:
+        # 既存のsummarize_text関数を使用
+        from api.utils.reactive import summarize_text
+        summary = summarize_text(conversation_text, lang)
+        
+        # 検索用に短縮（100文字以内）
+        if len(summary) > 100:
+            summary = summary[:100] + "..."
+        
+        return summary.strip() if summary else ""
+    except Exception as e:
+        print(f"会話要約生成エラー: {e}")
+        return ""
+
+
+def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple[str, str]] = None) -> Dict[int, Dict[str, Any]]:
     """
     言語検出に失敗/未対応の場合は例外を投げる
     成功時は rank-> [answer, question, time, similarity] を返す。
     similarity_threshold以下のスコアの結果は除外される。
+    history_qaが提供された場合、会話要約も検索クエリに含める。
     """
     # 言語検出（Linguaのみ、未対応/検出不可は例外）
     lang = detect_lang(question)  # 'ja' / 'en' / 'vi' / 'zh' / 'ko'
     print(f"検出言語: {lang}")
+
+    # 会話要約を生成（履歴がある場合）
+    conversation_summary = ""
+    if history_qa and len(history_qa) > 0:
+        conversation_summary = _generate_conversation_summary(history_qa, lang)
+        print(f"会話要約: {conversation_summary}")
 
     base_path = VECTOR_DIR / f"vectors_{lang}"
     faiss_path = base_path.with_suffix(".faiss")
@@ -402,7 +441,13 @@ def rag(question: str, similarity_threshold: float = 0.3) -> Dict[int, Dict[str,
     ignored_qa_ids = _load_global_qa_ignore()
     ignored_hashes = _load_lang_hash_ignores(lang)
 
-    query_vec = np.array(get_embedding(question)).astype("float32").reshape(1, -1)
+    # 検索クエリを構築（要約がある場合は組み合わせ）
+    search_query = question
+    if conversation_summary:
+        search_query = f"{question} {conversation_summary}"
+        print(f"拡張検索クエリ: {search_query}")
+
+    query_vec = np.array(get_embedding(search_query)).astype("float32").reshape(1, -1)
     faiss.normalize_L2(query_vec)
     D, I = index.search(query_vec, 10)  # より多く取得して閾値でフィルタリング
 
@@ -834,8 +879,8 @@ def answer_with_rag(
     except Exception:
         pass
 
-    # 検索
-    results = rag(question_text, similarity_threshold=similarity_threshold)
+    # 検索（会話履歴も含める）
+    results = rag(question_text, similarity_threshold=similarity_threshold, history_qa=history_qa)
 
     # 整形（UIで使いやすいよう辞書リスト化）。sid を振る
     references = []
