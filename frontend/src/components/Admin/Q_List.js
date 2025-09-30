@@ -490,11 +490,11 @@ const Q_List = () => {
   const handleSaveEdit = async (answerId, questionId) => {
     if (!answerId || isNaN(Number(answerId))) {
       console.error("無効な answerId:", answerId);
-      window.alert("回答のIDが無効です。");
+      window.alert(t.invalidAnswerId);
       return;
     }
     if (typeof editText === "undefined" || editText.trim() === "") {
-      window.alert("回答を入力してください。");
+      window.alert(t.pleaseEnterAnswer);
       return;
     }
 
@@ -582,9 +582,9 @@ const Q_List = () => {
       if (translateToAll) {
         const grammarCheckEnabled = grammarCheckSettings[`${questionId}:${language}`] === true;
         if (grammarCheckEnabled) {
-          message += "\n文法チェックが実行され、他言語の文法チェックが無効になりました。";
+          message += "\n" + t.grammarCheckExecuted;
         } else {
-          message += "\n文法チェックなしで翻訳されました。";
+          message += "\n" + t.grammarCheckSkipped;
         }
       }
       window.alert(message);
@@ -684,7 +684,7 @@ const Q_List = () => {
 
   const handleEditClick = (questionId, answerId, answerText) => {
     if (editingAnswerId === questionId) {
-      if (window.confirm("編集をキャンセルしますか？")) {
+      if (window.confirm(t.confirmCancelEdit)) {
         setEditingAnswerId(null);
         setEditText("");
         setTranslateToAll(false);
@@ -969,7 +969,7 @@ const Q_List = () => {
                                   console.error("文法チェック設定の更新に失敗:", error);
                                   // チェックボックスの状態を元に戻す
                                   e.target.checked = !e.target.checked;
-                                  alert("文法チェック設定の更新に失敗しました");
+                                  alert(t.grammarCheckUpdateFailed);
                                 }
                               }}
                               className={`w-3 h-3 border-gray-300 rounded focus:ring-green-500 ${
@@ -1094,10 +1094,10 @@ const Q_List = () => {
                                 }`}
                                 onClick={() => handleSaveEdit(question.answer_id, question.question_id)}
                                 disabled={isSaving || unchanged}
-                                title={unchanged ? '変更はありません' : ''}
+                                title={unchanged ? t.noChanges : ''}
                               >
                                 <Archive className="w-4 h-4" />
-                                {isSaving ? "保存中..." : "保存"}
+                                {isSaving ? t.saving : t.save}
                               </button>
                               <button
                                 className={`px-4 py-2 bg-gray-500 text-white rounded-md font-medium transition-colors flex items-center gap-2 ${
@@ -1107,7 +1107,7 @@ const Q_List = () => {
                                 disabled={isSaving}
                               >
                                 <ArrowLeft className="w-4 h-4" />
-                                キャンセル
+                                {t.cancel}
                               </button>
                             </>
                           );
@@ -1120,7 +1120,7 @@ const Q_List = () => {
                           disabled={isSaving}
                         >
                           <History className="w-4 h-4" />
-                          {historyOpenId === question.answer_id ? '履歴を閉じる' : '過去の回答を見る'}
+                          {historyOpenId === question.answer_id ? t.historyClose : t.historyOpen}
                         </button>
                       </div>
                     ) : (
@@ -1130,14 +1130,14 @@ const Q_List = () => {
                           onClick={() => handleEditClick(question.question_id, question.answer_id, question.回答)}
                         >
                           <Edit3 className="w-4 h-4" />
-                          編集
+                          {t.edit}
                         </button>
                         <button
                           className="px-4 py-2 bg-purple-500 text-white rounded-md font-medium hover:bg-purple-600 transition-colors flex items-center gap-2"
                           onClick={() => toggleHistory(question.answer_id)}
                         >
                           <History className="w-4 h-4" />
-                          {historyOpenId === question.answer_id ? '履歴を閉じる' : '過去の回答を見る'}
+                          {historyOpenId === question.answer_id ? t.historyClose : t.historyOpen}
                         </button>
                       </div>
                     )}

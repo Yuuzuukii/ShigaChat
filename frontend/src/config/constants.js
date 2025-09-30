@@ -20,6 +20,9 @@ export const translations = {
     disclaimer: "ShigaChatの情報は正確でない場合があります",
     questionLabel: "質問を入力：",
     placeholder: "ここに質問を入力してください...",
+    placeholderQuestionAdmin: "質問内容を入力してください...",
+    placeholderAnswerAdmin: "回答内容を入力してください...",
+    charUnit: "文字",
     askButton: "質問する",
     generatingAnswer: "回答を生成しています...",
     answer: "回答：",
@@ -156,6 +159,18 @@ export const translations = {
     tooltipLanguageSelect: "表示言語を変更します",
     tooltipSidebarToggle: "サイドバーの表示/非表示を切り替えます",
     tooltipUserMenu: "ユーザーメニューを開きます",
+    saving: "保存中...",
+    // 確認ポップアップ関連
+    confirmCancelEdit: "編集をキャンセルしますか？",
+    confirmMoveCategory: "カテゴリを移動：",
+    deleteSuccess: "質問が削除されました",
+    errorDelete: "質問の削除に失敗しました",
+    invalidAnswerId: "回答のIDが無効です。",
+    pleaseEnterAnswer: "回答を入力してください。",
+    grammarCheckUpdateFailed: "文法チェック設定の更新に失敗しました",
+    noChanges: "変更はありません",
+    grammarCheckExecuted: "文法チェックが実行され、他言語の文法チェックが無効になりました。",
+    grammarCheckSkipped: "文法チェックなしで翻訳されました。"
   },
   en: {
     home: "Home",
@@ -168,6 +183,9 @@ export const translations = {
     disclaimer: "ShigaChat information may be inaccurate.",
     questionLabel: "Enter your question:",
     placeholder: "Type your question here...",
+    placeholderQuestionAdmin: "Please enter the question...",
+    placeholderAnswerAdmin: "Please enter the answer...",
+    charUnit: "chars",
     askButton: "Ask Question",
     generatingAnswer: "Generating answer...",
     answer: "Answer: ",
@@ -304,6 +322,18 @@ export const translations = {
     tooltipLanguageSelect: "Change display language",
     tooltipSidebarToggle: "Toggle sidebar visibility",
     tooltipUserMenu: "Open user menu",
+    saving: "Saving...",
+    // Confirmation popups
+    confirmCancelEdit: "Do you want to cancel editing?",
+    confirmMoveCategory: "Move to category: ",
+    deleteSuccess: "Question has been deleted",
+    errorDelete: "Failed to delete question",
+    invalidAnswerId: "Invalid answer ID.",
+    pleaseEnterAnswer: "Please enter an answer.",
+    grammarCheckUpdateFailed: "Failed to update grammar check setting",
+    noChanges: "No changes",
+    grammarCheckExecuted: "Grammar check executed and disabled for other languages.",
+    grammarCheckSkipped: "Translated without grammar check."
   },  
   zh: {
     home: "首页",
@@ -316,6 +346,9 @@ export const translations = {
     disclaimer: "ShigaChat 的信息可能不准确。",
     questionLabel: "输入你的问题：",
     placeholder: "请在此输入你的问题...",
+    placeholderQuestionAdmin: "请输入问题内容...",
+    placeholderAnswerAdmin: "请输入回答内容...",
+    charUnit: "字",
     askButton: "提交问题",
     generatingAnswer: "正在生成回答...",
     answer: "回答：",
@@ -323,15 +356,6 @@ export const translations = {
     noSimilarWarning: "未找到类似问题。回答可能不够准确。",
     sortByDate: "按日期排序",
     sortBySimilarity: "按相似度排序",
-    registerquestion: "注册问答",
-    error: "发生错误：",
-    official: "官方",
-    publicToggle: "公开",
-    privateToggle: "私密",
-    makepublicToggle: "公开此问题",
-    makeprivateToggle: "保留为私密", 
-    enterquestion: "请输入问题",
-    failedtopost: "提交问题失败",
     failtogetanswer: "获取回答失败",
     failtoupdate: "更新失败。",
     timeUnknown: "时间未知",
@@ -452,6 +476,18 @@ export const translations = {
     tooltipLanguageSelect: "更改显示语言",
     tooltipSidebarToggle: "切换侧边栏显示/隐藏",
     tooltipUserMenu: "打开用户菜单",
+    saving: "保存中...",
+    // Confirmation popups
+    confirmCancelEdit: "您要取消编辑吗？",
+    confirmMoveCategory: "移至分类：",
+    deleteSuccess: "问题已删除",
+    errorDelete: "删除问题失败",
+    invalidAnswerId: "无效的答案ID。",
+    pleaseEnterAnswer: "请输入答案。",
+    grammarCheckUpdateFailed: "更新语法检查设置失败",
+    noChanges: "没有变更",
+    grammarCheckExecuted: "语法检查已执行，其他语言的语法检查已禁用。",
+    grammarCheckSkipped: "已翻译，未进行语法检查。"
   },
   vi: {
     home: "Trang chủ",
@@ -600,6 +636,18 @@ export const translations = {
     tooltipLanguageSelect: "Thay đổi ngôn ngữ hiển thị",
     tooltipSidebarToggle: "Bật/tắt thanh bên",
     tooltipUserMenu: "Mở menu người dùng",
+    saving: "Đang lưu...",
+    // Confirmation popups
+    confirmCancelEdit: "Bạn có muốn hủy chỉnh sửa không?",
+    confirmMoveCategory: "Chuyển đến danh mục: ",
+    deleteSuccess: "Câu hỏi đã được xóa",
+    errorDelete: "Xóa câu hỏi thất bại",
+    invalidAnswerId: "ID câu trả lời không hợp lệ.",
+    pleaseEnterAnswer: "Vui lòng nhập câu trả lời.",
+    grammarCheckUpdateFailed: "Cập nhật cài đặt kiểm tra ngữ pháp thất bại",
+    noChanges: "Không có thay đổi",
+    grammarCheckExecuted: "Kiểm tra ngữ pháp đã được thực hiện và vô hiệu hóa cho các ngôn ngữ khác.",
+    grammarCheckSkipped: "Đã dịch mà không kiểm tra ngữ pháp."
   },
   ko: {
     home: "홈",
@@ -748,6 +796,18 @@ export const translations = {
     tooltipLanguageSelect: "표시 언어 변경",
     tooltipSidebarToggle: "사이드바 표시/숨기기 전환",
     tooltipUserMenu: "사용자 메뉴 열기",
+    saving: "저장 중...",
+    // Confirmation popups
+    confirmCancelEdit: "편집을 취소하시겠습니까?",
+    confirmMoveCategory: "카테고리로 이동: ",
+    deleteSuccess: "질문이 삭제되었습니다",
+    errorDelete: "질문 삭제에 실패했습니다",
+    invalidAnswerId: "유효하지 않은 답변 ID입니다.",
+    pleaseEnterAnswer: "답변을 입력해 주세요.",
+    grammarCheckUpdateFailed: "문법 검사 설정 업데이트에 실패했습니다",
+    noChanges: "변경 사항 없음",
+    grammarCheckExecuted: "문법 검사가 실행되었으며 다른 언어의 문법 검사가 비활성화되었습니다.",
+    grammarCheckSkipped: "문법 검사 없이 번역되었습니다."
   },
   pt: {
     home: "Início",
@@ -896,6 +956,18 @@ export const translations = {
     tooltipLanguageSelect: "Alterar idioma de exibição",
     tooltipSidebarToggle: "Mostrar/ocultar a barra lateral",
     tooltipUserMenu: "Abrir menu do usuário",
+    saving: "Salvando...",
+    // Confirmation popups
+    confirmCancelEdit: "Deseja cancelar a edição?",
+    confirmMoveCategory: "Mover para categoria: ",
+    deleteSuccess: "Pergunta foi excluída",
+    errorDelete: "Falha ao excluir pergunta",
+    invalidAnswerId: "ID de resposta inválido.",
+    pleaseEnterAnswer: "Por favor, digite uma resposta.",
+    grammarCheckUpdateFailed: "Falha ao atualizar configuração de verificação gramatical",
+    noChanges: "Nenhuma alteração",
+    grammarCheckExecuted: "Verificação gramatical executada e desabilitada para outros idiomas.",
+    grammarCheckSkipped: "Traduzido sem verificação gramatical."
   },
   es: { // スペイン語
     home: "Inicio",
@@ -1044,6 +1116,18 @@ export const translations = {
     tooltipLanguageSelect: "Cambiar idioma de visualización",
     tooltipSidebarToggle: "Mostrar/ocultar barra lateral",
     tooltipUserMenu: "Abrir menú de usuario",
+    saving: "Guardando...",
+    // Confirmation popups
+    confirmCancelEdit: "¿Desea cancelar la edición?",
+    confirmMoveCategory: "Mover a categoría: ",
+    deleteSuccess: "La pregunta ha sido eliminada",
+    errorDelete: "Error al eliminar la pregunta",
+    invalidAnswerId: "ID de respuesta inválido.",
+    pleaseEnterAnswer: "Por favor, ingrese una respuesta.",
+    grammarCheckUpdateFailed: "Error al actualizar la configuración de verificación gramatical",
+    noChanges: "Sin cambios",
+    grammarCheckExecuted: "Verificación gramatical ejecutada y deshabilitada para otros idiomas.",
+    grammarCheckSkipped: "Traducido sin verificación gramatical."
   },
 
   tl: { // タガログ語
@@ -1193,6 +1277,18 @@ export const translations = {
     tooltipLanguageSelect: "Palitan ang wika ng display",
     tooltipSidebarToggle: "Ipakita/itago ang sidebar",
     tooltipUserMenu: "Buksan ang menu ng user",
+    saving: "Nagsi-save...",
+    // Confirmation popups
+    confirmCancelEdit: "Gusto mo bang kanselahin ang pag-edit?",
+    confirmMoveCategory: "Ilipat sa kategorya: ",
+    deleteSuccess: "Natanggal na ang tanong",
+    errorDelete: "Nabigo ang pagtanggal ng tanong",
+    invalidAnswerId: "Hindi wastong ID ng sagot.",
+    pleaseEnterAnswer: "Pakipasok ang sagot.",
+    grammarCheckUpdateFailed: "Nabigo ang pag-update ng setting ng grammar check",
+    noChanges: "Walang pagbabago",
+    grammarCheckExecuted: "Na-execute ang grammar check at na-disable para sa ibang wika.",
+    grammarCheckSkipped: "Naisalin nang walang grammar check."
   },
 
   id: {
@@ -1341,7 +1437,19 @@ export const translations = {
     tooltipNotifications: "Periksa notifikasi",
     tooltipLanguageSelect: "Ubah bahasa tampilan",
     tooltipSidebarToggle: "Tampilkan/sembunyikan sidebar",
-    tooltipUserMenu: "Buka menu pengguna"
+    tooltipUserMenu: "Buka menu pengguna",
+    saving: "Menyimpan...",
+    // Confirmation popups
+    confirmCancelEdit: "Apakah Anda ingin membatalkan pengeditan?",
+    confirmMoveCategory: "Pindah ke kategori: ",
+    deleteSuccess: "Pertanyaan telah dihapus",
+    errorDelete: "Gagal menghapus pertanyaan",
+    invalidAnswerId: "ID jawaban tidak valid.",
+    pleaseEnterAnswer: "Silakan masukkan jawaban.",
+    grammarCheckUpdateFailed: "Gagal memperbarui pengaturan pemeriksaan tata bahasa",
+    noChanges: "Tidak ada perubahan",
+    grammarCheckExecuted: "Pemeriksaan tata bahasa dijalankan dan dinonaktifkan untuk bahasa lain.",
+    grammarCheckSkipped: "Diterjemahkan tanpa pemeriksaan tata bahasa."
 }
 
 

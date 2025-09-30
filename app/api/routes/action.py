@@ -241,6 +241,20 @@ def apply_action(payload: ActionPayload, current_user: dict = Depends(current_us
     try:
         resp = llm.invoke([SystemMessage(content=sys), HumanMessage(content=human)])
         result = (resp.content or "").strip()
+        # If simplify produced an output identical to the input answer, retry with a stronger instruction
+        if payload.action == "simplify" and answer and result.strip() == answer.strip():
+            sys2 = sys + (
+                "\n\nIf the output is identical to the input, produce a simpler version: "
+                "shorten sentences, use more common words, and preserve meaning. Output only the rewritten Answer."
+            )
+            try:
+                resp2 = llm.invoke([SystemMessage(content=sys2), HumanMessage(content=human)])
+                result2 = (resp2.content or "").strip()
+                if result2 and result2 != result:
+                    result = result2
+            except Exception:
+                # Ignore retry errors and keep original result
+                pass
         # Persist into thread history
         user_id = current_user["id"]
         assigned_thread_id = None
