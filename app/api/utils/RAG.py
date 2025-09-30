@@ -192,6 +192,54 @@ def _save_lang_hash_ignores(lang_code: str, s: set) -> None:
     with open(p, "w", encoding="utf-8") as f:
         json.dump(sorted(list(s)), f, ensure_ascii=False)
 
+def ignore_current_vectors_for_qa_languages(question_id: int, answer_id: int, language_codes: list = None) -> int:
+    """Record hash ignores for current QA payloads for specific languages only.
+
+    Args:
+        question_id: The question ID
+        answer_id: The answer ID
+        language_codes: List of language codes to ignore (e.g., ['ja', 'en']). If None, ignores all languages.
+
+    Returns the number of language hashes added.
+    """
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    LANGUAGE_MAP = get_language_map()  # {id: 'ja', ...}
+    
+    # Filter to only specified languages if provided
+    if language_codes is not None:
+        language_codes_set = set(language_codes)
+        filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
+                               if lang_code in language_codes_set}
+    else:
+        filtered_language_map = LANGUAGE_MAP
+
+    count = 0
+    for lang_id, lang_code in filtered_language_map.items():
+        cur.execute(
+            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
+            (question_id, lang_id),
+        )
+        qrow = cur.fetchone()
+        cur.execute(
+            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+            (answer_id, lang_id),
+        )
+        arow = cur.fetchone()
+        if not (qrow and arow):
+            continue
+        payload = f"Q: {qrow[0]}\nA: {arow[0]}"
+        h = _payload_hash(payload)
+        s = _load_lang_hash_ignores(lang_code)
+        if h not in s:
+            s.add(h)
+            _save_lang_hash_ignores(lang_code, s)
+            count += 1
+
+    conn.close()
+    return count
+
 def ignore_current_vectors_for_qa(question_id: int, answer_id: int) -> int:
     """Record hash ignores for current QA payloads across all languages.
 
@@ -225,6 +273,88 @@ def ignore_current_vectors_for_qa(question_id: int, answer_id: int) -> int:
 
     conn.close()
     return count
+
+def append_qa_to_vector_index_for_languages(question_id: int, answer_id: int, language_codes: list = None) -> int:
+    """Append a single QA pair to vector indexes for specific languages only.
+
+    Args:
+        question_id: The question ID
+        answer_id: The answer ID  
+        language_codes: List of language codes to update (e.g., ['ja', 'en']). If None, updates all languages.
+
+    Returns the count of vectors appended across specified languages.
+    """
+    conn = sqlite3.connect(DATABASE)
+    cur = conn.cursor()
+
+    # Resolve QA.id for consistency in meta
+    cur.execute("SELECT id FROM QA WHERE question_id = ? AND answer_id = ?", (question_id, answer_id))
+    qa_row = cur.fetchone()
+    qa_id = qa_row[0] if qa_row else None
+
+    # Fetch question time for texts sidecar
+    cur.execute("SELECT time FROM question WHERE question_id = ?", (question_id,))
+    trow = cur.fetchone()
+    time_val = trow[0] if trow else None
+
+    LANGUAGE_MAP = get_language_map()  # {id: 'ja'/'en'/...}
+
+    # Filter to only specified languages if provided
+    if language_codes is not None:
+        language_codes_set = set(language_codes)
+        filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
+                               if lang_code in language_codes_set}
+    else:
+        filtered_language_map = LANGUAGE_MAP
+
+    appended = 0
+    for lang_id, lang_code in filtered_language_map.items():
+        # Fetch translations for this language
+        cur.execute(
+            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
+            (question_id, lang_id),
+        )
+        qrow = cur.fetchone()
+        cur.execute(
+            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+            (answer_id, lang_id),
+        )
+        arow = cur.fetchone()
+        if not (qrow and arow):
+            continue
+
+        question_text = qrow[0]
+        answer_text = arow[0]
+        payload = f"Q: {question_text}\nA: {answer_text}"
+
+        # Compute embedding and normalize
+        emb = np.array(get_embedding(payload)).astype("float32").reshape(1, -1)
+        faiss.normalize_L2(emb)
+
+        # Load or create index and sidecars
+        index = _ensure_index_for_lang(emb.shape[1], lang_code)
+        if index is None:
+            # Skip this language if existing index has incompatible dim
+            continue
+        meta_list, texts_list = _load_sidecar_lists(lang_code)
+
+        # Append
+        try:
+            index.add(emb)
+        except Exception:
+            # Append failed, skip to keep existing index intact.
+            continue
+
+        # Keep the same structure as initial build: (qa_id, question_id)
+        meta_list.append((qa_id, question_id))
+        texts_list.append((question_text, answer_text, time_val))
+
+        # Persist
+        _save_index_and_sidecars(index, meta_list, texts_list, lang_code)
+        appended += 1
+
+    conn.close()
+    return appended
 
 def append_qa_to_vector_index(question_id: int, answer_id: int) -> int:
     """Append a single QA pair (all available languages) to vector indexes.
@@ -602,7 +732,7 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- Chỉ liệt kê các nguồn thực sự đã sử dụng trong used_source_ids (loại trừ những nguồn chưa sử dụng).\n"
         "- Tùy chọn: bao gồm trích dẫn chính xác trong evidence.quotes.\n"
         "- Nguồn chỉ giới hạn ở ngữ cảnh RAG và hội thoại. Nếu thông tin không có, hãy nêu rõ 'Không tìm thấy trong nguyên bản.'.\n"
-        "- Để dễ đọc, sử dụng xuống dòng, đoạn văn (dòng trống) và gạch đầu dòng (-, 1.) để tổ chức nội dung.\n"
+        "- Để dễ đọc, hãy dùng đoạn xuống dòng và gạch đầu dòng (-, 1.) khi phù hợp.\n"
         "- Xuất chính xác theo định dạng JSON sau và không gì khác:\n"
         "{\n  \"answer\": \"Mỗi câu với trích dẫn mã nguồn kiểu [S1]\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"trích dẫn chính xác\"]} ]\n}\n"
     )
@@ -628,7 +758,7 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
         "- 在used_source_ids中仅列出实际使用的来源（排除未使用的）。\n"
         "- 可选：在evidence.quotes中包含原文引文。\n"
         "- 证据仅限于提供的RAG上下文和对话。如果资料中不存在，请说明 '原典中未找到'.\n"
-        "- 为了可读性，使用换行、段落（空行）和项目符号（-、1.）来组织内容。\n"
+        "- 为提高可读性，请使用换行、段落（空行）和项目符号（-、1.）。\n"
         "- 严格按照以下JSON格式输出，不要输出其他内容：\n"
         "{\n  \"answer\": \"每句话带有[S1]样式的来源ID引用\",\n  \"used_source_ids\": [\"S1\",\"S3\"],\n  \"evidence\": [ {\"source_id\": \"S1\", \"quotes\": [\"原文引文\"]} ]\n}\n"
     )

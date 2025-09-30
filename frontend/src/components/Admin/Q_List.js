@@ -7,6 +7,7 @@ import {
   API_BASE_URL,
   translations,
   languageLabelToCode,
+  languageCodeToId,
   categoryList,
 } from "../../config/constants";
 import {
@@ -107,6 +108,8 @@ const Q_List = () => {
   });
   const [editingAnswerId, setEditingAnswerId] = useState(null);
   const [editText, setEditText] = useState("");
+  const [translateToAll, setTranslateToAll] = useState(false);
+  const [grammarCheckSettings, setGrammarCheckSettings] = useState({}); // {question_id: boolean}
   const [historyOpenId, setHistoryOpenId] = useState(null);
   const [historyMap, setHistoryMap] = useState({}); // {answer_id: [{texts, edited_at, editor_name}, ...]}
   const [historyDiffOpenMap, setHistoryDiffOpenMap] = useState({}); // {`${answerId}:${idx}`: true}
@@ -239,6 +242,18 @@ const Q_List = () => {
 
     loadData();
   }, [categoryId, language, user, token, t]);
+
+  // 質問がロードされた後に文法チェック設定を読み込む（言語ごと）
+  useEffect(() => {
+    if (questions && questions.length > 0) {
+      questions.forEach(question => {
+        const key = `${question.question_id}:${language}`;
+        if (question.question_id && !grammarCheckSettings.hasOwnProperty(key)) {
+          fetchGrammarCheckSetting(question.question_id);
+        }
+      });
+    }
+  }, [questions, language]);
 
   // 特定質問へスクロール
   useEffect(() => {
@@ -494,6 +509,7 @@ const Q_List = () => {
         body: JSON.stringify({
           answer_id: Number(answerId),
           new_text: editText.trim(),
+          translate_to_all: translateToAll,
         }),
       });
 
@@ -525,6 +541,7 @@ const Q_List = () => {
 
       setEditingAnswerId(null);
       setEditText("");
+      setTranslateToAll(false);
       
       // 即時に履歴を更新（該当回答の履歴パネルが開いている場合）
       try {
@@ -559,7 +576,42 @@ const Q_List = () => {
           return newMap;
         });
       }
-      window.alert(t.answerupdated);
+      
+      // 成功メッセージに文法チェック情報を含める
+      let message = t.answerupdated;
+      if (translateToAll) {
+        const grammarCheckEnabled = grammarCheckSettings[`${questionId}:${language}`] === true;
+        if (grammarCheckEnabled) {
+          message += "\n文法チェックが実行され、他言語の文法チェックが無効になりました。";
+        } else {
+          message += "\n文法チェックなしで翻訳されました。";
+        }
+      }
+      window.alert(message);
+
+      // 全言語翻訳の場合、文法チェック設定を再読み込み
+      if (translateToAll) {
+        try {
+          // 該当質問のすべての言語の文法チェック設定をクリアして再読み込みを強制
+          setGrammarCheckSettings(prevSettings => {
+            const newSettings = { ...prevSettings };
+            // 該当質問の全言語設定をクリア
+            Object.keys(newSettings).forEach(key => {
+              if (key.startsWith(`${questionId}:`)) {
+                delete newSettings[key];
+              }
+            });
+            return newSettings;
+          });
+          
+          // 現在の言語の設定を再読み込み
+          setTimeout(() => {
+            fetchGrammarCheckSetting(questionId);
+          }, 100);
+        } catch (error) {
+          console.error("文法チェック設定の再読み込みに失敗:", error);
+        }
+      }
 
       try {
         await fetchQuestions(
@@ -581,16 +633,67 @@ const Q_List = () => {
     }
   };
 
+  // 文法チェック設定を取得する関数（言語ごと）
+  const fetchGrammarCheckSetting = async (questionId) => {
+    try {
+      // 現在の言語IDを取得
+      const languageId = languageCodeToId[language] || 1; // デフォルトは日本語 (ID: 1)
+      
+      const response = await fetch(`${API_BASE_URL}/admin/grammar_check_setting?question_id=${questionId}&language_id=${languageId}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+      });
+      if (!response.ok) throw new Error('Failed to fetch grammar check setting');
+      const data = await response.json();
+      const key = `${questionId}:${language}`;
+      setGrammarCheckSettings(prev => ({ ...prev, [key]: data.grammar_check_enabled }));
+      return data.grammar_check_enabled;
+    } catch (error) {
+      console.error("Error fetching grammar check setting:", error);
+      return false; // デフォルトは無効
+    }
+  };
+
+  // 文法チェック設定を更新する関数（言語ごと）
+  const updateGrammarCheckSetting = async (questionId, enabled) => {
+    try {
+      // 現在の言語IDを取得
+      const languageId = languageCodeToId[language] || 1; // デフォルトは日本語 (ID: 1)
+
+      const response = await fetch(`${API_BASE_URL}/admin/grammar_check_setting`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({
+          question_id: questionId,
+          language_id: languageId,
+          grammar_check_enabled: enabled
+        })
+      });
+      if (!response.ok) throw new Error('Failed to update grammar check setting');
+      const data = await response.json();
+      const key = `${questionId}:${language}`;
+      setGrammarCheckSettings(prev => ({ ...prev, [key]: enabled }));
+      return data;
+    } catch (error) {
+      console.error("Error updating grammar check setting:", error);
+      throw error;
+    }
+  };
+
   const handleEditClick = (questionId, answerId, answerText) => {
     if (editingAnswerId === questionId) {
       if (window.confirm("編集をキャンセルしますか？")) {
         setEditingAnswerId(null);
         setEditText("");
+        setTranslateToAll(false);
         setIsSaving(false);
       }
     } else {
       setEditingAnswerId(questionId);
       setEditText(answerText || "");
+      setTranslateToAll(false);
       setIsSaving(false);
     }
   };
@@ -831,6 +934,7 @@ const Q_List = () => {
                         toggleAnswer(question.question_id);
                       }}
                     >
+                      
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
                           <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -841,6 +945,50 @@ const Q_List = () => {
                           </div>
                         </div>
                         <div className="flex items-center gap-2 flex-shrink-0">
+                          {/* 文法チェック設定 */}
+                          <div 
+                            className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-md text-xs"
+                            onClick={(e) => e.stopPropagation()}
+                            title={t.grammarCheckDescription || "全言語翻訳時に基本的な文法チェックを実行"}
+                          >
+                            <input
+                              type="checkbox"
+                              id={`grammar-check-${question.question_id}`}
+                              checked={grammarCheckSettings[`${question.question_id}:${language}`] === true}
+                              onChange={async (e) => {
+                                try {
+                                  await updateGrammarCheckSetting(question.question_id, e.target.checked);
+                                  if (e.target.checked) {
+                                    // チェック時のフィードバック
+                                    console.log(`Grammar check enabled for question ${question.question_id} in language ${language}`);
+                                  } else {
+                                    // チェック解除時のフィードバック
+                                    console.log(`Grammar check disabled for question ${question.question_id} in language ${language}`);
+                                  }
+                                } catch (error) {
+                                  console.error("文法チェック設定の更新に失敗:", error);
+                                  // チェックボックスの状態を元に戻す
+                                  e.target.checked = !e.target.checked;
+                                  alert("文法チェック設定の更新に失敗しました");
+                                }
+                              }}
+                              className={`w-3 h-3 border-gray-300 rounded focus:ring-green-500 ${
+                                grammarCheckSettings[`${question.question_id}:${language}`] === true 
+                                  ? 'text-green-600 bg-green-50' 
+                                  : 'text-gray-400 bg-gray-50'
+                              }`}
+                            />
+                            <label 
+                              htmlFor={`grammar-check-${question.question_id}`}
+                              className={`cursor-pointer text-xs ${
+                                grammarCheckSettings[`${question.question_id}:${language}`] === true
+                                  ? 'text-green-600 font-medium'
+                                  : 'text-gray-500'
+                              }`}
+                            >
+                              {t.grammarCheckEnabled || "文法チェック"}
+                            </label>
+                          </div>
                           <button
                             className="px-3 py-1 text-sm bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors flex items-center gap-1"
                             onClick={(e) => {
@@ -851,6 +999,9 @@ const Q_List = () => {
                             <Layers className="w-4 h-4" />
                             {t.changecategory || "カテゴリ変更"}
                           </button>
+                          
+                        
+                          
                           <button
                             className="px-3 py-1 text-sm bg-red-500 text-white rounded-md hover:bg-red-600 transition-colors flex items-center gap-1"
                             onClick={(e) => {
@@ -867,14 +1018,14 @@ const Q_List = () => {
                       <div className="mt-3 flex items-center justify-between gap-1 text-sm text-zinc-500">
                         <div className="flex items-center gap-4">
                           <span>
-                            編集者: {question.editor_name || question.user_name || "—"}
+                            {t.editor} {question.editor_name || question.user_name || "—"}
                           </span>
                           <div className="flex items-center gap-1">
                             <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
                             <span>
-                              投稿日: {new Date((question.last_edited_at || question.time).replace(' ', 'T')).toLocaleString()}
+                              {t.questionDate} {new Date((question.last_edited_at || question.time).replace(' ', 'T')).toLocaleString()}
                             </span>
                           </div>
                         </div>
@@ -886,14 +1037,36 @@ const Q_List = () => {
                     <div className="text-sm font-semibold text-zinc-700 mb-3">{t.answer || "回答"}</div>
                     
                     {editingAnswerId === question.question_id ? (
-                      <textarea
-                        className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[200px] text-base leading-8"
-                        rows={12}
-                        value={editText}
-                        onChange={(e) => setEditText(e.target.value)}
-                        placeholder="回答を入力してください..."
-                        autoFocus
-                      />
+                      <>
+                        <textarea
+                          className="w-full p-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-y min-h-[200px] text-base leading-8"
+                          rows={12}
+                          value={editText}
+                          onChange={(e) => setEditText(e.target.value)}
+                          placeholder="回答を入力してください..."
+                          autoFocus
+                        />
+                        
+                        {/* 翻訳チェックボックス */}
+                        <div className="mt-3 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            id={`translate-checkbox-${question.question_id}`}
+                            checked={translateToAll}
+                            onChange={(e) => setTranslateToAll(e.target.checked)}
+                            className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500"
+                          />
+                          <label 
+                            htmlFor={`translate-checkbox-${question.question_id}`}
+                            className="text-sm font-medium text-gray-700 cursor-pointer"
+                          >
+                            {t.translateToAllLanguages || "すべての言語に翻訳し直す"}
+                          </label>
+                          <span className="text-xs text-gray-500 ml-2">
+                            {t.translateOnlyCurrentLanguage || "（チェックを外すと現在の言語のみ編集されます）"}
+                          </span>
+                        </div>
+                      </>
                     ) : (
                       <div
                         className="text-base leading-8 whitespace-pre-wrap break-words"
@@ -976,17 +1149,19 @@ const Q_List = () => {
                         {(() => {
                           const historyKey = `${question.answer_id}:${language}`;
                           const list = historyMap[historyKey] || [];
+                          const reversedList = [...list].reverse(); // 最新順に表示するため配列を逆順にする
                           return list.length === 0 ? (
                             <p className="text-gray-500 text-center py-4">履歴はありません。</p>
                           ) : (
                             <div className="space-y-4">
-                              {list.map((h, i) => {
-                                const localKey = `${question.answer_id}:${language}:${i}`;
-                                const baseText = (i < (list.length - 1))
-                                  ? (list[i + 1].texts || '')
+                              {reversedList.map((h, reverseIndex) => {
+                                const originalIndex = list.length - 1 - reverseIndex; // 元の配列のインデックス
+                                const localKey = `${question.answer_id}:${language}:${originalIndex}`;
+                                const baseText = (originalIndex < (list.length - 1))
+                                  ? (list[originalIndex + 1].texts || '')
                                   : (question.回答 || '');
                                 return (
-                                  <div key={i} className="border border-gray-100 rounded-lg p-3">
+                                  <div key={originalIndex} className="border border-gray-100 rounded-lg p-3">
                                     <div className="flex items-center justify-between mb-2">
                                       <div className="flex items-center gap-4 text-sm text-gray-500">
                                         <span>{fmtTime(h.edited_at)}</span>

@@ -6,7 +6,7 @@ from api.utils.translator import question_translate, answer_translate
 from config import DATABASE, language_mapping
 from api.utils.translator import translate
 from models.schemas import QuestionRequest, moveCategoryRequest, RegisterQuestionRequest
-from api.utils.RAG import append_qa_to_vector_index, add_qa_id_to_ignore, ignore_current_vectors_for_qa
+from api.utils.RAG import append_qa_to_vector_index, append_qa_to_vector_index_for_languages, add_qa_id_to_ignore, ignore_current_vectors_for_qa, ignore_current_vectors_for_qa_languages
 from fastapi import BackgroundTasks
 router = APIRouter()
 
@@ -29,6 +29,28 @@ def _ensure_answer_translation_history(conn: sqlite3.Connection) -> None:
         )
         # Indexes for efficient lookups
         cur.execute("CREATE INDEX IF NOT EXISTS idx_ath_answer_lang ON answer_translation_history(answer_id, language_id)")
+        conn.commit()
+    except Exception:
+        pass
+
+# Ensure question_grammar_check table exists for tracking grammar check settings per question and language
+def _ensure_question_grammar_check_table(conn: sqlite3.Connection):
+    try:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS question_grammar_check (
+                question_id INTEGER NOT NULL,
+                language_id INTEGER NOT NULL,
+                grammar_check_enabled BOOLEAN DEFAULT FALSE,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (question_id, language_id),
+                FOREIGN KEY (question_id) REFERENCES question (question_id),
+                FOREIGN KEY (language_id) REFERENCES language (id)
+            )
+            """
+        )
         conn.commit()
     except Exception:
         pass
@@ -73,6 +95,7 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
     spoken_language = current_user.get("spoken_language")
     language_id = language_mapping.get(spoken_language)
     answer_id = request.get("answer_id")
+    translate_to_all = request.get("translate_to_all", False)  # デフォルトはFalse
 
     try:
         with sqlite3.connect(DATABASE) as conn:
@@ -95,11 +118,7 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             question_owner_id = row[0]
             prev_editor_id = row[1]
 
-            # 先に現行のベクトルを無効化（各言語のハッシュを記録）
-            try:
-                ignore_current_vectors_for_qa(question_id, answer_id)
-            except Exception:
-                pass
+            # ベクトルの無効化は言語確定後に実行
 
             # 🔄 `answer_translation` テーブルを更新（履歴保存付き）
             _ensure_answer_translation_history(conn)
@@ -145,11 +164,7 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             except Exception:
                 pass
 
-            # 4. 翻訳対象の言語を取得（元の言語を除外）
-            cursor.execute("SELECT id, code FROM language WHERE id != ?", (language_id,))
-            target_languages = cursor.fetchall()
-
-            # 5. 翻訳データを作成し、更新
+            # 言語ラベルからコードへのマッピング（ベクトル更新でも使用）
             language_label_to_code = {
                 "日本語": "ja",
                 "English": "en",
@@ -162,60 +177,137 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 "Bahasa Indonesia": "id"
             }
 
-            source_lang_code = language_label_to_code.get(spoken_language, "auto")
-
-            for target_id, target_code in target_languages:
-                target_code = target_code.lower()
-                if target_code == "zh":
-                    target_code = "zh-CN"
-
-                translated_text = translate(
-                    request.get("new_text"),
-                    source_language=source_lang_code,
-                    target_language=target_code
-                )
-
-                cursor.execute("""
-                    SELECT 1 FROM answer_translation WHERE answer_id = ? AND language_id = ?
-                """, (answer_id, target_id))
-                exists = cursor.fetchone()
-
-                if exists:
-                    # 履歴の保存（既存テキストがある場合）
+            # 4. 文法チェック機能（全言語翻訳時のみ実行）
+            if translate_to_all:
+                # 文法チェック設定テーブルを確保
+                _ensure_question_grammar_check_table(conn)
+                
+                # 現在編集中の言語の文法チェックが有効かチェック
+                cursor.execute("SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+                grammar_check_row = cursor.fetchone()
+                
+                # デフォルトは無効（レコードが存在しない場合）
+                grammar_check_enabled = grammar_check_row[0] if grammar_check_row else False
+                
+                if grammar_check_enabled:
                     try:
-                        cursor.execute(
-                            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-                            (answer_id, target_id),
-                        )
-                        prev = cursor.fetchone()
-                        if prev and prev[0] and prev[0] != translated_text:
+                        # 簡単な文法チェック（長すぎる文、句読点のチェックなど）
+                        new_text = request.get("new_text", "")
+                        grammar_suggestions = []
+                        
+                        # 基本的な文法チェック
+                        if len(new_text) > 1000:
+                            grammar_suggestions.append("文章が長すぎる可能性があります（1000文字以上）")
+                        
+                        if not new_text.strip().endswith(('。', '！', '？', '.', '!', '?')):
+                            grammar_suggestions.append("文末に適切な句読点がありません")
+                        
+                        # 連続する句読点のチェック
+                        import re
+                        if re.search(r'[。！？.!?]{2,}', new_text):
+                            grammar_suggestions.append("連続する句読点があります")
+                        
+                        # 文法チェック結果をログ出力（実際のプロダクションではより詳細な処理を実装）
+                        if grammar_suggestions:
+                            print(f"Grammar check suggestions for answer {answer_id} (language {language_id}): {grammar_suggestions}")
+                        else:
+                            print(f"Grammar check passed for answer {answer_id} (language {language_id})")
+                            
+                    except Exception as e:
+                        print(f"Grammar check error for answer {answer_id} (language {language_id}): {str(e)}")
+                        # 文法チェック失敗は致命的エラーとしない
+
+                # 📌 全言語翻訳実行後は編集言語のみ有効、他言語は無効にする
+                try:
+                    # 全ての言語IDを取得
+                    cursor.execute("SELECT id FROM language")
+                    all_languages = [row[0] for row in cursor.fetchall()]
+                    
+                    for lang_id in all_languages:
+                        # 編集した言語のみ有効、他の言語は無効
+                        grammar_enabled = (lang_id == language_id)
+                        
+                        cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, lang_id))
+                        exists = cursor.fetchone()
+                        
+                        if exists:
+                            # 既存設定を更新
                             cursor.execute(
-                                """
-                                INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
-                                VALUES (?, ?, ?, ?, ?, ?)
-                                """,
-                                (
-                                    answer_id,
-                                    target_id,
-                                    prev[0],
-                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                    operator_id,
-                                    current_user.get("name", "user"),
-                                ),
+                                "UPDATE question_grammar_check SET grammar_check_enabled = ?, updated_at = ? WHERE question_id = ? AND language_id = ?",
+                                (grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id, lang_id)
                             )
-                    except Exception:
-                        pass
+                        else:
+                            # レコードが存在しない場合は新規作成
+                            cursor.execute(
+                                "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                                (question_id, lang_id, grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                            )
+                    conn.commit()
+                    print(f"文法チェック設定を更新: 編集言語({language_id})=有効、他言語=無効")
+                except Exception as e:
+                    print(f"文法チェック設定の更新に失敗: {str(e)}")
+                    # 設定更新の失敗は致命的エラーとしない
+
+            # 5. 全言語への翻訳を行うかチェック
+            if translate_to_all:
+                # 翻訳対象の言語を取得（元の言語を除外）
+                cursor.execute("SELECT id, code FROM language WHERE id != ?", (language_id,))
+                target_languages = cursor.fetchall()
+
+                source_lang_code = language_label_to_code.get(spoken_language, "auto")
+
+                for target_id, target_code in target_languages:
+                    target_code = target_code.lower()
+                    if (target_code == "zh"):
+                        target_code = "zh-CN"
+
+                    translated_text = translate(
+                        request.get("new_text"),
+                        source_language=source_lang_code,
+                        target_language=target_code
+                    )
 
                     cursor.execute("""
-                        UPDATE answer_translation
-                        SET texts = ?
-                        WHERE answer_id = ? AND language_id = ?
-                    """, (translated_text, answer_id, target_id))
-                else:
-                    cursor.execute("""
-                        INSERT INTO answer_translation (answer_id, language_id, texts)
-                        VALUES (?, ?, ?)
-                    """, (answer_id, target_id, translated_text))
+                        SELECT 1 FROM answer_translation WHERE answer_id = ? AND language_id = ?
+                    """, (answer_id, target_id))
+                    exists = cursor.fetchone()
+
+                    if exists:
+                        # 履歴の保存（既存テキストがある場合）
+                        try:
+                            cursor.execute(
+                                "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+                                (answer_id, target_id),
+                            )
+                            prev = cursor.fetchone()
+                            if prev and prev[0] and prev[0] != translated_text:
+                                cursor.execute(
+                                    """
+                                    INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
+                                    VALUES (?, ?, ?, ?, ?, ?)
+                                    """,
+                                    (
+                                        answer_id,
+                                        target_id,
+                                        prev[0],
+                                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                        operator_id,
+                                        current_user.get("name", "user"),
+                                    ),
+                                )
+                        except Exception:
+                            pass
+
+                        cursor.execute("""
+                            UPDATE answer_translation
+                            SET texts = ?
+                            WHERE answer_id = ? AND language_id = ?
+                        """, (translated_text, answer_id, target_id))
+                    else:
+                        cursor.execute("""
+                            INSERT INTO answer_translation (answer_id, language_id, texts)
+                            VALUES (?, ?, ?)
+                        """, (answer_id, target_id, translated_text))
 
             conn.commit()
 
@@ -230,9 +322,19 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             except Exception:
                 pass
 
-            # 変更後の内容でベクトルを差分追加（全言語）
+            # 変更後の内容でベクトルを差分追加（更新された言語のみ）
             try:
-                append_qa_to_vector_index(question_id, answer_id)
+                # 更新された言語のリストを作成
+                updated_languages = [language_label_to_code.get(spoken_language, "ja")]  # 編集言語は必ず含める
+                if translate_to_all:
+                    # 全言語翻訳の場合は全言語を追加
+                    updated_languages = list(language_label_to_code.values())
+                
+                # 更新対象言語の現在のベクトルを無効化
+                ignore_current_vectors_for_qa_languages(question_id, answer_id, updated_languages)
+                
+                # 新しいベクトルを追加
+                append_qa_to_vector_index_for_languages(question_id, answer_id, updated_languages)
             except Exception:
                 pass
 
@@ -285,6 +387,19 @@ def _code_to_language_id(code: str, conn: sqlite3.Connection) -> int:
     cur.execute("SELECT id FROM language WHERE lower(code) = ?", (code.lower(),))
     row = cur.fetchone()
     return int(row[0]) if row else None
+
+# 言語コードから言語IDへのマッピング（フロントエンドと一致）
+language_code_to_id = {
+    "ja": 1,
+    "en": 2,
+    "vi": 3,
+    "zh": 4,
+    "ko": 5,
+    "pt": 6,
+    "es": 7,
+    "tl": 8,
+    "id": 9,
+}
 
 
 @router.get("/answer_history")
@@ -799,6 +914,22 @@ async def register_question(
         
         conn.commit()
 
+        # 📌 新規質問登録時の文法チェック設定初期化（登録言語のみ有効、他言語は無効）
+        try:
+            _ensure_question_grammar_check_table(conn)
+            # 全ての言語に対して文法チェック設定を作成
+            for lang_id in languages:
+                # 登録された言語（人間が入力したオリジナル言語）のみ有効、他は無効
+                grammar_enabled = (lang_id == language_id)
+                cursor.execute(
+                    "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (question_id, lang_id, grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
+            conn.commit()
+        except Exception as e:
+            print(f"文法チェック設定の初期化に失敗: {str(e)}")
+            # 設定の初期化失敗は致命的エラーとしない
+
         # 📌 通知の先頭メッセージ（言語別）
         new_question_translations = {
             "日本語": "新しい質問が登録されました",
@@ -898,4 +1029,144 @@ def save_question_with_category(question: str, category_id: int, user_id: int):
             conn.commit()
     except sqlite3.Error as e:
         raise RuntimeError("質問の保存に失敗しました")
+
+@router.get("/grammar_check_setting")
+def get_grammar_check_setting(question_id: int, language_id: int = None, current_user: dict = Depends(current_user_info)):
+    """ 指定された質問の指定言語での文法チェック設定を取得 """
+    print(f"DEBUG: get_grammar_check_setting called with question_id={question_id}, language_id={language_id}")
     
+    # 言語IDが指定されていない場合は、ユーザーの使用言語を使用
+    if language_id is None:
+        spoken_language = current_user.get("spoken_language")
+        language_id = language_mapping.get(spoken_language, 1)  # デフォルトは日本語
+        print(f"DEBUG: language_id was None, resolved to {language_id} from spoken_language={spoken_language}")
+    
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            _ensure_question_grammar_check_table(conn)
+            
+            print(f"DEBUG: Executing query with question_id={question_id}, language_id={language_id}")
+            cursor.execute("SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+            row = cursor.fetchone()
+            print(f"DEBUG: Query result: {row}")
+            
+            # デフォルトはFalse（設定が存在しない場合） - 新規質問では無効から始める
+            grammar_check_enabled = row[0] if row else False
+            
+            result = {
+                "question_id": question_id,
+                "language_id": language_id,
+                "grammar_check_enabled": bool(grammar_check_enabled)
+            }
+            print(f"DEBUG: Returning result: {result}")
+            return result
+    except sqlite3.Error as e:
+        print(f"DEBUG: SQLite error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
+    except Exception as e:
+        print(f"DEBUG: Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"予期しないエラー: {str(e)}")
+
+@router.post("/grammar_check_setting")
+def set_grammar_check_setting(request: dict, current_user: dict = Depends(current_user_info)):
+    """ 指定された質問の指定言語での文法チェック設定を変更 """
+    question_id = request.get("question_id")
+    language_id = request.get("language_id")
+    grammar_check_enabled = request.get("grammar_check_enabled", False)
+    
+    print(f"DEBUG: set_grammar_check_setting called with request: {request}")
+    print(f"DEBUG: question_id={question_id}, language_id={language_id}, grammar_check_enabled={grammar_check_enabled}")
+    
+    if question_id is None:
+        raise HTTPException(status_code=400, detail="question_idが必要です")
+    
+    # 言語IDが指定されていない場合は、ユーザーの使用言語を使用
+    if language_id is None:
+        spoken_language = current_user.get("spoken_language")
+        language_id = language_mapping.get(spoken_language, 1)  # デフォルトは日本語
+        print(f"DEBUG: language_id was None, resolved to {language_id} from spoken_language={spoken_language}")
+    
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            _ensure_question_grammar_check_table(conn)
+            
+            # 既存の設定をチェック
+            cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+            exists = cursor.fetchone()
+            print(f"DEBUG: Existing record check result: {exists}")
+            
+            if exists:
+                # 更新
+                print(f"DEBUG: Updating existing record")
+                cursor.execute(
+                    "UPDATE question_grammar_check SET grammar_check_enabled = ?, updated_at = ? WHERE question_id = ? AND language_id = ?",
+                    (grammar_check_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id, language_id)
+                )
+            else:
+                # 新規作成
+                print(f"DEBUG: Creating new record")
+                cursor.execute(
+                    "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    (question_id, language_id, grammar_check_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                )
+            
+            conn.commit()
+            
+            result = {
+                "question_id": question_id,
+                "language_id": language_id,
+                "grammar_check_enabled": bool(grammar_check_enabled),
+                "message": "文法チェック設定が更新されました"
+            }
+            print(f"DEBUG: Returning result: {result}")
+            return result
+    except sqlite3.Error as e:
+        print(f"DEBUG: SQLite error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
+    except Exception as e:
+        print(f"DEBUG: Unexpected error: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"予期しないエラー: {str(e)}")
+
+@router.post("/initialize_all_grammar_check")
+def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)):
+    """ 全ての既存質問に対してデフォルトで文法チェック有効設定を追加 """
+    try:
+        with sqlite3.connect(DATABASE) as conn:
+            cursor = conn.cursor()
+            _ensure_question_grammar_check_table(conn)
+            
+            # 全ての質問IDと言語IDを取得
+            cursor.execute("SELECT question_id FROM question")
+            all_questions = cursor.fetchall()
+            
+            cursor.execute("SELECT id FROM language")
+            all_languages = [row[0] for row in cursor.fetchall()]
+            
+            initialized_count = 0
+            for (question_id,) in all_questions:
+                for language_id in all_languages:
+                    # 既存の設定をチェック
+                    cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+                    exists = cursor.fetchone()
+                    
+                    if not exists:
+                        # 文法チェックを無効にしてレコードを作成
+                        cursor.execute(
+                            "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                            (question_id, language_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+                        )
+                        initialized_count += 1
+            
+            conn.commit()
+            
+            return {
+                "message": f"{initialized_count}件の質問・言語ペアに文法チェック設定を初期化しました（デフォルト: 無効）",
+                "initialized_count": initialized_count,
+                "total_questions": len(all_questions),
+                "total_languages": len(all_languages)
+            }
+    except sqlite3.Error as e:
+        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
+
