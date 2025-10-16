@@ -144,7 +144,17 @@ function CategoryDetail() {
             }
 
             const categoryData = await categoryResponse.json();
-            setCategoryName(categoryData["カテゴリ名"] || t.categorynotfound);
+            console.log("📊 カテゴリデータ:", categoryData);
+            console.log("📊 カテゴリ名の型:", typeof categoryData["カテゴリ名"]);
+            console.log("📊 カテゴリ名の値:", categoryData["カテゴリ名"]);
+            
+            // カテゴリ名がオブジェクトの場合はdescriptionを取り出す
+            const categoryNameValue = categoryData["カテゴリ名"];
+            const categoryNameText = typeof categoryNameValue === 'object' && categoryNameValue !== null
+                ? (categoryNameValue.description || JSON.stringify(categoryNameValue))
+                : (categoryNameValue || t.categorynotfound);
+            
+            setCategoryName(categoryNameText);
 
             const response = await fetch(`${API_BASE_URL}/category/category/${categoryId}?lang=${lang}`, {
                 headers: {
@@ -163,6 +173,13 @@ function CategoryDetail() {
             }
 
             const data = await response.json();
+            console.log("📊 取得したデータ:", data);
+            console.log("📊 質問データ:", data.questions);
+            if (data.questions && data.questions.length > 0) {
+                console.log("📊 最初の質問:", data.questions[0]);
+                console.log("📊 質問フィールドの型:", typeof data.questions[0].質問);
+                console.log("📊 回答フィールドの型:", typeof data.questions[0].回答);
+            }
             setQuestions(data.questions);
         } catch (error) {
             console.error("エラー:", error);
@@ -237,7 +254,9 @@ function CategoryDetail() {
                         <div className="w-full space-y-6 mb-20">
                         {questions.length > 0 ? (
                             <div className="space-y-6">
-                                {questions.map((question) => (
+                                {questions.map((question) => {
+                                    console.log("🔍 レンダリング中の質問:", question.question_id, typeof question.質問, question.質問);
+                                    return (
                                     <div
                                         key={question.question_id}
                                         id={`question-${question.question_id}`}
@@ -281,7 +300,8 @@ function CategoryDetail() {
                                             </div>
                                         )}
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <p className="text-center text-sm text-zinc-500">{t.noQuestions}</p>

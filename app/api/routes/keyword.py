@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, Query
-import sqlite3
-from config import DATABASE
+from fastapi import APIRouter, HTTPException, Depends
+from database_utils import get_db_cursor, get_placeholder
 from api.routes.user import current_user_info
 
 router = APIRouter()
@@ -16,14 +15,15 @@ def search_keywords(keywords: str, current_user: dict = Depends(current_user_inf
     print(f"spoken_language: {spoken_language}")  # デバッグ用ログ
 
     # spoken_languageからlanguage_idを取得
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM language WHERE name = ?", (spoken_language,))
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        cursor.execute(f"SELECT id FROM language WHERE name = {ph}", (spoken_language,))
         language_row = cursor.fetchone()
         if not language_row:
             print(f"Invalid spoken_language: {spoken_language}")  # 詳細なログ
             raise HTTPException(status_code=400, detail=f"Invalid spoken_language: {spoken_language}")
-        language_id = language_row[0]
+
+        language_id = language_row['id']
 
     # キーワードを分割
     tmp_keyword_list = keywords.split(" ")
@@ -63,31 +63,40 @@ def search_keyword(keyword: str, language_id: int):
     """
     keyword = f"%{keyword}%"
     results = []
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-        cursor.execute("""
-            SELECT QA.question_id, question_translation.texts, QA.answer_id, answer_translation.texts,
-                   answer.time, category.id, category.description, title
+    
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        cursor.execute(f"""
+            SELECT QA.question_id, 
+                   question_translation.texts AS question_text, 
+                   QA.answer_id, 
+                   answer_translation.texts AS answer_text,
+                   answer.time, 
+                   category.id AS category_id, 
+                   category.description AS category_description, 
+                   question.title
             FROM QA
             JOIN answer ON QA.answer_id = answer.id
-            JOIN answer_translation ON QA.answer_id = answer_translation.answer_id AND answer_translation.language_id = ?
-            JOIN question_translation ON QA.question_id = question_translation.question_id AND question_translation.language_id = ?
+            JOIN answer_translation ON QA.answer_id = answer_translation.answer_id AND answer_translation.language_id = {ph}
+            JOIN question_translation ON QA.question_id = question_translation.question_id AND question_translation.language_id = {ph}
             JOIN question ON QA.question_id = question.question_id
             JOIN category ON question.category_id = category.id
-            WHERE question_translation.texts LIKE ? OR answer_translation.texts LIKE ?
+            WHERE question_translation.texts LIKE {ph} OR answer_translation.texts LIKE {ph}
         """, (language_id, language_id, keyword, keyword))
         search_results = cursor.fetchall()
+        
         if search_results:
             for search_result in search_results:
                 results.append({
-                    "category_id": search_result[5],
-                    "category_text": search_result[6],
-                    "question_id": search_result[0],
-                    "question_text": search_result[1],
-                    "answer_id": search_result[2],
-                    "answer_text": search_result[3],
+                    "category_id": search_result['category_id'],
+                    "category_text": search_result['category_description'],
+                    "question_id": search_result['question_id'],
+                    "question_text": search_result['question_text'],
+                    "answer_id": search_result['answer_id'],
+                    "answer_text": search_result['answer_text'],
                     "language_id": language_id,
-                    "update_time": search_result[4],
-                    "title": search_result[7]
+                    "update_time": search_result['time'],
+                    "title": search_result['title']
                 })
+            
     return results

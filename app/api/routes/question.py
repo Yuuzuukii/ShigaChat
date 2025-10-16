@@ -1,59 +1,52 @@
-# データベースの中身を見たい時、uwsgiコンテナの中（exec）で以下を実行
-"""
-apt-get update
-apt-get install -y sqlite3
-sqlite3 ShigaChat.db
-"""
-
-import os
-import sqlite3
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends, Query
-from langdetect import detect
-from langdetect.lang_detect_exception import LangDetectException
-from config import DATABASE, OPENAI_API_KEY, language_mapping
+from config import language_mapping
+from database_utils import get_db_cursor, get_placeholder
 from api.routes.user import current_user_info
-from api.routes.category import categorize_question
-from models.schemas import SimpleQuestion, QuestionRequest, Question, AnswerRequest
-from api.utils.security import detect_privacy_info
-from api.utils.translator import question_translate, answer_translate
-from api.utils.RAG import rag, generate_answer_with_llm
+from models.schemas import Question
 from api.utils.RAG import (
-    rag,
     LanguageDetectionError,
     UnsupportedLanguageError,
     answer_with_rag,
-    detect_lang,
 )
 import json
 
 router = APIRouter()
 
 # --- Helpers ---------------------------------------------------------------
-def _ensure_thread_qa_has_rag_column(conn: sqlite3.Connection) -> None:
+def _ensure_thread_qa_has_rag_column() -> None:
     """Ensure thread_qa table has a rag_qa TEXT column to store JSON.
     Safe to call often; adds the column only if missing.
     """
     try:
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(thread_qa)")
-        cols = [row[1] for row in cur.fetchall()]  # row[1] = name
-        if "rag_qa" not in cols:
-            cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
-            conn.commit()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'thread_qa' 
+                AND COLUMN_NAME = 'rag_qa'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
+                conn.commit()
+    
     except Exception:
         # Don't crash API path if migration fails; let main ops proceed.
         pass
 
-def _ensure_thread_qa_has_type_column(conn: sqlite3.Connection) -> None:
+def _ensure_thread_qa_has_type_column() -> None:
     """Ensure thread_qa table has a type TEXT column to store action type (e.g., 'rag')."""
     try:
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(thread_qa)")
-        cols = [row[1] for row in cur.fetchall()]  # row[1] = name
-        if "type" not in cols:
-            cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
-            conn.commit()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("""
+                SELECT COUNT(*) FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'thread_qa' 
+                AND COLUMN_NAME = 'type'
+            """)
+            if cursor.fetchone()[0] == 0:
+                cursor.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
+                conn.commit()
     except Exception:
         pass
 
@@ -74,13 +67,12 @@ def get_translated_question(question_id: int, language_id: int, current_user: di
             detail=f"Unsupported spoken language: {spoken_language}"
         )
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         # 翻訳済みの質問を取得
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT texts FROM question_translation
-            WHERE question_id = ? AND language_id = ?
+            WHERE question_id = {ph} AND language_id = {ph}
         """, (question_id, language_id))
         translated_question = cursor.fetchone()
 
@@ -89,18 +81,13 @@ def get_translated_question(question_id: int, language_id: int, current_user: di
                 status_code=404,
                 detail="指定された言語で翻訳済み質問が見つかりません"
             )
-
-        return {"text": translated_question[0]}
+        return {"text": translated_question['texts']}
 
 def load_data_from_database():
-    if not os.path.exists(DATABASE):
-        raise FileNotFoundError(f"Database not found: {DATABASE}")
-
     questions_and_answers = []
     
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        with get_db_cursor() as (cursor, conn):
             cursor.execute("""SELECT question_translation.question_id, texts FROM question_translation 
                 JOIN question ON question_translation.question_id=question.question_id 
                 WHERE question.title="official" AND
@@ -123,7 +110,7 @@ def load_data_from_database():
 
         print(f"✅ データベースから取得した Q&A の数: {len(questions_and_answers)}")
 
-    except sqlite3.Error as e:
+    except Exception as e:
         print(f"❌ データベースの読み込みエラー: {str(e)}")
     
     return questions_and_answers
@@ -134,17 +121,17 @@ def create_thread(current_user: dict = Depends(current_user_info)):
     空のスレッドを作成してIDを返す。最初の投稿前にUIから作成したいケース用。
     """
     user_id = current_user["id"]
+    ph = get_placeholder()
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        with get_db_cursor() as (cursor, conn):
             cursor.execute(
-                "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
+                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
                 (user_id, datetime.now()),
             )
             new_id = cursor.lastrowid
             conn.commit()
             return {"thread_id": int(new_id)}
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
 
 @router.post("/get_answer")
@@ -153,34 +140,33 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
     req_thread_id = request.thread_id
     user_id = current_user["id"]
 
+    ph = get_placeholder()
     try:
         # ---- 既存スレッドの検証 or 新規作成（AUTOINCREMENT） --------------------
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        with get_db_cursor() as (cursor, conn):
             assigned_thread_id = None
 
             if req_thread_id is not None:
-                cursor.execute("SELECT id, user_id FROM threads WHERE id = ?", (req_thread_id,))
+                cursor.execute(f"SELECT id, user_id FROM threads WHERE id = {ph}", (req_thread_id,))
                 row = cursor.fetchone()
                 if row:
-                    if row[1] != user_id:
+                    if row['user_id'] != user_id:
                         raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
                     assigned_thread_id = req_thread_id
 
             if assigned_thread_id is None:
                 cursor.execute(
-                    "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
+                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
                     (user_id, datetime.now()),
                 )
                 assigned_thread_id = cursor.lastrowid
                 conn.commit()
 
         # ---- 履歴の取得（逐次フローの reactive で参照するので先に取る） ----------
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute(f"""
                 SELECT question, answer FROM thread_qa
-                WHERE thread_id = ?
+                WHERE thread_id = {ph}
                 ORDER BY created_at DESC
                 LIMIT 6
             """, (assigned_thread_id,))
@@ -213,30 +199,29 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         rag_qa = references if isinstance(references, list) else []
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
-        with sqlite3.connect(DATABASE) as conn:
-            _ensure_thread_qa_has_rag_column(conn)  # 既存のマイグレーションヘルパ
-            _ensure_thread_qa_has_type_column(conn) # 新規：type列
+        with get_db_cursor() as (cursor, conn):
+            _ensure_thread_qa_has_rag_column()  # 既存のマイグレーションヘルパ
+            _ensure_thread_qa_has_type_column() # 新規：type列
             # 必要なら「type」カラムを追加しても良い（下記コメント参照）
-            cursor = conn.cursor()
             try:
                 cursor.execute(
-                    """
+                    f"""
                     INSERT INTO thread_qa (thread_id, question, answer, rag_qa, type)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
                     """,
                     (assigned_thread_id, question_text, answer_text, json.dumps(rag_qa, ensure_ascii=False), action_type),
                 )
-            except sqlite3.OperationalError:
+            except Exception:
                 # 互換性: type列がない古い環境
                 cursor.execute(
-                    """
+                    f"""
                     INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
-                    VALUES (?, ?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph}, {ph})
                     """,
                     (assigned_thread_id, question_text, answer_text, json.dumps(rag_qa, ensure_ascii=False)),
                 )
             cursor.execute(
-                "UPDATE threads SET last_updated = ? WHERE id = ?",
+                f"UPDATE threads SET last_updated = {ph} WHERE id = {ph}",
                 (datetime.now(), assigned_thread_id),
             )
             conn.commit()
@@ -259,10 +244,6 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         error_detail = f"Language detection failed: {str(e)}"
         print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
-    except sqlite3.Error as e:
-        error_detail = f"DBエラー: {str(e)}"
-        print(f"❌ {error_detail}")
-        raise HTTPException(status_code=500, detail=error_detail)
     except RuntimeError as e:
         error_detail = str(e)
         print(f"❌ Runtime error: {error_detail}")
@@ -292,12 +273,11 @@ def get_translated_answer(
             detail=f"Unsupported spoken language: {spoken_language}"
         )
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
-        cursor.execute("""
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        cursor.execute(f"""
             SELECT texts FROM answer_translation
-            WHERE answer_id = ? AND language_id = ?
+            WHERE answer_id = {ph} AND language_id = {ph}
         """, (answer_id, language_id))
         translated_answer = cursor.fetchone()
 
@@ -307,7 +287,7 @@ def get_translated_answer(
                 detail="指定された言語で翻訳済み回答が見つかりません"
             )
 
-        return {"text": translated_answer[0]}
+        return {"text": translated_answer['texts']}
 
 @router.get("/get_qa")
 def get_qa(
@@ -326,16 +306,15 @@ def get_qa(
             detail=f"Unsupported spoken language: {spoken_language}"
         )
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         # 質問を取得
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT q.question_id, qt.texts, q.title, q.time, c.description
             FROM question q
             JOIN question_translation qt ON q.question_id = qt.question_id
             JOIN category c ON q.category_id = c.id
-            WHERE q.question_id = ? AND qt.language_id = ?
+            WHERE q.question_id = {ph} AND qt.language_id = {ph}
         """, (question_id, language_id))
         question_row = cursor.fetchone()
 
@@ -343,28 +322,28 @@ def get_qa(
             raise HTTPException(status_code=404, detail="質問が見つかりません")
 
         question_data = {
-            "question_id": question_row[0],
-            "text": question_row[1],
-            "title": question_row[2],
-            "time": question_row[3],
-            "category": question_row[4]
+            "question_id": question_row['question_id'],
+            "text": question_row['texts'],
+            "title": question_row['title'],
+            "time": question_row['time'],
+            "category": question_row['description']
         }
 
         # 回答を取得
-        cursor.execute("""
+        cursor.execute(f"""
             SELECT a.answer_id, at.texts, a.time
             FROM answer a
             JOIN answer_translation at ON a.answer_id = at.answer_id
-            WHERE a.question_id = ? AND at.language_id = ?
+            WHERE a.question_id = {ph} AND at.language_id = {ph}
         """, (question_id, language_id))
         answers = cursor.fetchall()
 
         answer_data = []
         for answer in answers:
             answer_data.append({
-                "answer_id": answer[0],
-                "text": answer[1],
-                "time": answer[2]
+                "answer_id": answer['answer_id'],
+                "text": answer['texts'],
+                "time": answer['time']
             })
 
     return {
@@ -391,25 +370,24 @@ def get_qa_list(
             detail=f"Unsupported spoken language: {spoken_language}"
         )
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         # SQL構築
-        query = """
+        query = f"""
             SELECT q.question_id, qt.texts, q.title, q.time, c.description
             FROM question q
             JOIN question_translation qt ON q.question_id = qt.question_id
             JOIN category c ON q.category_id = c.id
-            WHERE qt.language_id = ?
+            WHERE qt.language_id = {ph}
         """
         params = [language_id]
 
         if mine:
-            query += " AND q.user_id = ?"
+            query += f" AND q.user_id = {ph}"
             params.append(user_id)
 
         if category_id is not None:
-            query += " AND q.category_id = ?"
+            query += f" AND q.category_id = {ph}"
             params.append(category_id)
 
         query += " ORDER BY q.time DESC"
@@ -417,14 +395,16 @@ def get_qa_list(
         cursor.execute(query, tuple(params))
         rows = cursor.fetchall()
 
-        qa_list = [{
-            "question_id": row[0],
-            "text": row[1],
-            "title": row[2],
-            "time": row[3],
-            "category": row[4]
-        } for row in rows]
-
+        qa_list = []
+        for row in rows:
+            qa_list.append({
+                "question_id": row['question_id'],
+                "text": row['texts'],
+                "title": row['title'],
+                "time": row['time'],
+                "category": row['description']
+            })
+            
     return {"qa_list": qa_list}
 
 @router.get("/get_user_threads")
@@ -434,28 +414,35 @@ def get_user_threads(current_user: dict = Depends(current_user_info)):
     """
     user_id = current_user["id"]
     
+    ph = get_placeholder()
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute(f"""
                 SELECT id, last_updated FROM threads
-                WHERE user_id = ?
+                WHERE user_id = {ph}
                 ORDER BY last_updated DESC
             """, (user_id,))
             threads_data = cursor.fetchall()
             
             threads = []
-            for thread_id, last_updated in threads_data:
+            for thread_data in threads_data:
+                thread_id = thread_data['id']
+                last_updated = thread_data['last_updated']
+                
                 # 各スレッドの最初の質問を取得してタイトルにする
-                cursor.execute("""
+                cursor.execute(f"""
                     SELECT question FROM thread_qa
-                    WHERE thread_id = ?
+                    WHERE thread_id = {ph}
                     ORDER BY created_at ASC
                     LIMIT 1
                 """, (thread_id,))
                 first_question = cursor.fetchone()
                 
-                title = first_question[0][:50] + "..." if first_question and len(first_question[0]) > 50 else (first_question[0] if first_question else "無題のスレッド")
+                if first_question:
+                    q_text = first_question['question']
+                    title = q_text[:50] + "..." if len(q_text) > 50 else q_text
+                else:
+                    title = "無題のスレッド"
                 
                 threads.append({
                     "thread_id": thread_id,
@@ -465,10 +452,8 @@ def get_user_threads(current_user: dict = Depends(current_user_info)):
             
             return {"threads": threads}
             
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
 
 @router.get("/get_thread_messages/{thread_id}")
 def get_thread_messages(thread_id: str, current_user: dict = Depends(current_user_info)):
@@ -477,29 +462,28 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
     """
     user_id = current_user["id"]
     
+    ph = get_placeholder()
     try:
-        import json
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            _ensure_thread_qa_has_rag_column(conn)
-            _ensure_thread_qa_has_type_column(conn)
+        with get_db_cursor() as (cursor, conn):
+            _ensure_thread_qa_has_rag_column()
+            _ensure_thread_qa_has_type_column()
             
             # スレッドの所有者確認
-            cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
+            cursor.execute(f"SELECT user_id FROM threads WHERE id = {ph}", (thread_id,))
             thread_data = cursor.fetchone()
             
             if not thread_data:
                 raise HTTPException(status_code=404, detail="スレッドが見つかりません")
             
-            if thread_data[0] != user_id:
+            if thread_data['user_id'] != user_id:
                 raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
-            
+        
             # メッセージ履歴を取得（rag_qa も返す）
             cursor.execute(
-                """
+                f"""
                 SELECT question, answer, created_at, rag_qa, COALESCE(type, '') as type
                 FROM thread_qa
-                WHERE thread_id = ?
+                WHERE thread_id = {ph}
                 ORDER BY created_at ASC
                 """,
                 (thread_id,),
@@ -508,12 +492,12 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
             
             messages = []
             for row in messages_data:
-                # Support both with and without type column
-                if len(row) >= 5:
-                    question, answer, created_at, rag_qa_text, msg_type = row
-                else:
-                    question, answer, created_at, rag_qa_text = row
-                    msg_type = ""
+                question = row['question']
+                answer = row['answer']
+                created_at = row['created_at']
+                rag_qa_text = row['rag_qa']
+                msg_type = row['type'] if 'type' in row else ''
+            
                 rag_val = None
                 if rag_qa_text:
                     try:
@@ -530,8 +514,6 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
             
             return {"messages": messages}
             
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
 
@@ -542,31 +524,28 @@ def delete_thread(thread_id: str, current_user: dict = Depends(current_user_info
     """
     user_id = current_user["id"]
     
+    ph = get_placeholder()
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            
+        with get_db_cursor() as (cursor, conn):
             # スレッドの所有者確認
-            cursor.execute("SELECT user_id FROM threads WHERE id = ?", (thread_id,))
+            cursor.execute(f"SELECT user_id FROM threads WHERE id = {ph}", (thread_id,))
             thread_data = cursor.fetchone()
             
             if not thread_data:
                 raise HTTPException(status_code=404, detail="スレッドが見つかりません")
             
-            if thread_data[0] != user_id:
+            if thread_data['user_id'] != user_id:
                 raise HTTPException(status_code=403, detail="このスレッドを削除する権限がありません")
-            
+    
             # 関連するメッセージを削除
-            cursor.execute("DELETE FROM thread_qa WHERE thread_id = ?", (thread_id,))
+            cursor.execute(f"DELETE FROM thread_qa WHERE thread_id = {ph}", (thread_id,))
             
             # スレッドを削除
-            cursor.execute("DELETE FROM threads WHERE id = ?", (thread_id,))
+            cursor.execute(f"DELETE FROM threads WHERE id = {ph}", (thread_id,))
             
             conn.commit()
             
             return {"message": "スレッドが正常に削除されました", "thread_id": thread_id}
             
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")

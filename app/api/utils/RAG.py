@@ -1,19 +1,18 @@
 import os
-import sqlite3
 import pickle
 import json
 import hashlib
 from pathlib import Path
 from collections import defaultdict
-from typing import Optional, Iterable, Union, List, Dict, Tuple, Any
+from typing import Optional, List, Dict, Tuple, Any
 import re
 import dotenv
 import numpy as np
 import faiss
 from tqdm import tqdm
-from config import DATABASE
+from database_utils import get_db_cursor, get_placeholder
 from openai import OpenAI
-from lingua import Language, LanguageDetectorBuilder
+from lingua import LanguageDetectorBuilder
 
 # ----------------------------------------------------------------------------
 # Errors
@@ -84,12 +83,10 @@ def get_embedding(text: str):
 
 def get_language_map() -> Dict[int, str]:
     """languageテーブルから {id: code(lower)} を取得"""
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
-    cur.execute("SELECT id, code FROM language")
-    rows = cur.fetchall()
-    conn.close()
-    return {row[0]: row[1].lower() for row in rows}
+    with get_db_cursor() as (cursor, conn):
+        cursor.execute("SELECT id, code FROM language")
+        rows = cursor.fetchall()
+        return {row['id']: row['code'].lower() for row in rows}
 
 # ----------------------------------------------------------------------------
 # Incremental update (append) helpers
@@ -202,77 +199,77 @@ def ignore_current_vectors_for_qa_languages(question_id: int, answer_id: int, la
 
     Returns the number of language hashes added.
     """
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        LANGUAGE_MAP = get_language_map()  # {id: 'ja', ...}
+        
+        # Filter to only specified languages if provided
+        if language_codes is not None:
+            language_codes_set = set(language_codes)
+            filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
+                                   if lang_code in language_codes_set}
+        else:
+            filtered_language_map = LANGUAGE_MAP
 
-    LANGUAGE_MAP = get_language_map()  # {id: 'ja', ...}
-    
-    # Filter to only specified languages if provided
-    if language_codes is not None:
-        language_codes_set = set(language_codes)
-        filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
-                               if lang_code in language_codes_set}
-    else:
-        filtered_language_map = LANGUAGE_MAP
+        count = 0
+        for lang_id, lang_code in filtered_language_map.items():
+            cursor.execute(
+                f"SELECT texts FROM question_translation WHERE question_id = {ph} AND language_id = {ph}",
+                (question_id, lang_id),
+            )
+            qrow = cursor.fetchone()
+            cursor.execute(
+                f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
+                (answer_id, lang_id),
+            )
+            arow = cursor.fetchone()
+            if not (qrow and arow):
+                continue
+            q_text = qrow['texts']
+            a_text = arow['texts']
+            payload = f"Q: {q_text}\nA: {a_text}"
+            h = _payload_hash(payload)
+            s = _load_lang_hash_ignores(lang_code)
+            if h not in s:
+                s.add(h)
+                _save_lang_hash_ignores(lang_code, s)
+                count += 1
 
-    count = 0
-    for lang_id, lang_code in filtered_language_map.items():
-        cur.execute(
-            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
-            (question_id, lang_id),
-        )
-        qrow = cur.fetchone()
-        cur.execute(
-            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-            (answer_id, lang_id),
-        )
-        arow = cur.fetchone()
-        if not (qrow and arow):
-            continue
-        payload = f"Q: {qrow[0]}\nA: {arow[0]}"
-        h = _payload_hash(payload)
-        s = _load_lang_hash_ignores(lang_code)
-        if h not in s:
-            s.add(h)
-            _save_lang_hash_ignores(lang_code, s)
-            count += 1
-
-    conn.close()
-    return count
+        return count
 
 def ignore_current_vectors_for_qa(question_id: int, answer_id: int) -> int:
     """Record hash ignores for current QA payloads across all languages.
 
     Returns the number of language hashes added.
     """
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        LANGUAGE_MAP = get_language_map()  # {id: 'ja', ...}
+        count = 0
+        for lang_id, lang_code in LANGUAGE_MAP.items():
+            cursor.execute(
+                f"SELECT texts FROM question_translation WHERE question_id = {ph} AND language_id = {ph}",
+                (question_id, lang_id),
+            )
+            qrow = cursor.fetchone()
+            cursor.execute(
+                f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
+                (answer_id, lang_id),
+            )
+            arow = cursor.fetchone()
+            if not (qrow and arow):
+                continue
+            q_text = qrow['texts']
+            a_text = arow['texts']
+            payload = f"Q: {q_text}\nA: {a_text}"
+            h = _payload_hash(payload)
+            s = _load_lang_hash_ignores(lang_code)
+            if h not in s:
+                s.add(h)
+                _save_lang_hash_ignores(lang_code, s)
+                count += 1
 
-    LANGUAGE_MAP = get_language_map()  # {id: 'ja', ...}
-    count = 0
-    for lang_id, lang_code in LANGUAGE_MAP.items():
-        cur.execute(
-            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
-            (question_id, lang_id),
-        )
-        qrow = cur.fetchone()
-        cur.execute(
-            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-            (answer_id, lang_id),
-        )
-        arow = cur.fetchone()
-        if not (qrow and arow):
-            continue
-        payload = f"Q: {qrow[0]}\nA: {arow[0]}"
-        h = _payload_hash(payload)
-        s = _load_lang_hash_ignores(lang_code)
-        if h not in s:
-            s.add(h)
-            _save_lang_hash_ignores(lang_code, s)
-            count += 1
-
-    conn.close()
-    return count
+        return count
 
 def append_qa_to_vector_index_for_languages(question_id: int, answer_id: int, language_codes: list = None) -> int:
     """Append a single QA pair to vector indexes for specific languages only.
@@ -284,216 +281,214 @@ def append_qa_to_vector_index_for_languages(question_id: int, answer_id: int, la
 
     Returns the count of vectors appended across specified languages.
     """
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        # Resolve QA.id for consistency in meta
+        cursor.execute(f"SELECT id FROM QA WHERE question_id = {ph} AND answer_id = {ph}", (question_id, answer_id))
+        qa_row = cursor.fetchone()
+        qa_id = (qa_row['id']) if qa_row else None
 
-    # Resolve QA.id for consistency in meta
-    cur.execute("SELECT id FROM QA WHERE question_id = ? AND answer_id = ?", (question_id, answer_id))
-    qa_row = cur.fetchone()
-    qa_id = qa_row[0] if qa_row else None
+        # Fetch question time for texts sidecar
+        cursor.execute(f"SELECT time FROM question WHERE question_id = {ph}", (question_id,))
+        trow = cursor.fetchone()
+        time_val = (trow['time']) if trow else None
 
-    # Fetch question time for texts sidecar
-    cur.execute("SELECT time FROM question WHERE question_id = ?", (question_id,))
-    trow = cur.fetchone()
-    time_val = trow[0] if trow else None
+        LANGUAGE_MAP = get_language_map()  # {id: 'ja'/'en'/...}
 
-    LANGUAGE_MAP = get_language_map()  # {id: 'ja'/'en'/...}
+        # Filter to only specified languages if provided
+        if language_codes is not None:
+            language_codes_set = set(language_codes)
+            filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
+                                   if lang_code in language_codes_set}
+        else:
+            filtered_language_map = LANGUAGE_MAP
 
-    # Filter to only specified languages if provided
-    if language_codes is not None:
-        language_codes_set = set(language_codes)
-        filtered_language_map = {lang_id: lang_code for lang_id, lang_code in LANGUAGE_MAP.items() 
-                               if lang_code in language_codes_set}
-    else:
-        filtered_language_map = LANGUAGE_MAP
+        appended = 0
+        for lang_id, lang_code in filtered_language_map.items():
+            # Fetch translations for this language
+            cursor.execute(
+                f"SELECT texts FROM question_translation WHERE question_id = {ph} AND language_id = {ph}",
+                (question_id, lang_id),
+            )
+            qrow = cursor.fetchone()
+            cursor.execute(
+                f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
+                (answer_id, lang_id),
+            )
+            arow = cursor.fetchone()
+            if not (qrow and arow):
+                continue
 
-    appended = 0
-    for lang_id, lang_code in filtered_language_map.items():
-        # Fetch translations for this language
-        cur.execute(
-            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
-            (question_id, lang_id),
-        )
-        qrow = cur.fetchone()
-        cur.execute(
-            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-            (answer_id, lang_id),
-        )
-        arow = cur.fetchone()
-        if not (qrow and arow):
-            continue
+            question_text = qrow['texts']
+            answer_text = arow['texts']
+            payload = f"Q: {question_text}\nA: {answer_text}"
 
-        question_text = qrow[0]
-        answer_text = arow[0]
-        payload = f"Q: {question_text}\nA: {answer_text}"
+            # Compute embedding and normalize
+            emb = np.array(get_embedding(payload)).astype("float32").reshape(1, -1)
+            faiss.normalize_L2(emb)
 
-        # Compute embedding and normalize
-        emb = np.array(get_embedding(payload)).astype("float32").reshape(1, -1)
-        faiss.normalize_L2(emb)
+            # Load or create index and sidecars
+            index = _ensure_index_for_lang(emb.shape[1], lang_code)
+            if index is None:
+                # Skip this language if existing index has incompatible dim
+                continue
+            meta_list, texts_list = _load_sidecar_lists(lang_code)
 
-        # Load or create index and sidecars
-        index = _ensure_index_for_lang(emb.shape[1], lang_code)
-        if index is None:
-            # Skip this language if existing index has incompatible dim
-            continue
-        meta_list, texts_list = _load_sidecar_lists(lang_code)
+            # Append
+            try:
+                index.add(emb)
+            except Exception:
+                # Append failed, skip to keep existing index intact.
+                continue
 
-        # Append
-        try:
-            index.add(emb)
-        except Exception:
-            # Append failed, skip to keep existing index intact.
-            continue
+            # Keep the same structure as initial build: (qa_id, question_id)
+            meta_list.append((qa_id, question_id))
+            texts_list.append((question_text, answer_text, time_val))
 
-        # Keep the same structure as initial build: (qa_id, question_id)
-        meta_list.append((qa_id, question_id))
-        texts_list.append((question_text, answer_text, time_val))
+            # Persist
+            _save_index_and_sidecars(index, meta_list, texts_list, lang_code)
+            appended += 1
 
-        # Persist
-        _save_index_and_sidecars(index, meta_list, texts_list, lang_code)
-        appended += 1
-
-    conn.close()
-    return appended
+        return appended
 
 def append_qa_to_vector_index(question_id: int, answer_id: int) -> int:
     """Append a single QA pair (all available languages) to vector indexes.
 
     Returns the count of vectors appended across languages.
     """
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        # Resolve QA.id for consistency in meta
+        cursor.execute(f"SELECT id FROM QA WHERE question_id = {ph} AND answer_id = {ph}", (question_id, answer_id))
+        qa_row = cursor.fetchone()
+        qa_id = (qa_row['id']) if qa_row else None
 
-    # Resolve QA.id for consistency in meta
-    cur.execute("SELECT id FROM QA WHERE question_id = ? AND answer_id = ?", (question_id, answer_id))
-    qa_row = cur.fetchone()
-    qa_id = qa_row[0] if qa_row else None
+        # Fetch question time for texts sidecar
+        cursor.execute(f"SELECT time FROM question WHERE question_id = {ph}", (question_id,))
+        trow = cursor.fetchone()
+        time_val = (trow['time']) if trow else None
 
-    # Fetch question time for texts sidecar
-    cur.execute("SELECT time FROM question WHERE question_id = ?", (question_id,))
-    trow = cur.fetchone()
-    time_val = trow[0] if trow else None
+        LANGUAGE_MAP = get_language_map()  # {id: 'ja'/'en'/...}
 
-    LANGUAGE_MAP = get_language_map()  # {id: 'ja'/'en'/...}
+        appended = 0
+        for lang_id, lang_code in LANGUAGE_MAP.items():
+            # Fetch translations for this language
+            cursor.execute(
+                f"SELECT texts FROM question_translation WHERE question_id = {ph} AND language_id = {ph}",
+                (question_id, lang_id),
+            )
+            qrow = cursor.fetchone()
+            cursor.execute(
+                f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
+                (answer_id, lang_id),
+            )
+            arow = cursor.fetchone()
+            if not (qrow and arow):
+                continue
 
-    appended = 0
-    for lang_id, lang_code in LANGUAGE_MAP.items():
-        # Fetch translations for this language
-        cur.execute(
-            "SELECT texts FROM question_translation WHERE question_id = ? AND language_id = ?",
-            (question_id, lang_id),
-        )
-        qrow = cur.fetchone()
-        cur.execute(
-            "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-            (answer_id, lang_id),
-        )
-        arow = cur.fetchone()
-        if not (qrow and arow):
-            continue
+            question_text = qrow['texts']
+            answer_text = arow['texts']
+            payload = f"Q: {question_text}\nA: {answer_text}"
 
-        question_text = qrow[0]
-        answer_text = arow[0]
-        payload = f"Q: {question_text}\nA: {answer_text}"
+            # Compute embedding and normalize
+            emb = np.array(get_embedding(payload)).astype("float32").reshape(1, -1)
+            faiss.normalize_L2(emb)
 
-        # Compute embedding and normalize
-        emb = np.array(get_embedding(payload)).astype("float32").reshape(1, -1)
-        faiss.normalize_L2(emb)
+            # Load or create index and sidecars
+            index = _ensure_index_for_lang(emb.shape[1], lang_code)
+            if index is None:
+                # Skip this language if existing index has incompatible dim
+                continue
+            meta_list, texts_list = _load_sidecar_lists(lang_code)
 
-        # Load or create index and sidecars
-        index = _ensure_index_for_lang(emb.shape[1], lang_code)
-        if index is None:
-            # Skip this language if existing index has incompatible dim
-            continue
-        meta_list, texts_list = _load_sidecar_lists(lang_code)
+            # Append
+            try:
+                index.add(emb)
+            except Exception:
+                # Append failed, skip to keep existing index intact.
+                continue
 
-        # Append
-        try:
-            index.add(emb)
-        except Exception:
-            # Append failed, skip to keep existing index intact.
-            continue
+            # Keep the same structure as initial build: (qa_id, question_id)
+            meta_list.append((qa_id, question_id))
+            texts_list.append((question_text, answer_text, time_val))
 
-        # Keep the same structure as initial build: (qa_id, question_id)
-        meta_list.append((qa_id, question_id))
-        texts_list.append((question_text, answer_text, time_val))
+            # Persist
+            _save_index_and_sidecars(index, meta_list, texts_list, lang_code)
+            appended += 1
 
-        # Persist
-        _save_index_and_sidecars(index, meta_list, texts_list, lang_code)
-        appended += 1
-
-    conn.close()
-    return appended
+        return appended
 
 # ----------------------------------------------------------------------------
 # Index build
 # ----------------------------------------------------------------------------
 
 def generate_and_save_vectors():
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        print("ベクトル生成開始...")
+        cursor.execute("SELECT id, question_id, answer_id FROM QA")
+        qa_rows = cursor.fetchall()
+        print(f"総QA数: {len(qa_rows)} 件")
 
-    print("ベクトル生成開始...")
-    cur.execute("SELECT id, question_id, answer_id FROM QA")
-    qa_rows = cur.fetchall()
-    print(f"総QA数: {len(qa_rows)} 件")
+        LANGUAGE_MAP = get_language_map()  # {id:'ja', ...}
+        print(f"対応言語: {list(set(LANGUAGE_MAP.values()))}")
 
-    LANGUAGE_MAP = get_language_map()  # {id:'ja', ...}
-    print(f"対応言語: {list(set(LANGUAGE_MAP.values()))}")
+        lang_text_map: Dict[str, list] = defaultdict(list)
 
-    lang_text_map: Dict[str, list] = defaultdict(list)
-
-    for qa_id, qid, aid in tqdm(qa_rows, desc="ベクトル生成中"):
-        for lang_id, lang_code in LANGUAGE_MAP.items():
-            cur.execute(
-                "SELECT texts FROM question_translation WHERE question_id=? AND language_id=?",
-                (qid, lang_id)
-            )
-            qrow = cur.fetchone()
-
-            cur.execute(
-                "SELECT texts FROM answer_translation WHERE answer_id=? AND language_id=?",
-                (aid, lang_id)
-            )
-            arow = cur.fetchone()
-
-            cur.execute("SELECT time FROM question WHERE question_id=?", (qid,))
-            trow = cur.fetchone()
-
-            if qrow and arow and trow:
-                question_text = qrow[0]
-                answer_text = arow[0]
-                time_val = trow[0]
-                text = f"Q: {question_text}\nA: {answer_text}"
-                embedding = get_embedding(text)
-                lang_text_map[lang_code].append(
-                    (embedding, (qa_id, qid), (question_text, answer_text, time_val))
+        for qa_row in tqdm(qa_rows, desc="ベクトル生成中"):
+            qa_id = qa_row['id']
+            qid = qa_row['question_id']
+            aid = qa_row['answer_id']
+            
+            for lang_id, lang_code in LANGUAGE_MAP.items():
+                cursor.execute(
+                    f"SELECT texts FROM question_translation WHERE question_id={ph} AND language_id={ph}",
+                    (qid, lang_id)
                 )
+                qrow = cursor.fetchone()
 
-    # 言語ごとにFAISSへ投入して保存
-    for lang_code, data in lang_text_map.items():
-        if not data:
-            print(f"{lang_code} のデータが空なのでスキップ")
-            continue
+                cursor.execute(
+                    f"SELECT texts FROM answer_translation WHERE answer_id={ph} AND language_id={ph}",
+                    (aid, lang_id)
+                )
+                arow = cursor.fetchone()
 
-        vectors = np.array([x[0] for x in data]).astype("float32")
-        faiss.normalize_L2(vectors)
-        meta = [x[1] for x in data]
-        texts = [x[2] for x in data]
+                cursor.execute(f"SELECT time FROM question WHERE question_id={ph}", (qid,))
+                trow = cursor.fetchone()
 
-        index = faiss.IndexFlatIP(vectors.shape[1])
-        index.add(vectors)
+                if qrow and arow and trow:
+                    question_text = qrow['texts']
+                    answer_text = arow['texts']
+                    time_val = trow['time']
+                    text = f"Q: {question_text}\nA: {answer_text}"
+                    embedding = get_embedding(text)
+                    lang_text_map[lang_code].append(
+                        (embedding, (qa_id, qid), (question_text, answer_text, time_val))
+                    )
 
-        faiss.write_index(index, str(VECTOR_DIR / f"vectors_{lang_code}.faiss"))
-        with open(VECTOR_DIR / f"vectors_{lang_code}.meta.pkl", "wb") as f:
-            pickle.dump(meta, f)
-        with open(VECTOR_DIR / f"vectors_{lang_code}.texts.pkl", "wb") as f:
-            pickle.dump(texts, f)
+        # 言語ごとにFAISSへ投入して保存
+        for lang_code, data in lang_text_map.items():
+            if not data:
+                print(f"{lang_code} のデータが空なのでスキップ")
+                continue
 
-        print(f"保存完了: vectors_{lang_code}.*（{len(data)} 件）")
+            vectors = np.array([x[0] for x in data]).astype("float32")
+            faiss.normalize_L2(vectors)
+            meta = [x[1] for x in data]
+            texts = [x[2] for x in data]
 
-    conn.close()
-    print("全ベクトル保存完了")
+            index = faiss.IndexFlatIP(vectors.shape[1])
+            index.add(vectors)
+
+            faiss.write_index(index, str(VECTOR_DIR / f"vectors_{lang_code}.faiss"))
+            with open(VECTOR_DIR / f"vectors_{lang_code}.meta.pkl", "wb") as f:
+                pickle.dump(meta, f)
+            with open(VECTOR_DIR / f"vectors_{lang_code}.texts.pkl", "wb") as f:
+                pickle.dump(texts, f)
+
+            print(f"保存完了: vectors_{lang_code}.*（{len(data)} 件）")
+
+        print("全ベクトル保存完了")
 
 # ----------------------------------------------------------------------------
 # Retrieval
@@ -586,73 +581,71 @@ def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple
 
     rank = 1
     # DB 接続（category 取得用）
-    conn = sqlite3.connect(DATABASE)
-    cur = conn.cursor()
-    for idx, similarity in ranked:
-        # 類似度が閾値以上の場合のみ結果に含める
-        if similarity >= similarity_threshold:
-            question_text, answer_text, time_val = texts[idx]
-            qa_meta = meta[idx] if idx < len(meta) else (None, None)
-            qa_id = None
-            qid = None
-            try:
-                qa_id = int(qa_meta[0]) if qa_meta and qa_meta[0] is not None else None
-                qid = int(qa_meta[1]) if qa_meta and qa_meta[1] is not None else None
-            except Exception:
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        for idx, similarity in ranked:
+            # 類似度が閾値以上の場合のみ結果に含める
+            if similarity >= similarity_threshold:
+                question_text, answer_text, time_val = texts[idx]
+                qa_meta = meta[idx] if idx < len(meta) else (None, None)
                 qa_id = None
                 qid = None
-
-            # Check ignores
-            payload_hash = _payload_hash(f"Q: {question_text}\nA: {answer_text}")
-            if (qa_id is not None and qa_id in ignored_qa_ids) or (payload_hash in ignored_hashes):
-                continue
-
-            # category_id 取得（存在しない場合は None）
-            cat_id = None
-            if qid is not None:
                 try:
-                    cur.execute("SELECT category_id FROM question WHERE question_id = ?", (qid,))
-                    row = cur.fetchone()
-                    if row:
-                        cat_id = int(row[0])
+                    qa_id = int(qa_meta[0]) if qa_meta and qa_meta[0] is not None else None
+                    qid = int(qa_meta[1]) if qa_meta and qa_meta[1] is not None else None
                 except Exception:
-                    cat_id = None
+                    qa_id = None
+                    qid = None
 
-            # 回答の最終編集時刻（answer.time）を取得
-            ans_time = None
-            if qa_id is not None:
-                try:
-                    cur.execute("SELECT answer_id FROM QA WHERE id = ?", (qa_id,))
-                    qa_row = cur.fetchone()
-                    if qa_row and qa_row[0] is not None:
-                        ans_id = int(qa_row[0])
-                        cur.execute("SELECT time FROM answer WHERE answer_id = ?", (ans_id,))
-                        arow = cur.fetchone()
-                        if arow:
-                            ans_time = arow[0]
-                except Exception:
-                    ans_time = None
+                # Check ignores
+                payload_hash = _payload_hash(f"Q: {question_text}\nA: {answer_text}")
+                if (qa_id is not None and qa_id in ignored_qa_ids) or (payload_hash in ignored_hashes):
+                    continue
 
-            results[rank] = {
-                "answer": answer_text,
-                "question": question_text,
-                "time": time_val,
-                "similarity": float(similarity),
-                "question_id": qid,
-                "category_id": cat_id,
-                "answer_time": ans_time,
-            }
-            rank += 1
+                # category_id 取得（存在しない場合は None）
+                cat_id = None
+                if qid is not None:
+                    try:
+                        cursor.execute(f"SELECT category_id FROM question WHERE question_id = {ph}", (qid,))
+                        row = cursor.fetchone()
+                        if row:
+                            cat_id = int(row['category_id'])
+                    except Exception:
+                        cat_id = None
 
-            # 最大5件まで
-            if rank > 5:
-                break
+                # 回答の最終編集時刻（answer.time）を取得
+                ans_time = None
+                if qa_id is not None:
+                    try:
+                        cursor.execute(f"SELECT answer_id FROM QA WHERE id = {ph}", (qa_id,))
+                        qa_row = cursor.fetchone()
+                        if qa_row:
+                            ans_id_val = qa_row['answer_id']
+                            if ans_id_val is not None:
+                                ans_id = int(ans_id_val)
+                                cursor.execute(f"SELECT time FROM answer WHERE answer_id = {ph}", (ans_id,))
+                                arow = cursor.fetchone()
+                                if arow:
+                                    ans_time = arow['time']
+                    except Exception:
+                        ans_time = None
+
+                results[rank] = {
+                    "answer": answer_text,
+                    "question": question_text,
+                    "time": time_val,
+                    "similarity": float(similarity),
+                    "question_id": qid,
+                    "category_id": cat_id,
+                    "answer_time": ans_time,
+                }
+                rank += 1
+
+                # 最大5件まで
+                if rank > 5:
+                    break
 
     print(f"類似度閾値 {similarity_threshold} 以上の結果: {len(results)}件")
-    try:
-        conn.close()
-    except Exception:
-        pass
     return results
 
 # ----------------------------------------------------------------------------

@@ -1,9 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from api.routes.user import current_user_info
 from typing import Literal, Optional
-import sqlite3
 from datetime import datetime
-from config import DATABASE
+from database_utils import get_db_cursor, get_placeholder
 from pydantic import BaseModel
 from langchain_community.chat_models import ChatOpenAI
 from langchain.schema import SystemMessage, HumanMessage
@@ -258,52 +257,62 @@ def apply_action(payload: ActionPayload, current_user: dict = Depends(current_us
         # Persist into thread history
         user_id = current_user["id"]
         assigned_thread_id = None
-        with sqlite3.connect(DATABASE) as conn:
-            cur = conn.cursor()
+        ph = get_placeholder()
+        with get_db_cursor() as (cur, conn):
             # Ensure thread
             if payload.thread_id is not None:
-                cur.execute("SELECT id, user_id FROM threads WHERE id = ?", (payload.thread_id,))
+                cur.execute(f"SELECT id, user_id FROM threads WHERE id = {ph}", (payload.thread_id,))
                 row = cur.fetchone()
-                if row and int(row[1]) == int(user_id):
-                    assigned_thread_id = int(row[0])
-                else:
-                    # Ignore invalid thread ownership, create new
-                    assigned_thread_id = None
+                if row:
+                        if int(row['user_id']) == int(user_id):
+                            assigned_thread_id = int(row['id'])
+
             if assigned_thread_id is None:
                 cur.execute(
-                    "INSERT INTO threads (user_id, last_updated) VALUES (?, ?)",
+                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
                     (user_id, datetime.now()),
                 )
                 assigned_thread_id = cur.lastrowid
 
             # Ensure columns exist: rag_qa, type
             try:
-                cur.execute("PRAGMA table_info(thread_qa)")
-                cols = [r[1] for r in cur.fetchall()]
-                if "rag_qa" not in cols:
-                    cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
-                if "type" not in cols:
-                    cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
-                conn.commit()
+                    # Check if columns exist in MySQL
+                    cur.execute("""
+                        SELECT COUNT(*) FROM information_schema.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'thread_qa' 
+                        AND COLUMN_NAME = 'rag_qa'
+                    """)
+                    if cur.fetchone()[0] == 0:
+                        cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
+                    cur.execute("""
+                        SELECT COUNT(*) FROM information_schema.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'thread_qa' 
+                        AND COLUMN_NAME = 'type'
+                    """)
+                    if cur.fetchone()[0] == 0:
+                        cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
+                    conn.commit()
             except Exception:
                 pass
 
             q_text = (payload.action_label or f"Action: {payload.action}").strip()
             try:
                 cur.execute(
-                    """
+                    f"""
                     INSERT INTO thread_qa (thread_id, question, answer, rag_qa, type)
-                    VALUES (?, ?, ?, ?, ?)
+                    VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
                     """,
                     (assigned_thread_id, q_text, result, "[]", "action"),
                 )
-            except sqlite3.OperationalError:
+            except Exception:
                 cur.execute(
-                    "INSERT INTO thread_qa (thread_id, question, answer) VALUES (?, ?, ?)",
+                    f"INSERT INTO thread_qa (thread_id, question, answer) VALUES ({ph}, {ph}, {ph})",
                     (assigned_thread_id, q_text, result),
                 )
             cur.execute(
-                "UPDATE threads SET last_updated = ? WHERE id = ?",
+                f"UPDATE threads SET last_updated = {ph} WHERE id = {ph}",
                 (datetime.now(), assigned_thread_id),
             )
             conn.commit()

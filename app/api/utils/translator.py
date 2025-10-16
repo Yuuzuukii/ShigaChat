@@ -1,8 +1,6 @@
-import sqlite3
 from deep_translator import GoogleTranslator
-from fastapi import HTTPException, Depends
-from api.routes.user import get_current_user
-from config import DATABASE
+from fastapi import HTTPException
+from database_utils import get_db_cursor, get_placeholder
 
 
 import re
@@ -163,30 +161,30 @@ def question_translate(question_id: int, target_language_id: int, current_user: 
         "id": "id",       # インドネシア語
     }
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         # 元の質問を取得
-        cursor.execute("SELECT content, language_id FROM question WHERE question_id = ?", (question_id,))
+        cursor.execute(f"SELECT content, language_id FROM question WHERE question_id = {ph}", (question_id,))
         question = cursor.fetchone()
         if not question:
             raise HTTPException(status_code=404, detail="指定された質問が存在しません")
 
-        original_content, original_language_id = question
+        original_content = question['content']
+        original_language_id = question['language_id']
 
         # 元言語コードを取得
-        cursor.execute("SELECT code FROM language WHERE id = ?", (original_language_id,))
+        cursor.execute(f"SELECT code FROM language WHERE id = {ph}", (original_language_id,))
         source_language_row = cursor.fetchone()
         if not source_language_row:
             raise HTTPException(status_code=404, detail="元言語コードが見つかりません")
-        source_language_code = source_language_row[0].lower()  # 小文字に変換
+        source_language_code = (source_language_row['code']).lower()
 
         # ターゲット言語コードを取得
-        cursor.execute("SELECT code FROM language WHERE id = ?", (target_language_id,))
+        cursor.execute(f"SELECT code FROM language WHERE id = {ph}", (target_language_id,))
         target_language_row = cursor.fetchone()
         if not target_language_row:
             raise HTTPException(status_code=404, detail="指定された言語IDが存在しません")
-        target_language_code_from_db = target_language_row[0].lower()  # 小文字に変換
+        target_language_code_from_db = (target_language_row['code']).lower()
 
         # 言語マッピングから翻訳ライブラリ用のコードを取得
         source_language_code_mapped = translation_language_map.get(source_language_code)
@@ -204,10 +202,11 @@ def question_translate(question_id: int, target_language_id: int, current_user: 
         # 翻訳処理
         try:
             translated_text = translate(original_content, source_language_code_mapped, target_language_code)
-            cursor.execute("""
-                INSERT OR REPLACE INTO question_translation (question_id, language_id, texts)
-                VALUES (?, ?, ?)
-            """, (question_id, target_language_id, translated_text))
+            cursor.execute(f"""
+                INSERT INTO question_translation (question_id, language_id, texts)
+                VALUES ({ph}, {ph}, {ph})
+                ON DUPLICATE KEY UPDATE texts = {ph}
+            """, (question_id, target_language_id, translated_text, translated_text))
             conn.commit()
 
         except Exception as e:
@@ -230,30 +229,30 @@ def answer_translate(answer_id: int, target_language_id: int, current_user: dict
         "id": "id",       # インドネシア語
     }
 
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
-
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         # 元の回答を取得
-        cursor.execute("SELECT texts, language_id FROM answer_translation WHERE answer_id = ?", (answer_id,))
+        cursor.execute(f"SELECT texts, language_id FROM answer_translation WHERE answer_id = {ph}", (answer_id,))
         answer = cursor.fetchone()
         if not answer:
             raise HTTPException(status_code=404, detail="指定された回答が存在しません")
 
-        original_content, original_language_id = answer
+        original_content = answer['texts']
+        original_language_id = answer['language_id']
 
         # 元言語コードを取得
-        cursor.execute("SELECT code FROM language WHERE id = ?", (original_language_id,))
+        cursor.execute(f"SELECT code FROM language WHERE id = {ph}", (original_language_id,))
         source_language_row = cursor.fetchone()
         if not source_language_row:
             raise HTTPException(status_code=404, detail="元言語コードが見つかりません")
-        source_language_code = source_language_row[0].lower()  # 小文字に変換
+        source_language_code = (source_language_row['code']).lower()
 
         # ターゲット言語コードを取得
-        cursor.execute("SELECT code FROM language WHERE id = ?", (target_language_id,))
+        cursor.execute(f"SELECT code FROM language WHERE id = {ph}", (target_language_id,))
         target_language_row = cursor.fetchone()
         if not target_language_row:
             raise HTTPException(status_code=404, detail="指定された言語IDが存在しません")
-        target_language_code_from_db = target_language_row[0].lower()  # 小文字に変換
+        target_language_code_from_db = (target_language_row['code']).lower()
 
         # 言語マッピングから翻訳ライブラリ用のコードを取得
         source_language_code_mapped = translation_language_map.get(source_language_code)
@@ -271,9 +270,9 @@ def answer_translate(answer_id: int, target_language_id: int, current_user: dict
         # 翻訳処理
         try:
             translated_text = translate(original_content, source_language_code_mapped, target_language_code)
-            cursor.execute("""
+            cursor.execute(f"""
                 INSERT INTO answer_translation (answer_id, language_id, texts)
-                VALUES (?, ?, ?)
+                VALUES ({ph}, {ph}, {ph})
             """, (answer_id, target_language_id, translated_text))
             conn.commit()
 

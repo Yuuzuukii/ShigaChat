@@ -68,9 +68,6 @@ const Q_List = () => {
   const [searchParams] = useSearchParams();
   const targetQuestionId = Number(searchParams.get("id")) || null;
 
-  // デバッグ用ログ
-  console.log("Q_List - categoryId:", categoryId, "targetQuestionId:", targetQuestionId);
-
   // デバッグ用のスクロール関数をグローバルに追加
   useEffect(() => {
     window.debugScrollToQuestion = (questionId) => {
@@ -246,14 +243,16 @@ const Q_List = () => {
   // 質問がロードされた後に文法チェック設定を読み込む（言語ごと）
   useEffect(() => {
     if (questions && questions.length > 0) {
+      // 言語が変更されたときや、新しい質問が表示されたときに文法チェック設定を読み込む
       questions.forEach(question => {
         const key = `${question.question_id}:${language}`;
-        if (question.question_id && !grammarCheckSettings.hasOwnProperty(key)) {
+        // 既存のキャッシュがない場合のみ読み込む
+        if (question.question_id && grammarCheckSettings[key] === undefined) {
           fetchGrammarCheckSetting(question.question_id);
         }
       });
     }
-  }, [questions, language]);
+  }, [questions, language, grammarCheckSettings]);
 
   // 特定質問へスクロール
   useEffect(() => {
@@ -459,7 +458,17 @@ const Q_List = () => {
       if (!categoryResponse.ok) throw new Error(t.categorynotfound);
 
       const categoryData = await categoryResponse.json();
-      setCategoryName(categoryData["カテゴリ名"] || t.categorynotfound);
+      console.log("📊 カテゴリデータ (Admin):", categoryData);
+      console.log("📊 カテゴリ名の型 (Admin):", typeof categoryData["カテゴリ名"]);
+      console.log("📊 カテゴリ名の値 (Admin):", categoryData["カテゴリ名"]);
+      
+      // カテゴリ名がオブジェクトの場合はdescriptionを取り出す
+      const categoryNameValue = categoryData["カテゴリ名"];
+      const categoryNameText = typeof categoryNameValue === 'object' && categoryNameValue !== null
+        ? (categoryNameValue.description || JSON.stringify(categoryNameValue))
+        : (categoryNameValue || t.categorynotfound);
+      
+      setCategoryName(categoryNameText);
 
       const response = await fetch(
         `${API_BASE_URL}/category/category_admin/${categoryId}?lang=${lang}`,
@@ -592,7 +601,10 @@ const Q_List = () => {
       // 全言語翻訳の場合、文法チェック設定を再読み込み
       if (translateToAll) {
         try {
-          // 該当質問のすべての言語の文法チェック設定をクリアして再読み込みを強制
+          // 全言語翻訳時は、編集言語のみ有効、他の言語は無効になる
+          const currentLangCode = language;
+          
+          // 該当質問のすべての言語の文法チェック設定をクリアして即座に更新
           setGrammarCheckSettings(prevSettings => {
             const newSettings = { ...prevSettings };
             // 該当質問の全言語設定をクリア
@@ -601,13 +613,20 @@ const Q_List = () => {
                 delete newSettings[key];
               }
             });
+            // 現在の言語のみ有効に設定
+            newSettings[`${questionId}:${currentLangCode}`] = true;
             return newSettings;
           });
           
-          // 現在の言語の設定を再読み込み
-          setTimeout(() => {
-            fetchGrammarCheckSetting(questionId);
-          }, 100);
+          // 念のため、サーバーから最新の状態を再取得
+          setTimeout(async () => {
+            try {
+              await fetchGrammarCheckSetting(questionId);
+              console.log("✅ 文法チェック設定を再読み込みしました");
+            } catch (error) {
+              console.error("文法チェック設定の再読み込みに失敗:", error);
+            }
+          }, 200);
         } catch (error) {
           console.error("文法チェック設定の再読み込みに失敗:", error);
         }
@@ -639,13 +658,22 @@ const Q_List = () => {
       // 現在の言語IDを取得
       const languageId = languageCodeToId[language] || 1; // デフォルトは日本語 (ID: 1)
       
+      console.log(`🔍 文法チェック設定を取得中: questionId=${questionId}, language=${language}, languageId=${languageId}`);
+      
       const response = await fetch(`${API_BASE_URL}/admin/grammar_check_setting?question_id=${questionId}&language_id=${languageId}`, {
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
       if (!response.ok) throw new Error('Failed to fetch grammar check setting');
       const data = await response.json();
       const key = `${questionId}:${language}`;
-      setGrammarCheckSettings(prev => ({ ...prev, [key]: data.grammar_check_enabled }));
+      
+      console.log(`✅ 文法チェック設定を取得: key=${key}, enabled=${data.grammar_check_enabled}`);
+      
+      setGrammarCheckSettings(prev => {
+        const updated = { ...prev, [key]: data.grammar_check_enabled };
+        console.log(`📝 文法チェック設定を更新: `, updated);
+        return updated;
+      });
       return data.grammar_check_enabled;
     } catch (error) {
       console.error("Error fetching grammar check setting:", error);
@@ -956,19 +984,21 @@ const Q_List = () => {
                               id={`grammar-check-${question.question_id}`}
                               checked={grammarCheckSettings[`${question.question_id}:${language}`] === true}
                               onChange={async (e) => {
+                                const newValue = e.target.checked;
+                                console.log(`📝 文法チェック設定変更: questionId=${question.question_id}, language=${language}, newValue=${newValue}`);
                                 try {
-                                  await updateGrammarCheckSetting(question.question_id, e.target.checked);
-                                  if (e.target.checked) {
+                                  await updateGrammarCheckSetting(question.question_id, newValue);
+                                  if (newValue) {
                                     // チェック時のフィードバック
-                                    console.log(`Grammar check enabled for question ${question.question_id} in language ${language}`);
+                                    console.log(`✅ Grammar check enabled for question ${question.question_id} in language ${language}`);
                                   } else {
                                     // チェック解除時のフィードバック
-                                    console.log(`Grammar check disabled for question ${question.question_id} in language ${language}`);
+                                    console.log(`❌ Grammar check disabled for question ${question.question_id} in language ${language}`);
                                   }
                                 } catch (error) {
                                   console.error("文法チェック設定の更新に失敗:", error);
                                   // チェックボックスの状態を元に戻す
-                                  e.target.checked = !e.target.checked;
+                                  e.target.checked = !newValue;
                                   alert(t.grammarCheckUpdateFailed);
                                 }
                               }}

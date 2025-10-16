@@ -1,92 +1,99 @@
-import sqlite3
 from datetime import datetime,timedelta
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from api.routes.user import current_user_info
 from api.utils.translator import question_translate, answer_translate
-from config import DATABASE, language_mapping
+from config import language_mapping
+from database_utils import get_db_cursor, get_placeholder
 from api.utils.translator import translate
 from models.schemas import QuestionRequest, moveCategoryRequest, RegisterQuestionRequest
-from api.utils.RAG import append_qa_to_vector_index, append_qa_to_vector_index_for_languages, add_qa_id_to_ignore, ignore_current_vectors_for_qa, ignore_current_vectors_for_qa_languages
-from fastapi import BackgroundTasks
+from api.utils.RAG import append_qa_to_vector_index, append_qa_to_vector_index_for_languages, add_qa_id_to_ignore, ignore_current_vectors_for_qa_languages
+
 router = APIRouter()
 
 # ----- Answer history helpers -------------------------------------------------
-def _ensure_answer_translation_history(conn: sqlite3.Connection) -> None:
+def _ensure_answer_translation_history() -> None:
     try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS answer_translation_history (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                answer_id INTEGER NOT NULL,
-                language_id INTEGER NOT NULL,
-                texts TEXT NOT NULL,
-                edited_at DATETIME NOT NULL,
-                editor_user_id INTEGER,
-                editor_name TEXT
-            )
-            """
-        )
-        # Indexes for efficient lookups
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_ath_answer_lang ON answer_translation_history(answer_id, language_id)")
-        conn.commit()
-    except Exception:
-        pass
-
-# Ensure question_grammar_check table exists for tracking grammar check settings per question and language
-def _ensure_question_grammar_check_table(conn: sqlite3.Connection):
-    try:
-        cur = conn.cursor()
-        cur.execute(
-            """
-            CREATE TABLE IF NOT EXISTS question_grammar_check (
-                question_id INTEGER NOT NULL,
-                language_id INTEGER NOT NULL,
-                grammar_check_enabled BOOLEAN DEFAULT FALSE,
-                created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                PRIMARY KEY (question_id, language_id),
-                FOREIGN KEY (question_id) REFERENCES question (question_id),
-                FOREIGN KEY (language_id) REFERENCES language (id)
-            )
-            """
-        )
-        conn.commit()
-    except Exception:
-        pass
-
-# Ensure notifications table has question_id column
-def _ensure_notifications_question_id(conn: sqlite3.Connection):
-    try:
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(notifications)")
-        cols = [row[1] for row in cur.fetchall()]
-        if "question_id" not in cols:
-            cur.execute("ALTER TABLE notifications ADD COLUMN question_id INTEGER")
+        with get_db_cursor() as (cur, conn):
+            cur.execute("""
+                    CREATE TABLE IF NOT EXISTS answer_translation_history (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        answer_id INT NOT NULL,
+                        language_id INT NOT NULL,
+                        texts TEXT NOT NULL,
+                        edited_at DATETIME NOT NULL,
+                        editor_user_id INT,
+                        editor_name TEXT,
+                        INDEX idx_ath_answer_lang (answer_id, language_id)
+                    )
+                """)
             conn.commit()
     except Exception:
         pass
 
-# Ensure question table has last editor fields
-def _ensure_question_editor_columns(conn: sqlite3.Connection):
+def _ensure_question_grammar_check_table():
     try:
-        cur = conn.cursor()
-        cur.execute("PRAGMA table_info(question)")
-        cols = [row[1] for row in cur.fetchall()]
-        changed = False
-        if "last_editor_id" not in cols:
-            cur.execute("ALTER TABLE question ADD COLUMN last_editor_id INTEGER")
-            changed = True
-        if "last_edited_at" not in cols:
-            cur.execute("ALTER TABLE question ADD COLUMN last_edited_at DATETIME")
-            changed = True
-        if changed:
+        with get_db_cursor() as (cur, conn):
+            cur.execute(
+                    """
+                    CREATE TABLE IF NOT EXISTS question_grammar_check (
+                        question_id INT NOT NULL,
+                        language_id INT NOT NULL,
+                        grammar_check_enabled BOOLEAN DEFAULT FALSE,
+                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        PRIMARY KEY (question_id, language_id),
+                        FOREIGN KEY (question_id) REFERENCES question (question_id),
+                        FOREIGN KEY (language_id) REFERENCES language (id)
+                    )
+                    """
+                )
             conn.commit()
+    except Exception:
+        pass
+
+def _ensure_notifications_question_id():
+    try:
+        with get_db_cursor() as (cur, conn):
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = 'notifications' 
+                    AND COLUMN_NAME = 'question_id'
+                """)
+                if cur.fetchone()[0] == 0:
+                    cur.execute("ALTER TABLE notifications ADD COLUMN question_id INT")
+                    conn.commit()
+    except Exception:
+        pass
+
+def _ensure_question_editor_columns():
+    try:
+        with get_db_cursor() as (cur, conn):
+                cur.execute("""
+                    SELECT COUNT(*) FROM information_schema.COLUMNS 
+                    WHERE TABLE_SCHEMA = DATABASE() 
+                    AND TABLE_NAME = 'question' 
+                    AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
+                """)
+                existing_cols = cur.fetchone()[0]
+                if existing_cols < 2:
+                    cur.execute("""
+                        SELECT COLUMN_NAME FROM information_schema.COLUMNS 
+                        WHERE TABLE_SCHEMA = DATABASE() 
+                        AND TABLE_NAME = 'question' 
+                        AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
+                    """)
+                    cols = [row[0] if isinstance(row, dict) else row[0] for row in cur.fetchall()]
+                    if "last_editor_id" not in cols:
+                        cur.execute("ALTER TABLE question ADD COLUMN last_editor_id INT")
+                    if "last_edited_at" not in cols:
+                        cur.execute("ALTER TABLE question ADD COLUMN last_edited_at DATETIME")
+                    conn.commit()
     except Exception:
         pass
 
 @router.post("/answer_edit")
-def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
+def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: dict = Depends(current_user_info)):
     """ 回答を編集し、翻訳データを更新 + 通知を作成 """
     operator_id = current_user["id"]
     if operator_id is None:
@@ -96,50 +103,53 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
     language_id = language_mapping.get(spoken_language)
     answer_id = request.get("answer_id")
     translate_to_all = request.get("translate_to_all", False)  # デフォルトはFalse
+    
+    print(f"🔍 answer_edit called: answer_id={answer_id}, translate_to_all={translate_to_all}, language_id={language_id}")
 
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
 
             # 🔍 `QA` テーブルから `question_id` を取得
-            cursor.execute("SELECT question_id FROM QA WHERE answer_id = ?", (answer_id,))
+            cursor.execute(f"SELECT question_id FROM QA WHERE answer_id = {ph}", (answer_id,))
             row = cursor.fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"回答 {answer_id} に対応する質問が見つかりません")
 
-            question_id = row[0]
+            question_id = row['question_id']
 
             # 🔍 `question` テーブルから 投稿者 と 直近編集者 を取得
-            _ensure_question_editor_columns(conn)
-            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
+            _ensure_question_editor_columns()
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} の投稿者が見つかりません")
-            question_owner_id = row[0]
-            prev_editor_id = row[1]
+            question_owner_id = row['user_id']
+            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
 
             # ベクトルの無効化は言語確定後に実行
 
             # 🔄 `answer_translation` テーブルを更新（履歴保存付き）
-            _ensure_answer_translation_history(conn)
+            _ensure_answer_translation_history()
 
             # まず、編集対象言語の現行テキストを履歴へ保存（差分があるときのみ）
             try:
                 cursor.execute(
-                    "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
+                    f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
                     (answer_id, language_id),
                 )
                 row_cur = cursor.fetchone()
-                if row_cur and row_cur[0] and row_cur[0] != request.get("new_text"):
+                row_cur_text = row_cur['texts'] if (row_cur and isinstance(row_cur, dict)) else (row_cur[0] if row_cur else None)
+                if row_cur_text and row_cur_text != request.get("new_text"):
                     cursor.execute(
-                        """
+                        f"""
                         INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
-                        VALUES (?, ?, ?, ?, ?, ?)
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
                         """,
                         (
                             answer_id,
                             language_id,
-                            row_cur[0],
+                            row_cur_text,
                             datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                             operator_id,
                             current_user.get("name", "user"),
@@ -149,16 +159,16 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 pass
 
             # 対象言語の現行テキストを更新
-            cursor.execute("""
+            cursor.execute(f"""
                 UPDATE answer_translation
-                SET texts = ?
-                WHERE answer_id = ? AND language_id = ?
+                SET texts = {ph}
+                WHERE answer_id = {ph} AND language_id = {ph}
             """, (request.get("new_text"), answer_id, language_id))
 
             # 回答本体の更新時刻を更新（最終編集日時として利用）
             try:
                 cursor.execute(
-                    "UPDATE answer SET time = ? WHERE id = ?",
+                    f"UPDATE answer SET time = {ph} WHERE id = {ph}",
                     (datetime.now().strftime("%Y-%m-%d %H:%M:%S"), answer_id),
                 )
             except Exception:
@@ -180,14 +190,17 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
             # 4. 文法チェック機能（全言語翻訳時のみ実行）
             if translate_to_all:
                 # 文法チェック設定テーブルを確保
-                _ensure_question_grammar_check_table(conn)
+                _ensure_question_grammar_check_table()
                 
                 # 現在編集中の言語の文法チェックが有効かチェック
-                cursor.execute("SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+                cursor.execute(f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
                 grammar_check_row = cursor.fetchone()
                 
-                # デフォルトは無効（レコードが存在しない場合）
-                grammar_check_enabled = grammar_check_row[0] if grammar_check_row else False
+                # デフォルトは無効(レコードが存在しない場合)
+                if grammar_check_row:
+                    grammar_check_enabled = grammar_check_row['grammar_check_enabled'] if isinstance(grammar_check_row, dict) else grammar_check_row[0]
+                else:
+                    grammar_check_enabled = False
                 
                 if grammar_check_enabled:
                     try:
@@ -217,105 +230,63 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                         print(f"Grammar check error for answer {answer_id} (language {language_id}): {str(e)}")
                         # 文法チェック失敗は致命的エラーとしない
 
-                # 📌 全言語翻訳実行後は編集言語のみ有効、他言語は無効にする
+                # 📌 全言語翻訳実行後は編集言語を必ず有効、他言語は無効にする
                 try:
                     # 全ての言語IDを取得
                     cursor.execute("SELECT id FROM language")
-                    all_languages = [row[0] for row in cursor.fetchall()]
+                    all_languages = [row['id'] if isinstance(row, dict) else row[0] for row in cursor.fetchall()]
                     
                     for lang_id in all_languages:
-                        # 編集した言語のみ有効、他の言語は無効
-                        grammar_enabled = (lang_id == language_id)
+                        # 編集した言語は必ず有効、他の言語は無効（翻訳されたテキストは再度チェックが必要）
+                        grammar_enabled = 1 if (lang_id == language_id) else 0
                         
-                        cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, lang_id))
+                        cursor.execute(f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, lang_id))
                         exists = cursor.fetchone()
                         
                         if exists:
                             # 既存設定を更新
                             cursor.execute(
-                                "UPDATE question_grammar_check SET grammar_check_enabled = ?, updated_at = ? WHERE question_id = ? AND language_id = ?",
+                                f"UPDATE question_grammar_check SET grammar_check_enabled = {ph}, updated_at = {ph} WHERE question_id = {ph} AND language_id = {ph}",
                                 (grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id, lang_id)
                             )
                         else:
                             # レコードが存在しない場合は新規作成
                             cursor.execute(
-                                "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                                f"INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
                                 (question_id, lang_id, grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                             )
+                    
                     conn.commit()
-                    print(f"文法チェック設定を更新: 編集言語({language_id})=有効、他言語=無効")
+                    print(f"✅ 文法チェック設定を更新: 編集言語({language_id})=有効、他言語=無効（翻訳後は各言語で再チェックが必要）")
                 except Exception as e:
-                    print(f"文法チェック設定の更新に失敗: {str(e)}")
+                    print(f"❌ 文法チェック設定の更新に失敗: {str(e)}")
+                    import traceback
+                    print(f"❌ スタックトレース: {traceback.format_exc()}")
                     # 設定更新の失敗は致命的エラーとしない
 
             # 5. 全言語への翻訳を行うかチェック
             if translate_to_all:
-                # 翻訳対象の言語を取得（元の言語を除外）
-                cursor.execute("SELECT id, code FROM language WHERE id != ?", (language_id,))
-                target_languages = cursor.fetchall()
-
-                source_lang_code = language_label_to_code.get(spoken_language, "auto")
-
-                for target_id, target_code in target_languages:
-                    target_code = target_code.lower()
-                    if (target_code == "zh"):
-                        target_code = "zh-CN"
-
-                    translated_text = translate(
-                        request.get("new_text"),
-                        source_language=source_lang_code,
-                        target_language=target_code
-                    )
-
-                    cursor.execute("""
-                        SELECT 1 FROM answer_translation WHERE answer_id = ? AND language_id = ?
-                    """, (answer_id, target_id))
-                    exists = cursor.fetchone()
-
-                    if exists:
-                        # 履歴の保存（既存テキストがある場合）
-                        try:
-                            cursor.execute(
-                                "SELECT texts FROM answer_translation WHERE answer_id = ? AND language_id = ?",
-                                (answer_id, target_id),
-                            )
-                            prev = cursor.fetchone()
-                            if prev and prev[0] and prev[0] != translated_text:
-                                cursor.execute(
-                                    """
-                                    INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
-                                    VALUES (?, ?, ?, ?, ?, ?)
-                                    """,
-                                    (
-                                        answer_id,
-                                        target_id,
-                                        prev[0],
-                                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                                        operator_id,
-                                        current_user.get("name", "user"),
-                                    ),
-                                )
-                        except Exception:
-                            pass
-
-                        cursor.execute("""
-                            UPDATE answer_translation
-                            SET texts = ?
-                            WHERE answer_id = ? AND language_id = ?
-                        """, (translated_text, answer_id, target_id))
-                    else:
-                        cursor.execute("""
-                            INSERT INTO answer_translation (answer_id, language_id, texts)
-                            VALUES (?, ?, ?)
-                        """, (answer_id, target_id, translated_text))
+                # バックグラウンドタスクで全言語翻訳を実行
+                background_tasks.add_task(
+                    _background_translate_all_languages,
+                    answer_id,
+                    question_id,
+                    request.get("new_text"),
+                    language_id,
+                    language_label_to_code.get(spoken_language, "auto"),
+                    operator_id,
+                    current_user.get("name", "user"),
+                    language_label_to_code
+                )
+                print(f"🚀 バックグラウンドで全言語翻訳を開始: answer_id={answer_id}, question_id={question_id}")
 
             conn.commit()
 
             # 🔖 最終編集者を更新（回答編集時）
             try:
-                _ensure_question_editor_columns(conn)
+                _ensure_question_editor_columns()
                 cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    f"UPDATE question SET last_editor_id = {ph}, last_edited_at = {ph} WHERE question_id = {ph}",
                     (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
                 )
                 conn.commit()
@@ -323,27 +294,26 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 pass
 
             # 変更後の内容でベクトルを差分追加（更新された言語のみ）
-            try:
-                # 更新された言語のリストを作成
-                updated_languages = [language_label_to_code.get(spoken_language, "ja")]  # 編集言語は必ず含める
-                if translate_to_all:
-                    # 全言語翻訳の場合は全言語を追加
-                    updated_languages = list(language_label_to_code.values())
-                
-                # 更新対象言語の現在のベクトルを無効化
-                ignore_current_vectors_for_qa_languages(question_id, answer_id, updated_languages)
-                
-                # 新しいベクトルを追加
-                append_qa_to_vector_index_for_languages(question_id, answer_id, updated_languages)
-            except Exception:
-                pass
+            # 注: translate_to_all の場合、全言語のベクトル更新はバックグラウンドで実行
+            if not translate_to_all:
+                try:
+                    # 編集言語のみベクトル更新
+                    updated_languages = [language_label_to_code.get(spoken_language, "ja")]
+                    
+                    # 更新対象言語の現在のベクトルを無効化
+                    ignore_current_vectors_for_qa_languages(question_id, answer_id, updated_languages)
+                    
+                    # 新しいベクトルを追加
+                    append_qa_to_vector_index_for_languages(question_id, answer_id, updated_languages)
+                except Exception as e:
+                    print(f"ベクトル更新エラー(編集言語のみ): {str(e)}")
 
             # 📢 【通知の登録】直近編集者に個人通知（自分以外）
             if prev_editor_id and operator_id != prev_editor_id:
                 # 🔹 `notifications` に通知を追加
-                _ensure_notifications_question_id(conn)
+                _ensure_notifications_question_id()
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
@@ -366,9 +336,9 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
                 # 各言語の翻訳を `notifications_translation` に追加
                 for lang, lang_id in language_mapping.items():
                     cursor.execute(
-                        """
+                        f"""
                         INSERT INTO notifications_translation (notification_id, language_id, messages)
-                        VALUES (?, ?, ?)
+                        VALUES ({ph}, {ph}, {ph})
                         """,
                         (notification_id, lang_id, translations[lang]),
                     )
@@ -377,16 +347,20 @@ def answer_edit(request: dict, current_user: dict = Depends(current_user_info)):
 
         return {"editor_id": operator_id}
 
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
 
-def _code_to_language_id(code: str, conn: sqlite3.Connection) -> int:
-    cur = conn.cursor()
-    cur.execute("SELECT id FROM language WHERE lower(code) = ?", (code.lower(),))
-    row = cur.fetchone()
-    return int(row[0]) if row else None
+def _code_to_language_id(code: str) -> int:
+    """言語コードから言語IDを取得"""
+    ph = get_placeholder()
+    with get_db_cursor() as (cur, conn):
+        cur.execute(f"SELECT id FROM language WHERE lower(code) = {ph}", (code.lower(),))
+        row = cur.fetchone()
+        if row:
+            return int(row['id'])
+        return None
 
 # 言語コードから言語IDへのマッピング（フロントエンドと一致）
 language_code_to_id = {
@@ -413,37 +387,37 @@ def get_answer_history(
     language_id = None
 
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            _ensure_answer_translation_history(conn)
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            _ensure_answer_translation_history()
             # Resolve language_id: explicit 'lang' param takes precedence
             if lang:
-                language_id = _code_to_language_id(lang, conn)
+                language_id = _code_to_language_id(lang)
             if not language_id:
                 language_id = language_mapping.get(spoken_language)
             if not language_id:
                 raise HTTPException(status_code=400, detail="Unsupported spoken language or lang code")
-            cur = conn.cursor()
-            cur.execute(
-                """
-                SELECT texts, edited_at, editor_user_id, COALESCE(editor_name, '')
+            cursor.execute(
+                f"""
+                SELECT texts, edited_at, editor_user_id, COALESCE(editor_name, '') as editor_name
                 FROM answer_translation_history
-                WHERE answer_id = ? AND language_id = ?
+                WHERE answer_id = {ph} AND language_id = {ph}
                 ORDER BY edited_at ASC
                 """,
                 (answer_id, language_id),
             )
-            rows = cur.fetchall() or []
+            rows = cursor.fetchall() or []
         history = [
             {
-                "texts": r[0],
-                "edited_at": r[1],
-                "editor_user_id": r[2],
-                "editor_name": r[3],
+                "texts": r['texts'] if isinstance(r, dict) else r[0],
+                "edited_at": r['edited_at'] if isinstance(r, dict) else r[1],
+                "editor_user_id": r['editor_user_id'] if isinstance(r, dict) else r[2],
+                "editor_name": r['editor_name'] if isinstance(r, dict) else r[3],
             }
             for r in rows
         ]
         return {"answer_id": answer_id, "language_id": language_id, "history": history}
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
     
 @router.put("/official_question")
@@ -462,28 +436,28 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
         raise HTTPException(status_code=400, detail="Invalid title. Must be 'official' or 'ユーザ質問'.")
 
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
 
             # 🔍 投稿者と直近編集者を取得
-            _ensure_question_editor_columns(conn)
-            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
+            _ensure_question_editor_columns()
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
-            question_owner_id = row[0]
-            prev_editor_id = row[1]
+            question_owner_id = row['user_id']
+            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
 
             # 🔄 title を更新
-            cursor.execute("""UPDATE question SET title=? WHERE question_id=?""", (new_title, question_id))
+            cursor.execute(f"UPDATE question SET title={ph} WHERE question_id={ph}", (new_title, question_id))
             conn.commit()
             # mark last editor
             try:
-                _ensure_question_editor_columns(conn)
+                _ensure_question_editor_columns()
                 cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    f"UPDATE question SET last_editor_id = {ph}, last_edited_at = {ph} WHERE question_id = {ph}",
                     (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
                 )
                 conn.commit()
@@ -497,9 +471,9 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
                 )
 
                 # 🔹 `notifications` に通知を追加
-                _ensure_notifications_question_id(conn)
+                _ensure_notifications_question_id()
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
@@ -521,9 +495,9 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
                 # 各言語の翻訳を `notifications_translation` に追加
                 for lang, lang_id in language_mapping.items():
                     cursor.execute(
-                        """
+                        f"""
                         INSERT INTO notifications_translation (notification_id, language_id, messages)
-                        VALUES (?, ?, ?)
+                        VALUES ({ph}, {ph}, {ph})
                         """,
                         (notification_id, lang_id, translations[lang]),
                     )
@@ -532,7 +506,7 @@ def official_question(request: dict, current_user: dict = Depends(current_user_i
 
         return {"editor_user_id": operator_id, "question_id": question_id, "new_title": new_title}
 
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
@@ -549,28 +523,29 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
         raise HTTPException(status_code=400, detail="認証情報が取得できません")
 
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
 
             # 🔍 質問の投稿者・直近編集者を取得
-            _ensure_question_editor_columns(conn)
-            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
+            _ensure_question_editor_columns()
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
-            question_owner_id = row[0]
-            prev_editor_id = row[1]
+            question_owner_id = row['user_id']
+            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
 
             # 🔹 `QA` から `id` と `answer_id` を取得
-            cursor.execute("SELECT id, answer_id FROM QA WHERE question_id = ?", (question_id,))
+            cursor.execute(f"SELECT id, answer_id FROM QA WHERE question_id = {ph}", (question_id,))
             qa_row = cursor.fetchone()
 
             if not qa_row:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} に対応する回答が見つかりません")
 
-            qa_id, answer_id = qa_row
+            qa_id = qa_row['id']
+            answer_id = qa_row['answer_id']
 
             # 🧹 ベクトルをグローバルに無効化（QA IDベース）
             try:
@@ -578,23 +553,33 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
             except Exception:
                 pass
 
+            # 🔥 ベクトルインデックスから削除（QA削除前にqa_idを取得）
+            try:
+                cursor.execute(f"SELECT id FROM QA WHERE question_id = {ph} AND answer_id = {ph}", (question_id, answer_id))
+                qa_row = cursor.fetchone()
+                if qa_row:
+                    qa_id = qa_row['id']
+                    add_qa_id_to_ignore(qa_id)  # ベクトル検索時に無視リストに追加
+            except Exception:
+                pass
+
             # 🔹 データ削除処理（トランザクション処理を使用）
-            cursor.execute("DELETE FROM question WHERE question_id = ?", (question_id,))
-            cursor.execute("DELETE FROM question_translation WHERE question_id = ?", (question_id,))
-            cursor.execute("DELETE FROM QA WHERE question_id = ?", (question_id,))
-            cursor.execute("DELETE FROM answer_translation WHERE answer_id = ?", (answer_id,))
-            cursor.execute("DELETE FROM answer WHERE id = ?", (answer_id,))
+            cursor.execute(f"DELETE FROM question WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"DELETE FROM question_translation WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"DELETE FROM QA WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"DELETE FROM answer_translation WHERE answer_id = {ph}", (answer_id,))
+            cursor.execute(f"DELETE FROM answer WHERE id = {ph}", (answer_id,))
 
             conn.commit()  # すべての削除を確定
 
             # 🔥 関連する既存通知をクリーンアップ（削除通知を新規作成する前に）
             try:
-                _ensure_notifications_question_id(conn)
-                cursor.execute("SELECT id FROM notifications WHERE question_id = ?", (question_id,))
+                _ensure_notifications_question_id()
+                cursor.execute(f"SELECT id FROM notifications WHERE question_id = {ph}", (question_id,))
                 old_notifs = [row[0] for row in cursor.fetchall()]
                 if old_notifs:
-                    cursor.executemany("DELETE FROM notifications_translation WHERE notification_id = ?", [(nid,) for nid in old_notifs])
-                    cursor.execute("DELETE FROM notifications WHERE question_id = ?", (question_id,))
+                    cursor.executemany(f"DELETE FROM notifications_translation WHERE notification_id = {ph}", [(nid,) for nid in old_notifs])
+                    cursor.execute(f"DELETE FROM notifications WHERE question_id = {ph}", (question_id,))
                     conn.commit()
             except Exception:
                 pass
@@ -604,9 +589,9 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
                 notification_message = f"あなたの質問（ID: {question_id}）が管理者({operator_id})により削除されました。"
 
                 # 🔹 `notifications` に通知を追加
-                _ensure_notifications_question_id(conn)
+                _ensure_notifications_question_id()
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
@@ -629,9 +614,9 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
                 # 各言語の翻訳を `notifications_translation` に追加
                 for lang, lang_id in language_mapping.items():
                     cursor.execute(
-                        """
+                        f"""
                         INSERT INTO notifications_translation (notification_id, language_id, messages)
-                        VALUES (?, ?, ?)
+                        VALUES ({ph}, {ph}, {ph})
                         """,
                         (notification_id, lang_id, translations[lang]),
                     )
@@ -640,7 +625,7 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
 
         return {"message": f"question_id: {question_id} の質問を削除しました"}
 
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
@@ -655,34 +640,37 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
         raise HTTPException(status_code=400, detail="認証情報が取得できません")
 
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
 
             # 🔍 質問の投稿者・直近編集者 と 元のカテゴリIDを取得
-            _ensure_question_editor_columns(conn)
-            cursor.execute("SELECT user_id, COALESCE(last_editor_id, user_id), category_id FROM question WHERE question_id = ?", (question_id,))
+            _ensure_question_editor_columns()
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id), category_id FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
-            question_owner_id, prev_editor_id, original_category_id = row
+            question_owner_id = row['user_id']
+            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
+            original_category_id = row['category_id']
 
             # 📌 各言語でカテゴリ名を取得（`category_translation` テーブルから）
-            cursor.execute("SELECT language_id, description FROM category_translation WHERE category_id = ?", (original_category_id,))
-            original_category_translations = {lang_id: desc for lang_id, desc in cursor.fetchall()}
+            cursor.execute(f"SELECT language_id, description FROM category_translation WHERE category_id = {ph}", (original_category_id,))
+            original_category_translations = {row['language_id']: row['description'] for row in cursor.fetchall()}
 
-            cursor.execute("SELECT language_id, description FROM category_translation WHERE category_id = ?", (new_category_id,))
-            new_category_translations = {lang_id: desc for lang_id, desc in cursor.fetchall()}
+            cursor.execute(f"SELECT language_id, description FROM category_translation WHERE category_id = {ph}", (new_category_id,))
+            new_category_translations = {row['language_id']: row['description'] for row in cursor.fetchall()}
 
             # 🔄 category_id を更新
-            cursor.execute("UPDATE question SET category_id = ? WHERE question_id = ?", (new_category_id, question_id))
+            cursor.execute(f"UPDATE question SET category_id = {ph} WHERE question_id = {ph}", (new_category_id, question_id))
             conn.commit()
+            
             # mark last editor
             try:
-                _ensure_question_editor_columns(conn)
+                _ensure_question_editor_columns()
                 cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                    f"UPDATE question SET last_editor_id = {ph}, last_edited_at = {ph} WHERE question_id = {ph}",
                     (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
                 )
                 conn.commit()
@@ -692,9 +680,9 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
             # 📢 【通知の登録】直近編集者に通知（自分以外）
             if prev_editor_id and operator_id != prev_editor_id:
                 # 🔹 `notifications` に通知を追加
-                _ensure_notifications_question_id(conn)
+                _ensure_notifications_question_id()
                 cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
                 notification_id = cursor.lastrowid  # 挿入された通知のID
@@ -716,9 +704,9 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
 
                 for lang_id, message in translations.items():
                     cursor.execute(
-                        """
+                        f"""
                         INSERT INTO notifications_translation (notification_id, language_id, messages)
-                        VALUES (?, ?, ?)
+                        VALUES ({ph}, {ph}, {ph})
                         """,
                         (notification_id, lang_id, message),
                     )
@@ -729,93 +717,9 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
             "message": f"質問 {question_id} をカテゴリ '{original_category_translations.get(1, 'Unknown')}' から '{new_category_translations.get(1, 'Unknown')}' に移動しました。"
         }
 
-    except sqlite3.Error as e:
-        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"エラーが発生しました: {str(e)}")
-
-
-@router.post("/change_public")
-def change_public(request: dict, current_user: dict = Depends(current_user_info)):
-    question_id = request.get("question_id")
-    operator_id = current_user["id"]  # 現在の操作ユーザー
-
-    try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-
-            # 🔍 質問の現在の状態と、投稿者・直近編集者を取得
-            _ensure_question_editor_columns(conn)
-            cursor.execute("SELECT public, user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = ?", (question_id,))
-            row = cursor.fetchone()
-
-            if row is None:
-                raise HTTPException(status_code=404, detail="指定された質問が見つかりません")
-
-            current_status, question_owner_id, prev_editor_id = row
-
-            # 公開状態を反転
-            new_status = 1 if current_status == 0 else 0
-            status_text = "公開" if new_status == 1 else "非公開"
-
-            # 質問の public 状態を反転
-            new_status = 1 if current_status == 0 else 0
-
-            # 🔄 public 状態を更新
-            cursor.execute("UPDATE question SET public = ? WHERE question_id = ?", (new_status, question_id))
-            conn.commit()
-            # mark last editor
-            try:
-                _ensure_question_editor_columns(conn)
-                cursor.execute(
-                    "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
-                    (operator_id, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id)
-                )
-                conn.commit()
-            except Exception:
-                pass
-
-            # 📢 【通知の登録】直近編集者に通知（自分以外）
-            if prev_editor_id and operator_id != prev_editor_id:
-                # 🔹 `notifications` に通知を追加
-                _ensure_notifications_question_id(conn)
-                cursor.execute(
-                    "INSERT INTO notifications (user_id, is_read, time, question_id) VALUES (?, ?, ?, ?)",
-                    (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
-                )
-                notification_id = cursor.lastrowid  # 挿入された通知のID
-                conn.commit()
-
-                # 🔹 `notifications_translation` に翻訳を追加
-                translations = {
-                    "日本語": f"あなたの質問の公開設定が管理者により「{status_text}」に変更されました。（ID: {question_id}）",
-                    "English": f"The visibility of your question has been changed to \"{status_text}\" by the administrator. (ID: {question_id}) ",
-                    "Tiếng Việt": f"Cài đặt quyền riêng tư của câu hỏi của bạn đã được quản trị viên thay đổi thành \"{status_text}\".(ID: {question_id}) ",
-                    "中文": f"您的问题的可见性已被管理员更改为 \"{status_text}\"。（ID: {question_id}）",
-                    "한국어": f"귀하의 질문 의 공개 설정이 관리자 에 의해 \"{status_text}\"(으)로 변경되었습니다.(ID: {question_id})",
-                    "Português": f"A visibilidade da sua pergunta foi alterada para \"{status_text}\" pelo administrador. (ID: {question_id}) ",
-                    "Español": f"La visibilidad de su pregunta ha sido cambiada a \"{status_text}\" por el administrador. (ID: {question_id}) ",
-                    "Tagalog": f"Ang visibility ng iyong tanong ay binago sa \"{status_text}\" ng administrador. (ID: {question_id}) ",
-                    "Bahasa Indonesia": f"Visibilitas pertanyaan Anda telah diubah menjadi \"{status_text}\" oleh administrator. (ID: {question_id}) "
-                }
-
-                # 各言語の翻訳を `notifications_translation` に追加
-                for lang, lang_id in language_mapping.items():
-                    cursor.execute(
-                        """
-                        INSERT INTO notifications_translation (notification_id, language_id, messages)
-                        VALUES (?, ?, ?)
-                        """,
-                        (notification_id, lang_id, translations[lang]),
-                    )
-
-                conn.commit()  # 翻訳の挿入を確定
-
-            return {"question_id": question_id, "public": new_status}
-
-    except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
-    
+
 
 @router.post("/register_question")
 async def register_question(
@@ -826,14 +730,14 @@ async def register_question(
     spoken_language = current_user["spoken_language"]
     language_id = language_mapping.get(spoken_language)
     
-    with sqlite3.connect(DATABASE) as conn:
-        cursor = conn.cursor()
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
         japan_time = datetime.utcnow() + timedelta(hours=9)
         # 質問を登録
         cursor.execute(
-            """
+            f"""
             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
             """,
             (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
         )
@@ -842,9 +746,9 @@ async def register_question(
 
         # 元言語の質問を question_translation に格納
         cursor.execute(
-            """
+            f"""
             INSERT INTO question_translation (question_id, language_id, texts)
-            VALUES (?, ?, ?)
+            VALUES ({ph}, {ph}, {ph})
             """,
             (question_id, language_id, request.content)
         )
@@ -852,9 +756,9 @@ async def register_question(
         conn.commit()  # 質問挿入後にコミット
         # initialize last editor as creator at creation time
         try:
-            _ensure_question_editor_columns(conn)
+            _ensure_question_editor_columns()
             cursor.execute(
-                "UPDATE question SET last_editor_id = ?, last_edited_at = ? WHERE question_id = ?",
+                f"UPDATE question SET last_editor_id = {ph}, last_edited_at = {ph} WHERE question_id = {ph}",
                 (user_id, japan_time, question_id)
             )
             conn.commit()
@@ -873,9 +777,9 @@ async def register_question(
         
         # 回答を登録
         cursor.execute(
-            """
+            f"""
             INSERT INTO answer (time, language_id)
-            VALUES (?, ?)
+            VALUES ({ph}, {ph})
             """,
             (datetime.utcnow(), language_id)
         )
@@ -885,9 +789,9 @@ async def register_question(
         
         # 回答の元言語を登録
         cursor.execute(
-            """
+            f"""
             INSERT INTO answer_translation (answer_id, language_id, texts)
-            VALUES (?, ?, ?)
+            VALUES ({ph}, {ph}, {ph})
             """,
             (answer_id, language_id, request.answer_text)
         )
@@ -905,9 +809,9 @@ async def register_question(
         
         # QAテーブルに登録
         cursor.execute(
-            """
+            f"""
             INSERT INTO QA (question_id, answer_id)
-            VALUES (?, ?)
+            VALUES ({ph}, {ph})
             """,
             (question_id, answer_id)
         )
@@ -916,13 +820,13 @@ async def register_question(
 
         # 📌 新規質問登録時の文法チェック設定初期化（登録言語のみ有効、他言語は無効）
         try:
-            _ensure_question_grammar_check_table(conn)
+            _ensure_question_grammar_check_table()
             # 全ての言語に対して文法チェック設定を作成
             for lang_id in languages:
                 # 登録された言語（人間が入力したオリジナル言語）のみ有効、他は無効
                 grammar_enabled = (lang_id == language_id)
                 cursor.execute(
-                    "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    f"INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
                     (question_id, lang_id, grammar_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 )
             conn.commit()
@@ -960,11 +864,11 @@ async def register_question(
         snippet_length = 50  # スニペットの最大長
         
         # `notifications` に通知を追加（全体通知 + question_id）
-        _ensure_notifications_question_id(conn)
+        _ensure_notifications_question_id()
         cursor.execute(
-            """
+            f"""
             INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id)
-            VALUES (?, ?, ?, ?, ?)
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
             """,
             (-1, False, datetime.now(), '[]', question_id)
         )
@@ -973,8 +877,8 @@ async def register_question(
 
         # 📌 **通知の翻訳を `question_translation` から取得**
         cursor.execute(
-            """
-            SELECT language_id, texts FROM question_translation WHERE question_id = ?
+            f"""
+            SELECT language_id, texts FROM question_translation WHERE question_id = {ph}
             """, (question_id,)
         )
         translations = cursor.fetchall()
@@ -991,9 +895,9 @@ async def register_question(
             translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
 
             cursor.execute(
-                """
+                f"""
                 INSERT INTO notifications_translation (notification_id, language_id, messages)
-                VALUES (?, ?, ?)
+                VALUES ({ph}, {ph}, {ph})
                 """,
                 (notification_id, lang_id, translated_message),
             )
@@ -1020,53 +924,47 @@ def save_question_with_category(question: str, category_id: int, user_id: int):
     質問をカテゴリとともに保存する関数
     """
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            cursor.execute("""
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute(f"""
                 INSERT INTO question (content, category_id, user_id, time)
-                VALUES (?, ?, ?, ?)
+                VALUES ({ph}, {ph}, {ph}, {ph})
             """, (question, category_id, user_id, datetime.now()))
             conn.commit()
-    except sqlite3.Error as e:
+    except Exception as e:
         raise RuntimeError("質問の保存に失敗しました")
 
 @router.get("/grammar_check_setting")
 def get_grammar_check_setting(question_id: int, language_id: int = None, current_user: dict = Depends(current_user_info)):
     """ 指定された質問の指定言語での文法チェック設定を取得 """
-    print(f"DEBUG: get_grammar_check_setting called with question_id={question_id}, language_id={language_id}")
     
     # 言語IDが指定されていない場合は、ユーザーの使用言語を使用
     if language_id is None:
         spoken_language = current_user.get("spoken_language")
         language_id = language_mapping.get(spoken_language, 1)  # デフォルトは日本語
-        print(f"DEBUG: language_id was None, resolved to {language_id} from spoken_language={spoken_language}")
     
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            _ensure_question_grammar_check_table(conn)
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            _ensure_question_grammar_check_table()
             
-            print(f"DEBUG: Executing query with question_id={question_id}, language_id={language_id}")
-            cursor.execute("SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+            cursor.execute(f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
             row = cursor.fetchone()
-            print(f"DEBUG: Query result: {row}")
             
             # デフォルトはFalse（設定が存在しない場合） - 新規質問では無効から始める
-            grammar_check_enabled = row[0] if row else False
+            if row:
+                grammar_check_enabled = row['grammar_check_enabled']
+            else:
+                grammar_check_enabled = False
             
             result = {
                 "question_id": question_id,
                 "language_id": language_id,
                 "grammar_check_enabled": bool(grammar_check_enabled)
             }
-            print(f"DEBUG: Returning result: {result}")
             return result
-    except sqlite3.Error as e:
-        print(f"DEBUG: SQLite error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
-        print(f"DEBUG: Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"予期しないエラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
 
 @router.post("/grammar_check_setting")
 def set_grammar_check_setting(request: dict, current_user: dict = Depends(current_user_info)):
@@ -1075,9 +973,6 @@ def set_grammar_check_setting(request: dict, current_user: dict = Depends(curren
     language_id = request.get("language_id")
     grammar_check_enabled = request.get("grammar_check_enabled", False)
     
-    print(f"DEBUG: set_grammar_check_setting called with request: {request}")
-    print(f"DEBUG: question_id={question_id}, language_id={language_id}, grammar_check_enabled={grammar_check_enabled}")
-    
     if question_id is None:
         raise HTTPException(status_code=400, detail="question_idが必要です")
     
@@ -1085,30 +980,26 @@ def set_grammar_check_setting(request: dict, current_user: dict = Depends(curren
     if language_id is None:
         spoken_language = current_user.get("spoken_language")
         language_id = language_mapping.get(spoken_language, 1)  # デフォルトは日本語
-        print(f"DEBUG: language_id was None, resolved to {language_id} from spoken_language={spoken_language}")
     
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            _ensure_question_grammar_check_table(conn)
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            _ensure_question_grammar_check_table()
             
             # 既存の設定をチェック
-            cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+            cursor.execute(f"SELECT question_id FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
             exists = cursor.fetchone()
-            print(f"DEBUG: Existing record check result: {exists}")
             
             if exists:
                 # 更新
-                print(f"DEBUG: Updating existing record")
                 cursor.execute(
-                    "UPDATE question_grammar_check SET grammar_check_enabled = ?, updated_at = ? WHERE question_id = ? AND language_id = ?",
+                    f"UPDATE question_grammar_check SET grammar_check_enabled = {ph}, updated_at = {ph} WHERE question_id = {ph} AND language_id = {ph}",
                     (grammar_check_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id, language_id)
                 )
             else:
                 # 新規作成
-                print(f"DEBUG: Creating new record")
                 cursor.execute(
-                    "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                    f"INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
                     (question_id, language_id, grammar_check_enabled, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                 )
             
@@ -1120,22 +1011,17 @@ def set_grammar_check_setting(request: dict, current_user: dict = Depends(curren
                 "grammar_check_enabled": bool(grammar_check_enabled),
                 "message": "文法チェック設定が更新されました"
             }
-            print(f"DEBUG: Returning result: {result}")
             return result
-    except sqlite3.Error as e:
-        print(f"DEBUG: SQLite error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
     except Exception as e:
-        print(f"DEBUG: Unexpected error: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"予期しないエラー: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
 
 @router.post("/initialize_all_grammar_check")
 def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)):
     """ 全ての既存質問に対してデフォルトで文法チェック有効設定を追加 """
     try:
-        with sqlite3.connect(DATABASE) as conn:
-            cursor = conn.cursor()
-            _ensure_question_grammar_check_table(conn)
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            _ensure_question_grammar_check_table()
             
             # 全ての質問IDと言語IDを取得
             cursor.execute("SELECT question_id FROM question")
@@ -1148,13 +1034,13 @@ def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)
             for (question_id,) in all_questions:
                 for language_id in all_languages:
                     # 既存の設定をチェック
-                    cursor.execute("SELECT question_id FROM question_grammar_check WHERE question_id = ? AND language_id = ?", (question_id, language_id))
+                    cursor.execute(f"SELECT question_id FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
                     exists = cursor.fetchone()
                     
                     if not exists:
                         # 文法チェックを無効にしてレコードを作成
                         cursor.execute(
-                            "INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+                            f"INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
                             (question_id, language_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
                         )
                         initialized_count += 1
@@ -1167,6 +1053,94 @@ def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)
                 "total_questions": len(all_questions),
                 "total_languages": len(all_languages)
             }
-    except sqlite3.Error as e:
+    except Exception as e:
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
+
+# ----- Background task helpers -------------------------------------------------
+def _background_translate_all_languages(
+    answer_id: int,
+    question_id: int,
+    new_text: str,
+    source_language_id: int,
+    source_lang_code: str,
+    operator_id: int,
+    editor_name: str,
+    language_label_to_code: dict
+):
+    """全言語への翻訳をバックグラウンドで実行"""
+    try:
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            # 翻訳対象の言語を取得（元の言語を除外）
+            cursor.execute(f"SELECT id, code FROM language WHERE id != {ph}", (source_language_id,))
+            target_languages = cursor.fetchall()
+
+            for row in target_languages:
+                target_id = row['id'] if isinstance(row, dict) else row[0]
+                target_code = (row['code'] if isinstance(row, dict) else row[1]).lower()
+                if (target_code == "zh"):
+                    target_code = "zh-CN"
+
+                translated_text = translate(
+                    new_text,
+                    source_language=source_lang_code,
+                    target_language=target_code
+                )
+
+                cursor.execute(f"""
+                    SELECT 1 FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}
+                """, (answer_id, target_id))
+                exists = cursor.fetchone()
+
+                if exists:
+                    # 履歴の保存（既存テキストがある場合）
+                    try:
+                        cursor.execute(
+                            f"SELECT texts FROM answer_translation WHERE answer_id = {ph} AND language_id = {ph}",
+                            (answer_id, target_id),
+                        )
+                        prev = cursor.fetchone()
+                        prev_text = prev['texts'] if (prev and isinstance(prev, dict)) else (prev[0] if prev else None)
+                        if prev_text and prev_text != translated_text:
+                            cursor.execute(
+                                f"""
+                                INSERT INTO answer_translation_history (answer_id, language_id, texts, edited_at, editor_user_id, editor_name)
+                                VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+                                """,
+                                (
+                                    answer_id,
+                                    target_id,
+                                    prev_text,
+                                    datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                                    operator_id,
+                                    editor_name,
+                                ),
+                            )
+                    except Exception:
+                        pass
+
+                    cursor.execute(f"""
+                        UPDATE answer_translation
+                        SET texts = {ph}
+                        WHERE answer_id = {ph} AND language_id = {ph}
+                    """, (translated_text, answer_id, target_id))
+                else:
+                    cursor.execute(f"""
+                        INSERT INTO answer_translation (answer_id, language_id, texts)
+                        VALUES ({ph}, {ph}, {ph})
+                    """, (answer_id, target_id, translated_text))
+
+            conn.commit()
+
+            # ベクトル更新（全言語）
+            try:
+                updated_languages = list(language_label_to_code.values())
+                ignore_current_vectors_for_qa_languages(question_id, answer_id, updated_languages)
+                append_qa_to_vector_index_for_languages(question_id, answer_id, updated_languages)
+            except Exception as e:
+                print(f"ベクトル更新エラー: {str(e)}")
+                
+            print(f"✅ バックグラウンド翻訳完了: answer_id={answer_id}, question_id={question_id}")
+    except Exception as e:
+        print(f"❌ バックグラウンド翻訳エラー: {str(e)}")
 
