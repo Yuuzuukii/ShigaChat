@@ -919,34 +919,39 @@ _PROMPT_BUILDERS = {
 def _responses_text(
     prompt: str,
     *,
-    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名（高速・高品質）
-    max_output_tokens: int = 800,
-    timeout_s: int = 90,
-    response_schema: Optional[dict] = None,
+    model: str = "gpt-5-mini",
+    max_output_tokens: int = 600,   # 互換性のため受け取るが未使用
+    timeout_s: int = 60,
+    response_schema: Optional[dict] = None,  # 互換性のため受け取るが未使用
+    reasoning_effort: str = "low",           # 互換性のため受け取るが未使用
+    include_reasoning: bool = False,         # 互換性のため受け取るが未使用
 ) -> str:
+    """最小でシンプルな実装。
+
+    1) Chat Completions を使用（もっとも互換性が高い）
+    2) ダメなら Responses API を最小引数でフォールバック
+    """
     client_req = client.with_options(timeout=timeout_s)
-    # 提供されたコードの形式に合わせる（max_output_tokensは除外）
-    messages = [{"role": "user", "content": prompt}]
-    kwargs = dict(
-        model=model,
-        input=messages,
-    )
-    if response_schema:
-        kwargs["response_format"] = {
-            "type": "json_schema",
-            "json_schema": {
-                "name": "sourced_answer",
-                "schema": response_schema,
-                "strict": True,
-            },
-        }
+
+    # 1) Chat Completions
     try:
-        resp = client_req.responses.create(**kwargs)
-        result = resp.output_text if hasattr(resp, "output_text") else ""
-        return (result or "").strip()
-    except Exception as e:
-        print(f"API error: {e}")
+        chat = client_req.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+        )
+        return (chat.choices[0].message.content or "").strip()
+    except Exception as e_chat:
+        pass
+
+    # 2) Responses API（最小）
+    try:
+        resp = client_req.responses.create(model=model, input=prompt)
+        return (getattr(resp, "output_text", "") or "").strip()
+    except Exception as e_resp:
+        print(f"API error: chat.completions failed: {e_chat}; responses fallback failed: {e_resp}")
         return ""
+
 
 
 def _clip_history(history_qa: List[Tuple[str, str]], k: int) -> List[Tuple[str, str]]:
@@ -962,7 +967,7 @@ def generate_answer_with_llm(
     history_qa: List[Tuple[str, str]],
     *,
     lang: Optional[str] = None,
-    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
+    model: str = "gpt-4.1-nano",  # 修正: 正しいモデル名
     max_history_in_prompt: int = 6,
 ) -> Dict[str, Any]:
     """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
@@ -986,7 +991,41 @@ def generate_answer_with_llm(
     
     import time
     llm_start = time.time()
-    content = _responses_text(prompt, model=model, max_output_tokens=800, timeout_s=90)
+    # 期待するJSONのスキーマを指定して厳密出力を促す
+    response_schema = {
+        "type": "object",
+        "properties": {
+            "answer": {"type": "string"},
+            "used_source_ids": {
+                "type": "array",
+                "items": {"type": "string"}
+            },
+            "evidence": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "source_id": {"type": "string"},
+                        "quotes": {
+                            "type": "array",
+                            "items": {"type": "string"}
+                        }
+                    },
+                    "required": ["source_id", "quotes"],
+                    "additionalProperties": False
+                }
+            }
+        },
+        "required": ["answer", "used_source_ids", "evidence"],
+        "additionalProperties": False
+    }
+    content = _responses_text(
+        prompt,
+        model=model,
+        max_output_tokens=800,
+        timeout_s=90,
+        response_schema=response_schema,
+    )
     print(f"LLM回答生成完了 (所要時間: {time.time()-llm_start:.2f}s)")
 
     try:
