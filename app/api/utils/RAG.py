@@ -533,15 +533,19 @@ def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple
     similarity_threshold以下のスコアの結果は除外される。
     history_qaが提供された場合、会話要約も検索クエリに含める。
     """
+    import time
+    start_time = time.time()
+    
     # 言語検出（Linguaのみ、未対応/検出不可は例外）
     lang = detect_lang(question)  # 'ja' / 'en' / 'vi' / 'zh' / 'ko'
-    print(f"検出言語: {lang}")
+    print(f"[{time.time()-start_time:.2f}s] 検出言語: {lang}")
 
     # 会話要約を生成（履歴がある場合）
     conversation_summary = ""
     if history_qa and len(history_qa) > 0:
+        summary_start = time.time()
         conversation_summary = _generate_conversation_summary(history_qa, lang)
-        print(f"会話要約: {conversation_summary}")
+        print(f"[{time.time()-start_time:.2f}s] 会話要約完了 (所要時間: {time.time()-summary_start:.2f}s): {conversation_summary}")
 
     base_path = VECTOR_DIR / f"vectors_{lang}"
     faiss_path = base_path.with_suffix(".faiss")
@@ -570,11 +574,16 @@ def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple
     search_query = question
     if conversation_summary:
         search_query = f"{question} {conversation_summary}"
-        print(f"拡張検索クエリ: {search_query}")
+        print(f"[{time.time()-start_time:.2f}s] 拡張検索クエリ: {search_query}")
 
+    embed_start = time.time()
     query_vec = np.array(get_embedding(search_query)).astype("float32").reshape(1, -1)
+    print(f"[{time.time()-start_time:.2f}s] Embedding生成完了 (所要時間: {time.time()-embed_start:.2f}s)")
+    
     faiss.normalize_L2(query_vec)
+    search_start = time.time()
     D, I = index.search(query_vec, 10)  # より多く取得して閾値でフィルタリング
+    print(f"[{time.time()-start_time:.2f}s] ベクトル検索完了 (所要時間: {time.time()-search_start:.3f}s)")
 
     results: Dict[int, Dict[str, Any]] = {}
     ranked = sorted(zip(I[0], D[0]), key=lambda x: x[1], reverse=True)
@@ -633,11 +642,11 @@ def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple
                 results[rank] = {
                     "answer": answer_text,
                     "question": question_text,
-                    "time": time_val,
+                    "time": time_val.isoformat() if time_val else None,
                     "similarity": float(similarity),
                     "question_id": qid,
                     "category_id": cat_id,
-                    "answer_time": ans_time,
+                    "answer_time": ans_time.isoformat() if ans_time else None,
                 }
                 rank += 1
 
@@ -645,7 +654,7 @@ def rag(question: str, similarity_threshold: float = 0.3, history_qa: List[Tuple
                 if rank > 5:
                     break
 
-    print(f"類似度閾値 {similarity_threshold} 以上の結果: {len(results)}件")
+    print(f"[{time.time()-start_time:.2f}s] RAG検索完了: 類似度閾値 {similarity_threshold} 以上の結果 {len(results)}件")
     return results
 
 # ----------------------------------------------------------------------------
@@ -910,7 +919,7 @@ _PROMPT_BUILDERS = {
 def _responses_text(
     prompt: str,
     *,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名（高速・高品質）
     max_output_tokens: int = 800,
     timeout_s: int = 90,
     response_schema: Optional[dict] = None,
@@ -953,7 +962,7 @@ def generate_answer_with_llm(
     history_qa: List[Tuple[str, str]],
     *,
     lang: Optional[str] = None,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
     max_history_in_prompt: int = 6,
 ) -> Dict[str, Any]:
     """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
@@ -974,7 +983,11 @@ def generate_answer_with_llm(
     clipped_hist = _clip_history(history_qa, max_history_in_prompt)
 
     prompt = builder(question_text, rag_with_sid, clipped_hist)
+    
+    import time
+    llm_start = time.time()
     content = _responses_text(prompt, model=model, max_output_tokens=800, timeout_s=90)
+    print(f"LLM回答生成完了 (所要時間: {time.time()-llm_start:.2f}s)")
 
     try:
         data = json.loads(content)
@@ -993,7 +1006,7 @@ def answer_with_rag(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
 ) -> Dict[str, Any]:
     """Retrieve → generate. 統一フォーマットで返す。"""
     lang = "ja"
@@ -1135,7 +1148,7 @@ def orchestrate(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
     reactive_default_lang: str = "ja",
 ) -> Dict[str, Any]:
     """Front agent → (必要時) RAG の逐次フロー。
