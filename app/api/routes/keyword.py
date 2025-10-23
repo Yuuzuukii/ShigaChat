@@ -55,9 +55,12 @@ async def search_keywords(keywords: str, current_user: dict = Depends(current_us
                 seen.add(key)
         sorted_results = unique_results
 
+    else:
+        sorted_results = []
+
     return sorted_results
 
-async def search_keyword(keyword: str, language_id: int):
+def search_keyword(keyword: str, language_id: int):
     """
     キーワードと言語IDを基にQA情報を検索する。
     """
