@@ -677,6 +677,7 @@ def _build_prompt_ja(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "要件:\n"
         "- 回答は与えたコンテキストを参考に作成してください。与えたコンテキストからURLが提示可能な場合は示してください。\n"
+        "- 回答本文に [S#] や 'S1' などの出典IDは記載しないこと。出典は used_source_ids / evidence のみで示してください。\n"
         "- 各文に少なくとも1つの出典ID [S#] を付与。\n"
         "- 実際に使った出典だけを used_source_ids に列挙（未使用は含めない）。\n"
         "- 可能なら根拠箇所を evidence.quotes に原文抜粋として含める（任意）。\n"
@@ -703,6 +704,7 @@ def _build_prompt_en(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Requirements:\n"
         "- Create your answer based on the given context and the conversation summary.\n"
+        "- Do not include [S#] or source IDs in the answer text; list sources only in used_source_ids/evidence.\n"
         "- Add at least one source ID [S#] to each sentence.\n"
         "- List only actually used sources in used_source_ids (exclude unused ones).\n"
         "- Optionally include exact quotes in evidence.quotes.\n"
@@ -730,6 +732,7 @@ def _build_prompt_vi(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Yêu cầu:\n"
         "- Tạo câu trả lời dựa trên ngữ cảnh đã cho và tóm tắt hội thoại.\n"
+        "- Không chèn [S#] hoặc mã nguồn vào phần trả lời; chỉ liệt kê trong used_source_ids/evidence.\n"
         "- Thêm ít nhất một mã nguồn [S#] vào mỗi câu.\n"
         "- Chỉ liệt kê các nguồn thực sự đã sử dụng trong used_source_ids (loại trừ những nguồn chưa sử dụng).\n"
         "- Tùy chọn: bao gồm trích dẫn chính xác trong evidence.quotes.\n"
@@ -756,6 +759,7 @@ def _build_prompt_zh(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "要求：\n"
         "- 基于给定的上下文和对话摘要创建回答。\n"
+        "- 回答正文不要包含 [S#] 或来源ID；仅在 used_source_ids/evidence 中列出。\n"
         "- 为每句话添加至少一个来源ID [S#]。\n"
         "- 在used_source_ids中仅列出实际使用的来源（排除未使用的）。\n"
         "- 可选：在evidence.quotes中包含原文引文。\n"
@@ -782,6 +786,7 @@ def _build_prompt_ko(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "요건:\n"
         "- 주어진 컨텍스트와 대화 요약을 참고하여 답변을 작성하세요.\n"
+        "- 답변 본문에 [S#] 또는 출처ID를 넣지 마세요; used_source_ids/evidence 에만 나열하세요.\n"
         "- 각 문장에 최소 1개의 출처ID [S#]를 부여하세요.\n"
         "- 실제로 사용한 출처만 used_source_ids에 열거하세요 (미사용은 포함하지 않음).\n"
         "- 가능하면 근거 부분을 evidence.quotes에 원문 발췌로 포함하세요 (선택사항).\n"
@@ -807,6 +812,7 @@ def _build_prompt_pt(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Requisitos:\n"
         "- Elabore a resposta com base no contexto fornecido e no resumo da conversa.\n"
+        "- Não inclua [S#] ou IDs de fonte no texto da resposta; liste somente em used_source_ids/evidence.\n"
         "- Adicione pelo menos um ID de fonte [S#] a cada frase.\n"
         "- Liste apenas as fontes realmente utilizadas em used_source_ids (exclua as não utilizadas).\n"
         "- Opcional: inclua citações exatas em evidence.quotes.\n"
@@ -834,6 +840,7 @@ def _build_prompt_es(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Requisitos:\n"
         "- Crea tu respuesta basándote en el contexto proporcionado y en el resumen del diálogo.\n"
+        "- No incluyas [S#] ni IDs de fuente en el texto de la respuesta; enuméralos solo en used_source_ids/evidence.\n"
         "- Añade al menos un ID de fuente [S#] a cada frase.\n"
         "- Enumera solo las fuentes realmente usadas en used_source_ids (excluye las no usadas).\n"
         "- Opcionalmente incluye citas textuales en evidence.quotes.\n"
@@ -861,6 +868,7 @@ def _build_prompt_tl(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Mga Kinakailangan:\n"
         "- Gawin ang sagot batay sa ibinigay na konteksto at buod ng usapan.\n"
+        "- Huwag ilagay ang [S#] o source ID sa mismong sagot; ilista lamang sa used_source_ids/evidence.\n"
         "- Maglagay ng kahit isang source ID [S#] sa bawat pangungusap.\n"
         "- Ilahad lamang ang aktuwal na nagamit na sources sa used_source_ids (huwag isama ang hindi nagamit).\n"
         "- Opsyonal: isama ang eksaktong sipi sa evidence.quotes.\n"
@@ -888,6 +896,7 @@ def _build_prompt_id(question_text: str, rag_qa: list, history_qa: list) -> str:
     prompt += (
         "Persyaratan:\n"
         "- Buat jawaban berdasarkan konteks yang diberikan dan ringkasan percakapan.\n"
+        "- Jangan cantumkan [S#] atau ID sumber di teks jawaban; cantumkan hanya di used_source_ids/evidence.\n"
         "- Tambahkan setidaknya satu ID sumber [S#] pada setiap kalimat.\n"
         "- Cantumkan hanya sumber yang benar-benar digunakan di used_source_ids (kecualikan yang tidak digunakan).\n"
         "- Opsional: sertakan kutipan persis di evidence.quotes.\n"

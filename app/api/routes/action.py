@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+import logging
 from api.routes.user import current_user_info
 from typing import Literal, Optional
 from datetime import datetime
@@ -36,12 +37,36 @@ _LABEL_TO_CODE = {
 }
 
 
+# Human-readable names for target languages (used in prompts)
+_CODE_TO_NAME_EN = {
+    "ja": "Japanese",
+    "en": "English",
+    "vi": "Vietnamese",
+    "zh": "Chinese",
+    "ko": "Korean",
+    "pt": "Portuguese",
+    "es": "Spanish",
+    "tl": "Tagalog",
+    "id": "Indonesian",
+}
+
+
 def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) -> str:
     # Localized system prompts by UI language
+    # Use a human-readable language name for translation targets (avoid codes like 'zh').
+    tgt_code = (target_lang or ui_lang or "").lower()
+    tgt_name = _CODE_TO_NAME_EN.get(tgt_code, target_lang or ui_lang or "target language")
+    # For translate action, always use an English system prompt (clear and model-friendly)
+    if action == "translate":
+        return (
+            f"You are a precise translator. Translate only the Answer into {tgt_name}. "
+            "Do not use the Question to add or infer content. No notes or explanations. "
+            "Preserve facts, entities, numbers, and conditions. Output only the translation."
+        )
     prompts = {
         "ja": {
             "translate": lambda tgt: (
-                f"あなたは厳密な翻訳者です。以下の『回答(Answer)』だけを {tgt} に翻訳してください。"
+                f"あなたは厳密な翻訳者です。以下の『回答(Answer)』だけを {tgt_name} に翻訳してください。"
                 "『質問(Question)』を使って内容を付け足したり推測したりしないでください。"
                 "注釈や説明は付けず、事実・固有名詞・数値・条件を厳密に保持し、翻訳結果のみを出力してください。"
             ),
@@ -58,7 +83,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "en": {
             "translate": lambda tgt: (
-                f"You are a precise translator. Translate only the Answer into {tgt}. "
+                f"You are a precise translator. Translate only the Answer into {tgt_name}. "
                 "Do not use the Question to add or infer content. No notes or explanations. "
                 "Preserve facts, entities, numbers, and conditions. Output only the translation."
             ),
@@ -74,7 +99,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "vi": {
             "translate": lambda tgt: (
-                f"Bạn là người dịch chính xác. Chỉ dịch phần Trả lời (Answer) sang {tgt}. "
+                f"Bạn là người dịch chính xác. Chỉ dịch phần Trả lời (Answer) sang {tgt_name}. "
                 "Không dùng Câu hỏi (Question) để thêm/suy đoán nội dung. Không ghi chú/giải thích. "
                 "Giữ nguyên sự thật, tên riêng, số liệu và điều kiện. Chỉ xuất bản dịch."
             ),
@@ -90,7 +115,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "zh": {
             "translate": lambda tgt: (
-                f"你是一名严谨的翻译。只将『答案(Answer)』翻译成 {tgt}。"
+                f"你是一名严谨的翻译。只将『答案(Answer)』翻译成 {tgt_name}。"
                 "不要根据『问题(Question)』补充或推断内容。不要添加注释或说明。"
                 "保留事实、实体、数字和条件。仅输出翻译后的答案。"
             ),
@@ -106,7 +131,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "ko": {
             "translate": lambda tgt: (
-                f"당신은 엄밀한 번역가입니다. 아래 ‘답변(Answer)’만 {tgt}(으)로 번역하세요. "
+                f"당신은 엄밀한 번역가입니다. 아래 ‘답변(Answer)’만 {tgt_name}(으)로 번역하세요. "
                 "‘질문(Question)’을 근거로 내용을 보태거나 추측하지 마세요. 주석/설명 없이, 사실/고유명사/숫자/조건을 그대로 유지하고 번역만 출력하세요."
             ),
             "summarize": (
@@ -120,7 +145,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "pt": {
             "translate": lambda tgt: (
-                f"Você é um tradutor preciso. Traduza apenas a Resposta (Answer) para {tgt}. "
+                f"Você é um tradutor preciso. Traduza apenas a Resposta (Answer) para {tgt_name}. "
                 "Não use a Pergunta (Question) para adicionar ou inferir conteúdo. Sem notas ou explicações. "
                 "Mantenha fatos, entidades, números e condições. Saída somente a tradução."
             ),
@@ -137,7 +162,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "es": {
             "translate": lambda tgt: (
-                f"Eres un traductor preciso. Traduce solo la Respuesta (Answer) al {tgt}. "
+                f"Eres un traductor preciso. Traduce solo la Respuesta (Answer) al {tgt_name}. "
                 "No uses la Pregunta (Question) para añadir o inferir contenido. Sin notas ni explicaciones. "
                 "Conserva hechos, entidades, números y condiciones. Produce únicamente la traducción."
             ),
@@ -154,7 +179,7 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
         },
         "tl": {
             "translate": lambda tgt: (
-                f"Ikaw ay isang tumpak na tagasalin. Isalin lamang ang Sagot (Answer) sa {tgt}. "
+                f"Ikaw ay isang tumpak na tagasalin. Isalin lamang ang Sagot (Answer) sa {tgt_name}. "
                 "Huwag gamitin ang Tanong (Question) para magdagdag o manghula ng nilalaman. Walang tala o paliwanag. "
                 "Panatilihin ang mga katotohanan, entidad, numero, at mga kondisyon. Ilabas lamang ang salin."
             ),
@@ -197,20 +222,10 @@ def _build_system_prompt(action: str, target_lang: Optional[str], ui_lang: str) 
 
 
 def _build_human(question: str, answer: str, ui_lang: str) -> str:
-    labels = {
-        "ja": ("文脈（Question：追加禁止）", "対象（Answer：この本文のみ処理）"),
-        "en": ("Context Question (do NOT add content)", "Answer (the ONLY text to operate on)"),
-        "vi": ("Ngữ cảnh (Question: KHÔNG bổ sung)", "Answer (CHỈ văn bản cần xử lý)"),
-        "zh": ("上下文问题（不得据此添加内容）", "答案（唯一需要处理的文本）"),
-        "ko": ("문맥 질문(추가 금지)", "답변(처리 대상 유일 텍스트)"),
-        "pt": ("Contexto (Pergunta: NÃO adicionar)", "Resposta (o ÚNICO texto a processar)"),
-        "es": ("Contexto (Pregunta: NO añadir)", "Respuesta (el ÚNICO texto a procesar)"),
-        "tl": ("Konteksto (Tanong: HUWAG magdagdag)", "Sagot (tanging tekstong ipoproseso)"),
-        "id": ("Konteks (Pertanyaan: JANGAN menambah)", "Jawaban (TEKS satu-satunya untuk diproses)"),
-    }
-    lang = ui_lang if ui_lang in labels else "en"
-    ql, al = labels[lang]
-    return f"{ql}:\n{question}\n\n{al}:\n{answer}"
+    """Keep the human prompt minimal and unambiguous: answer text only.
+    Context/question is intentionally omitted to avoid the model using it.
+    """
+    return (answer or "").strip()
 
 
 @router.post("/apply")
@@ -234,10 +249,24 @@ async def apply_action(payload: ActionPayload, current_user: dict = Depends(curr
         human = fallback
 
     # Choose a lightweight, separate model from RAG generation
-    llm = ChatOpenAI(model="gpt-4.1-nano", temperature=0.2)
+    # Some hosted models only accept the default temperature (1). Set explicitly to avoid 400 errors.
+    llm = ChatOpenAI(model="gpt-4.1-nano", temperature=1)
     sys = _build_system_prompt(payload.action, payload.target_lang, ui_lang)
 
     try:
+        # Log prompts sent to the action LLM for debugging translations
+        try:
+            logging.info(
+                "======================[Action LLM] action=%s target_lang=%s ui_lang=%s\nSYSTEM:\n%s\nHUMAN:\n%s",
+                payload.action,
+                payload.target_lang,
+                ui_lang,
+                sys,
+                human,
+            )
+        except Exception:
+            pass
+
         resp = llm.invoke([SystemMessage(content=sys), HumanMessage(content=human)])
         result = (resp.content or "").strip()
         # If simplify produced an output identical to the input answer, retry with a stronger instruction
