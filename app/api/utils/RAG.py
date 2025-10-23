@@ -928,11 +928,11 @@ _PROMPT_BUILDERS = {
 def _responses_text(
     prompt: str,
     *,
-    model: str = "gpt-4.1-nano",
+    model: str = "gpt-5-nano",
     max_output_tokens: int = 600,   # 互換性のため受け取るが未使用
     timeout_s: int = 60,
     response_schema: Optional[dict] = None,  # 互換性のため受け取るが未使用
-    reasoning_effort: str = "low",
+    reasoning_effort: str = "minimal",
     include_reasoning: bool = False,         # 互換性のため受け取るが未使用
 ) -> Tuple[str, str]:
     """最小でシンプルな実装。
@@ -946,46 +946,45 @@ def _responses_text(
     client_req = client.with_options(timeout=timeout_s)
 
     # GPT-4.1-nano
-    if model == "gpt-4.1-nano":
-        try:
-            chat = client_req.chat.completions.create(
-                model="gpt-4.1-nano",
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0,
-            )
-            result = (chat.choices[0].message.content or "").strip()
-            print(f"✓ LLM回答生成成功: model=gpt-4.1-nano")
-            return result, "gpt-4.1-nano"
-        except Exception as e:
-            print(f"✗ gpt-4.1-nano failed: {e}")
+    # if model == "gpt-4.1-nano":
+    #     try:
+    #         chat = client_req.chat.completions.create(
+    #             model="gpt-4.1-nano",
+    #             messages=[{"role": "user", "content": prompt}],
+    #             temperature=0,
+    #         )
+    #         result = (chat.choices[0].message.content or "").strip()
+    #         print(f"✓ LLM回答生成成功: model=gpt-4.1-nano")
+    #         return result, "gpt-4.1-nano"
+    #     except Exception as e:
+    #         print(f"✗ gpt-4.1-nano failed: {e}")
                 
     # GPT-5-nano
-    if model == "gpt-5-nano":
-        try:
-            chat = client_req.chat.completions.create(
-                model="gpt-5-nano",
-                messages=[{"role": "user", "content": prompt}],
-                reasoning_effort=reasoning_effort,
-            )
-            result = (chat.choices[0].message.content or "").strip()
-            print(f"✓ LLM回答生成成功: model=gpt-5-nano, reasoning_effort={reasoning_effort}")
-            return result, "gpt-5-nano"
-        except Exception as e:
-            print(f"✗ gpt-5-nano failed: {e}")
+    try:
+        chat = client_req.chat.completions.create(
+            model="gpt-5-nano",
+            messages=[{"role": "user", "content": prompt}],
+            reasoning_effort=reasoning_effort,
+        )
+        result = (chat.choices[0].message.content or "").strip()
+        print(f"✓ LLM回答生成成功: model=gpt-5-nano, reasoning_effort={reasoning_effort}")
+        return result, "gpt-5-nano"
+    except Exception as e:
+        print(f"✗ gpt-5-nano failed: {e}")
 
     # GPT-5-mini
-    if model == "gpt-5-mini":
-        try:
-            chat = client_req.chat.completions.create(
-                model="gpt-5-mini",
-                messages=[{"role": "user", "content": prompt}],
-                reasoning_effort=reasoning_effort,
-            )
-            result = (chat.choices[0].message.content or "").strip()
-            print(f"✓ LLM回答生成成功: model=gpt-5-mini, reasoning_effort={reasoning_effort}")
-            return result, "gpt-5-mini"
-        except Exception as e:
-            print(f"✗ gpt-5-mini failed: {e}")
+    # if model == "gpt-5-mini":
+    #     try:
+    #         chat = client_req.chat.completions.create(
+    #             model="gpt-5-mini",
+    #             messages=[{"role": "user", "content": prompt}],
+    #             reasoning_effort=reasoning_effort,
+    #         )
+    #         result = (chat.choices[0].message.content or "").strip()
+    #         print(f"✓ LLM回答生成成功: model=gpt-5-mini, reasoning_effort={reasoning_effort}")
+    #         return result, "gpt-5-mini"
+    #     except Exception as e:
+    #         print(f"✗ gpt-5-mini failed: {e}")
 
     # 2) Responses API（最小）
     try:
@@ -1012,8 +1011,8 @@ def generate_answer_with_llm(
     history_qa: List[Tuple[str, str]],
     *,
     lang: Optional[str] = None,
-    model: str = "gpt-4.1-nano",
-    reasoning_effort: str = "low",
+    model: str = "gpt-5-nano",
+    reasoning_effort: str = "minimal",
     max_history_in_prompt: int = 6,
 ) -> Dict[str, Any]:
     """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
@@ -1102,8 +1101,8 @@ def answer_with_rag(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-4.1-nano",
-    reasoning_effort: str = "low",
+    model: str = "gpt-5-nano",
+    reasoning_effort: str = "minimal",
 ) -> Dict[str, Any]:
     """Retrieve → generate. 統一フォーマットで返す。"""
     lang = "ja"

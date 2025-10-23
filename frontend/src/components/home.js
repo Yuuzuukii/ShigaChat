@@ -733,8 +733,6 @@ export default function Home() {
       const base = {
         text,
         similarity_threshold: similarity,
-        model: selectedModel,
-        reasoning_effort: reasoningEffort,
       };
       const payload = isTemp ? base : { thread_id: Number(threadId), ...base };
       const res = await fetch(`${API_BASE_URL}/question/get_answer`, {
@@ -1121,9 +1119,8 @@ export default function Home() {
                   {t?.newChat || "新しいチャット"}
                 </span>
               </button>
-              {/* モデル選択 */}
-              <Card className="mt-3 px-4 py-3 bg-white/90 backdrop-blur-sm border border-zinc-200 shadow-sm hover:shadow transition-shadow duration-200">
-                {/* モデル選択 */}
+
+              {/* <Card className="mt-3 px-4 py-3 bg-white/90 backdrop-blur-sm border border-zinc-200 shadow-sm hover:shadow transition-shadow duration-200">
                 <div className="flex items-center gap-2 mb-2">
                   <Cpu className="w-4 h-4 text-blue-500" />
                   <label className="text-xs font-medium text-zinc-700">
@@ -1140,8 +1137,6 @@ export default function Home() {
                     <SelectItem value="gpt-5-mini">GPT-5 Mini</SelectItem>
                   </SelectContent>
                 </Select>
-
-                {/* reasoning effort (GPT-5系のみ) */}
                 {(selectedModel === "gpt-5-nano" ||
                   selectedModel === "gpt-5-mini") && (
                   <div className="mt-3">
@@ -1162,7 +1157,7 @@ export default function Home() {
                     </Select>
                   </div>
                 )}
-              </Card>
+              </Card> */}
             </div>
 
             {/* フローティング設定コントロール */}

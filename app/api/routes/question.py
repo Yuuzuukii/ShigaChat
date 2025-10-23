@@ -185,9 +185,9 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         except Exception:
             sim_th = 0.3
 
-        # モデルとreasoning_effortの取得
-        model = request.model if (hasattr(request, 'model') and request.model) else "gpt-4.1-nano"
-        reasoning_effort = request.reasoning_effort if (hasattr(request, 'reasoning_effort') and request.reasoning_effort) else "low"
+        # モデルとreasoning_effortは固定（ユーザー選択を無効化）
+        model = "gpt-5-nano"
+        reasoning_effort = "minimal"
 
         resp = answer_with_rag(
             question_text=question_text,
