@@ -214,7 +214,7 @@ def _build_human(question: str, answer: str, ui_lang: str) -> str:
 
 
 @router.post("/apply")
-def apply_action(payload: ActionPayload, current_user: dict = Depends(current_user_info)):
+async def apply_action(payload: ActionPayload, current_user: dict = Depends(current_user_info)):
     # Determine UI language from user profile
     ui_label = current_user.get("spoken_language") or "English"
     ui_lang = _LABEL_TO_CODE.get(ui_label, "en")
@@ -283,7 +283,9 @@ def apply_action(payload: ActionPayload, current_user: dict = Depends(current_us
                         AND TABLE_NAME = 'thread_qa' 
                         AND COLUMN_NAME = 'rag_qa'
                     """)
-                    if cur.fetchone()[0] == 0:
+                    row = cur.fetchone()
+                    cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
+                    if cnt == 0:
                         cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
                     cur.execute("""
                         SELECT COUNT(*) FROM information_schema.COLUMNS 
@@ -291,7 +293,9 @@ def apply_action(payload: ActionPayload, current_user: dict = Depends(current_us
                         AND TABLE_NAME = 'thread_qa' 
                         AND COLUMN_NAME = 'type'
                     """)
-                    if cur.fetchone()[0] == 0:
+                    row = cur.fetchone()
+                    cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
+                    if cnt == 0:
                         cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
                     conn.commit()
             except Exception:

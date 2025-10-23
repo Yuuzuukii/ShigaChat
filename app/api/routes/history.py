@@ -8,7 +8,7 @@ from models.schemas import QuestionRequest
 router = APIRouter()
 
 @router.get("/get_posted_question")
-def get_posted_question(language_id: int, current_user: dict = Depends(current_user_info)):
+async def get_posted_question(language_id: int, current_user: dict = Depends(current_user_info)):
     user_id = current_user["id"]
     spoken_language = current_user["spoken_language"]
     language_id = language_mapping.get(spoken_language)
@@ -74,7 +74,7 @@ def get_posted_question(language_id: int, current_user: dict = Depends(current_u
 
 
 @router.get("/get_viewed_question")
-def get_viewed_question(language_id: int, current_user: dict = Depends(current_user_info)):
+async def get_viewed_question(language_id: int, current_user: dict = Depends(current_user_info)):
     """
     ユーザーの閲覧履歴を取得し、指定された言語で質問と回答を返す。
     """
@@ -143,7 +143,7 @@ def get_viewed_question(language_id: int, current_user: dict = Depends(current_u
         return list(viewed_questions.values())
 
 @router.delete("/clear_history")
-def clear_history(current_user: dict = Depends(get_current_user)):
+async def clear_history(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     
     ph = get_placeholder()
@@ -157,7 +157,7 @@ def clear_history(current_user: dict = Depends(get_current_user)):
     return {"message": "閲覧履歴が削除されました"}
 
 @router.post("/add_history")
-def add_to_history(request: QuestionRequest, current_user: dict = Depends(get_current_user)):
+async def add_to_history(request: QuestionRequest, current_user: dict = Depends(get_current_user)):
     """
     質問IDを受け取り、該当する質問を履歴に追加します。
     """
@@ -173,7 +173,7 @@ def add_to_history(request: QuestionRequest, current_user: dict = Depends(get_cu
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"履歴追加中にエラーが発生しました: {str(e)}")
 
-def add_history(question_id: int, user_id: int):
+async def add_history(question_id: int, user_id: int):
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
         # QA.idを取得

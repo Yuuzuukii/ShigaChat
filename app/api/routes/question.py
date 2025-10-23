@@ -26,7 +26,9 @@ def _ensure_thread_qa_has_rag_column() -> None:
                 AND TABLE_NAME = 'thread_qa' 
                 AND COLUMN_NAME = 'rag_qa'
             """)
-            if cursor.fetchone()[0] == 0:
+            row = cursor.fetchone()
+            cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
+            if cnt == 0:
                 cursor.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
                 conn.commit()
     
@@ -44,14 +46,16 @@ def _ensure_thread_qa_has_type_column() -> None:
                 AND TABLE_NAME = 'thread_qa' 
                 AND COLUMN_NAME = 'type'
             """)
-            if cursor.fetchone()[0] == 0:
+            row = cursor.fetchone()
+            cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
+            if cnt == 0:
                 cursor.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
                 conn.commit()
     except Exception:
         pass
 
 @router.get("/get_translated_question")
-def get_translated_question(question_id: int, language_id: int, current_user: dict = Depends(current_user_info)):
+async def get_translated_question(question_id: int, language_id: int, current_user: dict = Depends(current_user_info)):
     """
     翻訳済みの質問を取得する
     """
@@ -83,7 +87,7 @@ def get_translated_question(question_id: int, language_id: int, current_user: di
             )
         return {"text": translated_question['texts']}
 
-def load_data_from_database():
+async def load_data_from_database():
     questions_and_answers = []
     
     try:
@@ -116,7 +120,7 @@ def load_data_from_database():
     return questions_and_answers
 
 @router.post("/create_thread")
-def create_thread(current_user: dict = Depends(current_user_info)):
+async def create_thread(current_user: dict = Depends(current_user_info)):
     """
     空のスレッドを作成してIDを返す。最初の投稿前にUIから作成したいケース用。
     """
@@ -181,12 +185,17 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         except Exception:
             sim_th = 0.3
 
+        # モデルとreasoning_effortの取得
+        model = request.model if (hasattr(request, 'model') and request.model) else "gpt-4.1-nano"
+        reasoning_effort = request.reasoning_effort if (hasattr(request, 'reasoning_effort') and request.reasoning_effort) else "low"
+
         resp = answer_with_rag(
             question_text=question_text,
             history_qa=history_qa,
             similarity_threshold=sim_th,
             max_history_in_prompt=6,
-            model="gpt-5-mini", 
+            model=model,
+            reasoning_effort=reasoning_effort,
         )
 
         # RAG専用応答を展開
@@ -256,7 +265,7 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         raise HTTPException(status_code=500, detail=error_detail)
 
 @router.get("/get_translated_answer")
-def get_translated_answer(
+async def get_translated_answer(
     answer_id: int = Query(..., description="Answer ID"),
     current_user: dict = Depends(current_user_info)
 ):
@@ -290,7 +299,7 @@ def get_translated_answer(
         return {"text": translated_answer['texts']}
 
 @router.get("/get_qa")
-def get_qa(
+async def get_qa(
     question_id: int,
     current_user: dict = Depends(current_user_info)
 ):
@@ -352,7 +361,7 @@ def get_qa(
     }
 
 @router.get("/get_qa_list")
-def get_qa_list(
+async def get_qa_list(
     mine: bool = Query(False, description="自分の質問のみを取得するかどうか"),
     category_id: int = Query(None, description="カテゴリIDでフィルタリング"),
     current_user: dict = Depends(current_user_info)
@@ -408,7 +417,7 @@ def get_qa_list(
     return {"qa_list": qa_list}
 
 @router.get("/get_user_threads")
-def get_user_threads(current_user: dict = Depends(current_user_info)):
+async def get_user_threads(current_user: dict = Depends(current_user_info)):
     """
     ユーザーのスレッド一覧を最新順で取得
     """
@@ -456,7 +465,7 @@ def get_user_threads(current_user: dict = Depends(current_user_info)):
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
 
 @router.get("/get_thread_messages/{thread_id}")
-def get_thread_messages(thread_id: str, current_user: dict = Depends(current_user_info)):
+async def get_thread_messages(thread_id: str, current_user: dict = Depends(current_user_info)):
     """
     指定されたスレッドのメッセージ履歴を取得
     """
@@ -518,7 +527,7 @@ def get_thread_messages(thread_id: str, current_user: dict = Depends(current_use
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
 
 @router.delete("/delete_thread/{thread_id}")
-def delete_thread(thread_id: str, current_user: dict = Depends(current_user_info)):
+async def delete_thread(thread_id: str, current_user: dict = Depends(current_user_info)):
     """
     指定されたスレッドとその関連メッセージを削除
     """

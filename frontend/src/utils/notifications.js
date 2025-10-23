@@ -172,3 +172,28 @@ export const handleGlobalNotificationMove = async (notification, navigate, token
     console.error("通知の既読処理エラー:", error);
   }
 };
+
+// すべて既読（個人 + 全体）
+export const markAllNotificationsRead = async ({ token, userId, refresh }) => {
+  try {
+    // 個人通知を一括既読
+    await fetch(`${API_BASE_URL}/notification/notifications/read_all`, {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    // ignore and continue
+  }
+  try {
+    // 全体通知を一括既読（このユーザを global_read_users に追加）
+    await fetch(`${API_BASE_URL}/notification/notifications/global/read_all`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+  } catch (e) {
+    // ignore
+  }
+  try {
+    if (typeof refresh === 'function') await refresh();
+  } catch {}
+};

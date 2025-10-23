@@ -43,7 +43,7 @@ CATEGORY_SLUGS = {
 }
 
 # ===== 整形：HTML→自然文（URL保持） =====
-def html_to_plaintext(html: str) -> str:
+async def html_to_plaintext(html: str) -> str:
     """
     回答HTMLを自然文テキストに整形。
     - <a> は「テキスト (URL)」
@@ -112,7 +112,7 @@ def html_to_plaintext(html: str) -> str:
     return text.strip()
 
 # ===== DBユーティリティ =====
-def wipe_seed_tables(conn):
+async def wipe_seed_tables(conn):
     """
     既存の投入済みデータ(question/answer/translation/QA)を一括削除し、
     AUTOINCREMENTの採番もリセットする。
@@ -141,7 +141,7 @@ def wipe_seed_tables(conn):
     finally:
         cur.execute("PRAGMA foreign_keys=ON;")
 
-def ensure_user(cur):
+async def ensure_user(cur):
     cur.execute("SELECT id FROM user WHERE name=?", ("sia",))
     row = cur.fetchone()
     if row:
@@ -149,7 +149,7 @@ def ensure_user(cur):
     cur.execute("INSERT INTO user (name, password) VALUES (?, ?)", ("sia", "sia"))
     return cur.lastrowid
 
-def insert_question(cur, category_id, user_id):
+async def insert_question(cur, category_id, user_id):
     cur.execute("""
         INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
         VALUES (?, ?, ?, ?, ?, ?, 1)
@@ -157,32 +157,32 @@ def insert_question(cur, category_id, user_id):
     return cur.lastrowid
 
 # AnswerはQごとに1件だけ作成（language_idはJA=1で固定）
-def insert_answer(cur):
+async def insert_answer(cur):
     cur.execute("INSERT INTO answer (time, language_id) VALUES (?, ?)", (FIXED_DT, 1))
     return cur.lastrowid
 
-def link_QA(cur, qid, aid):
+async def link_QA(cur, qid, aid):
     cur.execute("INSERT INTO QA (question_id, answer_id) VALUES (?, ?)", (qid, aid))
 
-def insert_q_trans(cur, qid, lang_id, text):
+async def insert_q_trans(cur, qid, lang_id, text):
     cur.execute("""
         INSERT INTO question_translation (question_id, language_id, texts, checked)
         VALUES (?, ?, ?, 1)
     """, (qid, lang_id, text or ""))
 
-def insert_a_trans(cur, aid, lang_id, text_plain):
+async def insert_a_trans(cur, aid, lang_id, text_plain):
     cur.execute("""
         INSERT INTO answer_translation (answer_id, language_id, texts, checked)
         VALUES (?, ?, ?, 1)
     """, (aid, lang_id, text_plain or ""))
 
 # ===== 取得・解析 =====
-def fetch_soup(url):
+async def fetch_soup(url):
     r = requests.get(url, headers=UA, timeout=30)
     r.raise_for_status()
     return BeautifulSoup(r.text, "html.parser")
 
-def extract_pairs(soup):
+async def extract_pairs(soup):
     """各 paragraph--type--consulting-qa から (Q_text, A_html) の配列を返す"""
     pairs = []
     for blk in soup.select(".paragraph--type--consulting-qa"):
@@ -195,7 +195,7 @@ def extract_pairs(soup):
         pairs.append((q_text, a_html))
     return pairs
 
-def load_category_all_lang(slug):
+async def load_category_all_lang(slug):
     """1カテゴリの全言語ページを1回ずつ取得して辞書で返す: {lang_id: [(Q, A_html), ...]}"""
     result = {}
     for code, lang_id, prefix in LANGS:
@@ -212,7 +212,7 @@ def load_category_all_lang(slug):
     return result
 
 # ===== メイン処理 =====
-def main():
+async def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 
@@ -312,7 +312,7 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; ShigaChatScraper/1.0; +https://example.com)"
 }
 
-def fetch_questions_ja(url: str):
+async def fetch_questions_ja(url: str):
     """日本語ページから質問文だけを抽出"""
     r = requests.get(url, headers=HEADERS, timeout=30)
     r.raise_for_status()
@@ -327,7 +327,7 @@ def fetch_questions_ja(url: str):
             questions.append(text)
     return questions
 
-def main():
+async def main():
     conn = sqlite3.connect(DB_PATH)
     cur = conn.cursor()
 

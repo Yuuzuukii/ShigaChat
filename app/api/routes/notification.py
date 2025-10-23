@@ -8,7 +8,7 @@ from models.schemas import NotificationRequest
 router = APIRouter()
 
 @router.get("/notifications")
-def get_notifications(current_user: dict = Depends(current_user_info)):
+async def get_notifications(current_user: dict = Depends(current_user_info)):
     user_id = current_user["id"]
     spoken_language = current_user["spoken_language"]
 
@@ -60,7 +60,7 @@ def get_notifications(current_user: dict = Depends(current_user_info)):
 
 # 既読処理のエンドポイント
 @router.put("/notifications/read")
-def read_notifications(request: NotificationRequest):
+async def read_notifications(request: NotificationRequest):
     try:
         ph = get_placeholder()
         with get_db_cursor() as (cursor, conn):
@@ -75,7 +75,7 @@ def read_notifications(request: NotificationRequest):
         raise HTTPException(status_code=500, detail=str(e))
    
 @router.get("/notifications/global")
-def get_notifications_global(current_user: dict = Depends(current_user_info)):
+async def get_notifications_global(current_user: dict = Depends(current_user_info)):
     """
     すべての全体通知を取得するエンドポイント（未読・既読関係なし）。
     ユーザーの言語でメッセージを取得。
@@ -101,7 +101,7 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
             FROM notifications n
             LEFT JOIN notifications_translation nt 
             ON n.id = nt.notification_id AND nt.language_id = {ph}
-            WHERE n.user_id = -1
+            WHERE n.user_id = -1 OR n.global_read_users IS NOT NULL
             ORDER BY n.time DESC
         """, (language_id,))
         
@@ -128,9 +128,62 @@ def get_notifications_global(current_user: dict = Depends(current_user_info)):
     return notifications
 
 
+# すべての個人通知を既読にする
+@router.put("/notifications/read_all")
+async def read_all_notifications(current_user: dict = Depends(current_user_info)):
+    try:
+        user_id = current_user["id"]
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute(
+                f"UPDATE notifications SET is_read = 1 WHERE user_id = {ph}",
+                (user_id,)
+            )
+            conn.commit()
+        return {"message": "All personal notifications marked as read"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# すべての全体通知を既読にする（現在のユーザーを global_read_users に追加）
+@router.post("/notifications/global/read_all")
+async def read_all_notifications_global(current_user: dict = Depends(current_user_info)):
+    try:
+        user_id = current_user["id"]
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute(
+                f"""
+                SELECT id, COALESCE(global_read_users, '[]') AS global_read_users
+                FROM notifications
+                WHERE user_id = -1 OR global_read_users IS NOT NULL
+                """
+            )
+            rows = cursor.fetchall() or []
+
+            for row in rows:
+                nid = row['id'] if isinstance(row, dict) else row[0]
+                gru_raw = row['global_read_users'] if isinstance(row, dict) else row[1]
+                try:
+                    arr = json.loads(gru_raw) if gru_raw else []
+                except Exception:
+                    arr = []
+                if user_id not in arr:
+                    arr.append(user_id)
+                    new_val = json.dumps(arr)
+                    cursor.execute(
+                        f"UPDATE notifications SET global_read_users = {ph} WHERE id = {ph}",
+                        (new_val, nid)
+                    )
+            conn.commit()
+        return {"message": "All global notifications marked as read for current user"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # 📌 全体通知を既読にする
 @router.post("/notifications/global/read")
-def read_notifications_global(request: NotificationRequest, current_user: dict = Depends(current_user_info)):
+async def read_notifications_global(request: NotificationRequest, current_user: dict = Depends(current_user_info)):
     """
     指定された全体通知を、ユーザーが既読にするエンドポイント
     """
@@ -140,7 +193,7 @@ def read_notifications_global(request: NotificationRequest, current_user: dict =
     with get_db_cursor() as (cursor, conn):
         # 既存の global_read_users を取得
         cursor.execute(
-            f"SELECT global_read_users FROM notifications WHERE id = {ph} AND user_id = -1",
+            f"SELECT global_read_users FROM notifications WHERE id = {ph} AND (user_id = -1 OR global_read_users IS NOT NULL)",
             (request.id,)
         )
         row = cursor.fetchone()

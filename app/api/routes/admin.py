@@ -11,6 +11,143 @@ from api.utils.RAG import append_qa_to_vector_index, append_qa_to_vector_index_f
 router = APIRouter()
 
 # ----- Answer history helpers -------------------------------------------------
+def _register_question_background(
+    question_id: int,
+    answer_id: int,
+    base_language_id: int,
+    user_id: int,
+    content: str,
+    answer_text: str,
+    spoken_language_label: str,
+):
+    try:
+        ph = get_placeholder()
+        with get_db_cursor() as (cursor, conn):
+            # 全言語
+            cursor.execute("SELECT id FROM language")
+            languages = [r['id'] for r in cursor.fetchall()]
+
+            # 翻訳（質問）
+            for target_lang_id in languages:
+                if int(target_lang_id) == int(base_language_id):
+                    continue
+                try:
+                    question_translate(question_id, target_lang_id, {"id": user_id, "spoken_language": spoken_language_label})
+                except Exception:
+                    pass
+
+            # 翻訳（回答）
+            for target_lang_id in languages:
+                if int(target_lang_id) == int(base_language_id):
+                    continue
+                try:
+                    answer_translate(answer_id, target_lang_id, {"id": user_id, "spoken_language": spoken_language_label})
+                except Exception:
+                    pass
+
+            # 通知（全体）
+            try:
+                snippet_length = 50
+                _ensure_system_user()
+                _ensure_notifications_question_id()
+                try:
+                    cursor.execute(
+                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
+                        (-1, False, datetime.now(), '[]', question_id),
+                    )
+                except Exception:
+                    cursor.execute(
+                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
+                        (user_id, False, datetime.now(), '[]', question_id),
+                    )
+                notification_id = cursor.lastrowid
+                conn.commit()
+
+                cursor.execute(f"SELECT language_id, texts FROM question_translation WHERE question_id = {ph}", (question_id,))
+                translations = cursor.fetchall() or []
+
+                # 言語別メッセージ
+                new_question_translations = {
+                    "日本語": "新しい質問が登録されました",
+                    "English": "A new question has been registered",
+                    "中文": "已注册新问题",
+                    "한국어": "새 질문이 등록되었습니다",
+                    "Português": "Uma nova pergunta foi registrada",
+                    "Español": "Se ha registrado una nueva pregunta",
+                    "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
+                    "Tagalog": "Nairehistro ang bagong tanong",
+                    "Bahasa Indonesia": "Pertanyaan baru telah didaftarkan",
+                }
+                by_user_translations = {
+                    "日本語": "登録者",
+                    "English": "by",
+                    "中文": "由",
+                    "한국어": "등록자",
+                    "Português": "por",
+                    "Español": "por",
+                    "Tiếng Việt": "bởi",
+                    "Tagalog": "ni",
+                    "Bahasa Indonesia": "oleh",
+                }
+                nickname = None
+                try:
+                    cursor.execute(f"SELECT name FROM user WHERE id = {ph}", (user_id,))
+                    r = cursor.fetchone()
+                    nickname = (r and (r.get('name') if isinstance(r, dict) else r[0])) or "user"
+                except Exception:
+                    nickname = "user"
+
+                for row in translations:
+                    lang_id = row['language_id'] if isinstance(row, dict) else row[0]
+                    text = row['texts'] if isinstance(row, dict) else row[1]
+                    snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
+                    lang_name = None
+                    for k, v in language_mapping.items():
+                        if v == lang_id:
+                            lang_name = k
+                            break
+                    if not lang_name:
+                        lang_name = "English"
+                    prefix = new_question_translations.get(lang_name, "A new question has been registered")
+                    by_label = by_user_translations.get(lang_name, "by")
+                    translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
+                    cursor.execute(
+                        f"INSERT INTO notifications_translation (notification_id, language_id, messages) VALUES ({ph}, {ph}, {ph})",
+                        (notification_id, lang_id, translated_message),
+                    )
+                conn.commit()
+            except Exception:
+                pass
+
+        # ベクトル
+        try:
+            append_qa_to_vector_index(question_id, answer_id)
+        except Exception:
+            pass
+    except Exception:
+        pass
+def _ensure_system_user() -> None:
+    """Ensure a special system user with id = -1 exists for global notifications.
+    Some code uses user_id = -1 to mark global notifications; satisfy FK.
+    """
+    try:
+        ph = get_placeholder()
+        with get_db_cursor() as (cur, conn):
+            cur.execute(f"SELECT id FROM user WHERE id = {ph}", (-1,))
+            row = cur.fetchone()
+            if not row:
+                try:
+                    # Insert minimal row. Adjust columns as per existing schema.
+                    cur.execute(
+                        f"INSERT INTO user (id, name, password, spoken_language) VALUES ({ph}, {ph}, {ph}, {ph})",
+                        (-1, "__system__", "", "English"),
+                    )
+                    conn.commit()
+                except Exception:
+                    # If insertion fails (e.g., different schema), skip; caller may handle differently.
+                    pass
+    except Exception:
+        pass
 def _ensure_answer_translation_history() -> None:
     try:
         with get_db_cursor() as (cur, conn):
@@ -60,7 +197,9 @@ def _ensure_notifications_question_id():
                     AND TABLE_NAME = 'notifications' 
                     AND COLUMN_NAME = 'question_id'
                 """)
-                if cur.fetchone()[0] == 0:
+                row = cur.fetchone()
+                cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
+                if cnt == 0:
                     cur.execute("ALTER TABLE notifications ADD COLUMN question_id INT")
                     conn.commit()
     except Exception:
@@ -75,7 +214,8 @@ def _ensure_question_editor_columns():
                     AND TABLE_NAME = 'question' 
                     AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
                 """)
-                existing_cols = cur.fetchone()[0]
+                row = cur.fetchone()
+                existing_cols = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
                 if existing_cols < 2:
                     cur.execute("""
                         SELECT COLUMN_NAME FROM information_schema.COLUMNS 
@@ -83,7 +223,7 @@ def _ensure_question_editor_columns():
                         AND TABLE_NAME = 'question' 
                         AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
                     """)
-                    cols = [row[0] if isinstance(row, dict) else row[0] for row in cur.fetchall()]
+                    cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
                     if "last_editor_id" not in cols:
                         cur.execute("ALTER TABLE question ADD COLUMN last_editor_id INT")
                     if "last_edited_at" not in cols:
@@ -93,7 +233,7 @@ def _ensure_question_editor_columns():
         pass
 
 @router.post("/answer_edit")
-def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: dict = Depends(current_user_info)):
+async def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: dict = Depends(current_user_info)):
     """ 回答を編集し、翻訳データを更新 + 通知を作成 """
     operator_id = current_user["id"]
     if operator_id is None:
@@ -187,13 +327,16 @@ def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: 
                 "Bahasa Indonesia": "id"
             }
 
-            # 4. 文法チェック機能（全言語翻訳時のみ実行）
+            # 4. 文法チェック機能
             if translate_to_all:
                 # 文法チェック設定テーブルを確保
                 _ensure_question_grammar_check_table()
                 
                 # 現在編集中の言語の文法チェックが有効かチェック
-                cursor.execute(f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
+                cursor.execute(
+                    f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}",
+                    (question_id, language_id)
+                )
                 grammar_check_row = cursor.fetchone()
                 
                 # デフォルトは無効(レコードが存在しない場合)
@@ -234,7 +377,7 @@ def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: 
                 try:
                     # 全ての言語IDを取得
                     cursor.execute("SELECT id FROM language")
-                    all_languages = [row['id'] if isinstance(row, dict) else row[0] for row in cursor.fetchall()]
+                    all_languages = [r['id'] for r in cursor.fetchall()]
                     
                     for lang_id in all_languages:
                         # 編集した言語は必ず有効、他の言語は無効（翻訳されたテキストは再度チェックが必要）
@@ -263,6 +406,30 @@ def answer_edit(request: dict, background_tasks: BackgroundTasks, current_user: 
                     import traceback
                     print(f"❌ スタックトレース: {traceback.format_exc()}")
                     # 設定更新の失敗は致命的エラーとしない
+            else:
+                # 単一言語編集時：編集中の自言語のみチェックを有効化（他言語は変更しない）
+                try:
+                    _ensure_question_grammar_check_table()
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    cursor.execute(
+                        f"SELECT grammar_check_enabled FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}",
+                        (question_id, language_id)
+                    )
+                    exists = cursor.fetchone()
+                    if exists:
+                        cursor.execute(
+                            f"UPDATE question_grammar_check SET grammar_check_enabled = {ph}, updated_at = {ph} WHERE question_id = {ph} AND language_id = {ph}",
+                            (1, now, question_id, language_id)
+                        )
+                    else:
+                        cursor.execute(
+                            f"INSERT INTO question_grammar_check (question_id, language_id, grammar_check_enabled, created_at, updated_at) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
+                            (question_id, language_id, 1, now, now)
+                        )
+                    conn.commit()
+                except Exception as e:
+                    print(f"❌ 文法チェック（単一言語）の更新に失敗: {str(e)}")
+                    # 失敗しても致命的ではないため続行
 
             # 5. 全言語への翻訳を行うかチェック
             if translate_to_all:
@@ -377,7 +544,7 @@ language_code_to_id = {
 
 
 @router.get("/answer_history")
-def get_answer_history(
+async def get_answer_history(
     answer_id: int,
     lang: str = Query(None, description="Optional language code like ja/en/vi/zh/ko"),
     current_user: dict = Depends(current_user_info),
@@ -421,7 +588,7 @@ def get_answer_history(
         raise HTTPException(status_code=500, detail=f"DB error: {str(e)}")
     
 @router.put("/official_question")
-def official_question(request: dict, current_user: dict = Depends(current_user_info)):
+async def official_question(request: dict, current_user: dict = Depends(current_user_info)):
     """
     指定された question_id の title を 'official' または 'ユーザ質問' に変更 + 通知を作成
     """
@@ -576,7 +743,7 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
             try:
                 _ensure_notifications_question_id()
                 cursor.execute(f"SELECT id FROM notifications WHERE question_id = {ph}", (question_id,))
-                old_notifs = [row[0] for row in cursor.fetchall()]
+                old_notifs = [r['id'] for r in cursor.fetchall()]
                 if old_notifs:
                     cursor.executemany(f"DELETE FROM notifications_translation WHERE notification_id = {ph}", [(nid,) for nid in old_notifs])
                     cursor.execute(f"DELETE FROM notifications WHERE question_id = {ph}", (question_id,))
@@ -724,6 +891,7 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
 @router.post("/register_question")
 async def register_question(
     request: RegisterQuestionRequest,
+    background_tasks: BackgroundTasks,
     current_user: dict = Depends(current_user_info)
 ):
     user_id = current_user["id"]
@@ -767,13 +935,9 @@ async def register_question(
 
         # 各言語に翻訳
         cursor.execute("SELECT id FROM language")
-        languages = [row[0] for row in cursor.fetchall()]
+        languages = [r['id'] for r in cursor.fetchall()]
         
-        for target_lang_id in languages:
-            try:
-                question_translate(question_id, target_lang_id, current_user)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"質問の翻訳に失敗しました: {str(e)}")
+        # 質問の全言語翻訳は背景タスクで実行
         
         # 回答を登録
         cursor.execute(
@@ -798,14 +962,7 @@ async def register_question(
 
         conn.commit()  # **元言語の回答を挿入した後にコミット**
 
-        # 各言語に翻訳
-        for target_lang_id in languages:
-            if target_lang_id == language_id:
-                continue  # 🔥 元言語はスキップ（すでにINSERT済み）
-            try:
-                answer_translate(answer_id, target_lang_id, current_user)
-            except Exception as e:
-                raise HTTPException(status_code=500, detail=f"回答ID {answer_id} の翻訳に失敗しました: {str(e)}")
+        # 回答の全言語翻訳は背景タスクで実行
         
         # QAテーブルに登録
         cursor.execute(
@@ -832,94 +989,28 @@ async def register_question(
             conn.commit()
         except Exception as e:
             print(f"文法チェック設定の初期化に失敗: {str(e)}")
-            # 設定の初期化失敗は致命的エラーとしない
-
-        # 📌 通知の先頭メッセージ（言語別）
-        new_question_translations = {
-            "日本語": "新しい質問が登録されました",
-            "English": "New question has been registered",
-            "Tiếng Việt": "Câu hỏi mới đã được đăng ký",
-            "中文": "新问题已注册",
-            "한국어": "새로운 질문이 등록되었습니다",
-            "Português": "Nova pergunta foi registrada",
-            "Español": "Se ha registrado una nueva pregunta",
-            "Tagalog": "Isang bagong tanong ang nairehistro",
-            "Bahasa Indonesia": "Pertanyaan baru telah terdaftar"
-
-        }
-        # 📌 投稿者（ニックネーム）の表記（言語別）
-        by_user_translations = {
-            "日本語": "登録者",
-            "English": "by",
-            "Tiếng Việt": "bởi",
-            "中文": "由",
-            "한국어": "등록자",
-            "Português": "por",
-            "Español": "por",
-            "Tagalog": "ni",
-            "Bahasa Indonesia": "oleh"
-        }
-
-        # 📌 **質問内容のスニペットを通知に追加**
-        snippet_length = 50  # スニペットの最大長
         
-        # `notifications` に通知を追加（全体通知 + question_id）
-        _ensure_notifications_question_id()
-        cursor.execute(
-            f"""
-            INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id)
-            VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
-            """,
-            (-1, False, datetime.now(), '[]', question_id)
+        # 重い処理は背景タスクで実行（翻訳・通知・ベクトル）
+        background_tasks.add_task(
+            _register_question_background,
+            question_id,
+            answer_id,
+            language_id,
+            user_id,
+            request.content,
+            request.answer_text,
+            spoken_language,
         )
-        notification_id = cursor.lastrowid  # 挿入された通知のID
-        conn.commit()
-
-        # 📌 **通知の翻訳を `question_translation` から取得**
-        cursor.execute(
-            f"""
-            SELECT language_id, texts FROM question_translation WHERE question_id = {ph}
-            """, (question_id,)
-        )
-        translations = cursor.fetchall()
-
-        # 🔹 各言語のスニペットを `notifications_translation` に格納
-        for lang_id, text in translations:
-            snippet = text[:snippet_length] + ("..." if len(text) > snippet_length else "")
-            # 言語名を取得（"日本語" など）
-            lang_name = next(key for key, val in language_mapping.items() if val == lang_id)
-            # メッセージ例: "新しい質問が登録されました（登録者: ニックネーム）: スニペット"
-            prefix = new_question_translations.get(lang_name, "New question has been registered")
-            by_label = by_user_translations.get(lang_name, "by")
-            nickname = current_user.get("name", "user")
-            translated_message = f"{prefix}（{by_label}: {nickname}）: {snippet}"
-
-            cursor.execute(
-                f"""
-                INSERT INTO notifications_translation (notification_id, language_id, messages)
-                VALUES ({ph}, {ph}, {ph})
-                """,
-                (notification_id, lang_id, translated_message),
-            )
-
-        conn.commit()  # 翻訳の挿入を確定
-
-        # ベクトルインデックスへ差分追加（全言語分）
-        try:
-            appended = append_qa_to_vector_index(question_id, answer_id)
-            # optional: could log appended count if a logger is present
-        except Exception:
-            # ベクトル更新失敗は致命ではないため処理を続行
-            pass
 
     return {
         "question_id": question_id,
         "question_text": request.content,
         "answer_id": answer_id,
         "answer_text": request.answer_text,
+        "status": "queued",
     }
 
-def save_question_with_category(question: str, category_id: int, user_id: int):
+async def save_question_with_category(question: str, category_id: int, user_id: int):
     """
     質問をカテゴリとともに保存する関数
     """
@@ -935,7 +1026,7 @@ def save_question_with_category(question: str, category_id: int, user_id: int):
         raise RuntimeError("質問の保存に失敗しました")
 
 @router.get("/grammar_check_setting")
-def get_grammar_check_setting(question_id: int, language_id: int = None, current_user: dict = Depends(current_user_info)):
+async def get_grammar_check_setting(question_id: int, language_id: int = None, current_user: dict = Depends(current_user_info)):
     """ 指定された質問の指定言語での文法チェック設定を取得 """
     
     # 言語IDが指定されていない場合は、ユーザーの使用言語を使用
@@ -967,7 +1058,7 @@ def get_grammar_check_setting(question_id: int, language_id: int = None, current
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
 
 @router.post("/grammar_check_setting")
-def set_grammar_check_setting(request: dict, current_user: dict = Depends(current_user_info)):
+async def set_grammar_check_setting(request: dict, current_user: dict = Depends(current_user_info)):
     """ 指定された質問の指定言語での文法チェック設定を変更 """
     question_id = request.get("question_id")
     language_id = request.get("language_id")
@@ -1016,7 +1107,7 @@ def set_grammar_check_setting(request: dict, current_user: dict = Depends(curren
         raise HTTPException(status_code=500, detail=f"データベースエラー: {str(e)}")
 
 @router.post("/initialize_all_grammar_check")
-def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)):
+async def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)):
     """ 全ての既存質問に対してデフォルトで文法チェック有効設定を追加 """
     try:
         ph = get_placeholder()
@@ -1025,13 +1116,13 @@ def initialize_all_grammar_check(current_user: dict = Depends(current_user_info)
             
             # 全ての質問IDと言語IDを取得
             cursor.execute("SELECT question_id FROM question")
-            all_questions = cursor.fetchall()
+            all_questions = [r['question_id'] for r in cursor.fetchall()]
             
             cursor.execute("SELECT id FROM language")
-            all_languages = [row[0] for row in cursor.fetchall()]
+            all_languages = [r['id'] for r in cursor.fetchall()]
             
             initialized_count = 0
-            for (question_id,) in all_questions:
+            for question_id in all_questions:
                 for language_id in all_languages:
                     # 既存の設定をチェック
                     cursor.execute(f"SELECT question_id FROM question_grammar_check WHERE question_id = {ph} AND language_id = {ph}", (question_id, language_id))
@@ -1143,4 +1234,3 @@ def _background_translate_all_languages(
             print(f"✅ バックグラウンド翻訳完了: answer_id={answer_id}, question_id={question_id}")
     except Exception as e:
         print(f"❌ バックグラウンド翻訳エラー: {str(e)}")
-

@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import { UserContext } from "../UserContext";
 import { API_BASE_URL, translations } from "../config/constants";
-import { fetchNotifications, handleGlobalNotificationMove, handleNotificationClick, handleNotificationMove } from "../utils/notifications";
+import { fetchNotifications, handleGlobalNotificationMove, handleNotificationClick, handleNotificationMove, markAllNotificationsRead } from "../utils/notifications";
 import { updateUserLanguage } from "../utils/language";
 import { Button } from "./ui/button";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "./ui/select";
@@ -487,27 +487,42 @@ export default function Navbar({ children }) {
                   {/* Header */}
                   <div className="mb-4 flex items-center justify-between">
                     <h3 className="text-lg font-semibold text-zinc-800">通知</h3>
-                    <div className="flex rounded-lg bg-zinc-100 p-1">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => setActiveTab('personal')} 
-                        className={`h-7 px-3 text-xs font-medium rounded transition-all ${
-                          activeTab === 'personal' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-50'
-                        }`}
+                        onClick={async () => {
+                          await markAllNotificationsRead({
+                            token,
+                            userId,
+                            refresh: () => fetchNotifications({ language, token, userId, setNotifications, setGlobalNotifications, setUnreadCount })
+                          });
+                        }}
+                        className="h-7 rounded bg-blue-50 px-2 text-xs font-medium text-blue-700 hover:bg-blue-100"
+                        title={t?.markAllRead || 'すべて既読'}
                       >
-                        {t.personal || '個人'}
+                        {t?.markAllRead || 'すべて既読'}
                       </button>
-                      <button
-                        onClick={() => setActiveTab('global')} 
-                        className={`h-7 px-3 text-xs font-medium rounded transition-all ${
-                          activeTab === 'global' 
-                            ? 'bg-white text-blue-600 shadow-sm' 
-                            : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-50'
-                        }`}
-                      >
-                        {t.global || '全体'}
-                      </button>
+                      <div className="flex rounded-lg bg-zinc-100 p-1">
+                        <button
+                          onClick={() => setActiveTab('personal')} 
+                          className={`h-7 px-3 text-xs font-medium rounded transition-all ${
+                            activeTab === 'personal' 
+                              ? 'bg-white text-blue-600 shadow-sm' 
+                              : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-50'
+                          }`}
+                        >
+                          {t.personal || '個人'}
+                        </button>
+                        <button
+                          onClick={() => setActiveTab('global')} 
+                          className={`h-7 px-3 text-xs font-medium rounded transition-all ${
+                            activeTab === 'global' 
+                              ? 'bg-white text-blue-600 shadow-sm' 
+                              : 'text-zinc-600 hover:text-zinc-800 hover:bg-zinc-50'
+                          }`}
+                        >
+                          {t.global || '全体'}
+                        </button>
+                      </div>
                     </div>
                   </div>
                   

@@ -919,38 +919,74 @@ _PROMPT_BUILDERS = {
 def _responses_text(
     prompt: str,
     *,
-    model: str = "gpt-5-mini",
+    model: str = "gpt-4.1-nano",
     max_output_tokens: int = 600,   # 互換性のため受け取るが未使用
     timeout_s: int = 60,
     response_schema: Optional[dict] = None,  # 互換性のため受け取るが未使用
-    reasoning_effort: str = "low",           # 互換性のため受け取るが未使用
+    reasoning_effort: str = "low",
     include_reasoning: bool = False,         # 互換性のため受け取るが未使用
-) -> str:
+) -> Tuple[str, str]:
     """最小でシンプルな実装。
 
     1) Chat Completions を使用（もっとも互換性が高い）
     2) ダメなら Responses API を最小引数でフォールバック
+    
+    Returns:
+        Tuple[str, str]: (生成されたテキスト, 使用されたモデル名)
     """
     client_req = client.with_options(timeout=timeout_s)
 
-    # 1) Chat Completions
-    try:
-        chat = client_req.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0,
-        )
-        return (chat.choices[0].message.content or "").strip()
-    except Exception as e_chat:
-        pass
+    # GPT-4.1-nano
+    if model == "gpt-4.1-nano":
+        try:
+            chat = client_req.chat.completions.create(
+                model="gpt-4.1-nano",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+            )
+            result = (chat.choices[0].message.content or "").strip()
+            print(f"✓ LLM回答生成成功: model=gpt-4.1-nano")
+            return result, "gpt-4.1-nano"
+        except Exception as e:
+            print(f"✗ gpt-4.1-nano failed: {e}")
+                
+    # GPT-5-nano
+    if model == "gpt-5-nano":
+        try:
+            chat = client_req.chat.completions.create(
+                model="gpt-5-nano",
+                messages=[{"role": "user", "content": prompt}],
+                reasoning_effort=reasoning_effort,
+            )
+            result = (chat.choices[0].message.content or "").strip()
+            print(f"✓ LLM回答生成成功: model=gpt-5-nano, reasoning_effort={reasoning_effort}")
+            return result, "gpt-5-nano"
+        except Exception as e:
+            print(f"✗ gpt-5-nano failed: {e}")
+
+    # GPT-5-mini
+    if model == "gpt-5-mini":
+        try:
+            chat = client_req.chat.completions.create(
+                model="gpt-5-mini",
+                messages=[{"role": "user", "content": prompt}],
+                reasoning_effort=reasoning_effort,
+            )
+            result = (chat.choices[0].message.content or "").strip()
+            print(f"✓ LLM回答生成成功: model=gpt-5-mini, reasoning_effort={reasoning_effort}")
+            return result, "gpt-5-mini"
+        except Exception as e:
+            print(f"✗ gpt-5-mini failed: {e}")
 
     # 2) Responses API（最小）
     try:
         resp = client_req.responses.create(model=model, input=prompt)
-        return (getattr(resp, "output_text", "") or "").strip()
+        result = (getattr(resp, "output_text", "") or "").strip()
+        print(f"✓ LLM回答生成成功: model={model} (Responses API fallback)")
+        return result, f"{model} (Responses API)"
     except Exception as e_resp:
-        print(f"API error: chat.completions failed: {e_chat}; responses fallback failed: {e_resp}")
-        return ""
+        print(f"✗ API error: all methods failed. Last error: {e_resp}")
+        return "", "none"
 
 
 
@@ -967,7 +1003,8 @@ def generate_answer_with_llm(
     history_qa: List[Tuple[str, str]],
     *,
     lang: Optional[str] = None,
-    model: str = "gpt-4.1-nano",  # 修正: 正しいモデル名
+    model: str = "gpt-4.1-nano",
+    reasoning_effort: str = "low",
     max_history_in_prompt: int = 6,
 ) -> Dict[str, Any]:
     """RAGで集めた参照と会話履歴から、出典付きJSONを返す。"""
@@ -1019,24 +1056,35 @@ def generate_answer_with_llm(
         "required": ["answer", "used_source_ids", "evidence"],
         "additionalProperties": False
     }
-    content = _responses_text(
+    content, used_model = _responses_text(
         prompt,
         model=model,
         max_output_tokens=800,
         timeout_s=90,
         response_schema=response_schema,
+        reasoning_effort=reasoning_effort,
     )
-    print(f"LLM回答生成完了 (所要時間: {time.time()-llm_start:.2f}s)")
+    print(f"LLM回答生成完了 (所要時間: {time.time()-llm_start:.2f}s, 使用モデル: {used_model})")
 
     try:
         data = json.loads(content)
         answer_text = str(data.get("answer", "")).strip()
         used_ids = [str(x) for x in (data.get("used_source_ids") or [])]
         evidence = data.get("evidence") or []
-        return {"answer": answer_text, "used_source_ids": used_ids, "evidence": evidence}
+        return {
+            "answer": answer_text, 
+            "used_source_ids": used_ids, 
+            "evidence": evidence,
+            "model_used": used_model,
+        }
     except Exception:
         # フォールバック: そのままテキストを返し、全ての出典を使用扱い
-        return {"answer": content, "used_source_ids": [x["sid"] for x in rag_with_sid], "evidence": []}
+        return {
+            "answer": content, 
+            "used_source_ids": [x["sid"] for x in rag_with_sid], 
+            "evidence": [],
+            "model_used": used_model,
+        }
 
 
 def answer_with_rag(
@@ -1045,7 +1093,8 @@ def answer_with_rag(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
+    model: str = "gpt-4.1-nano",
+    reasoning_effort: str = "low",
 ) -> Dict[str, Any]:
     """Retrieve → generate. 統一フォーマットで返す。"""
     lang = "ja"
@@ -1119,7 +1168,8 @@ def answer_with_rag(
             ),
         }
         fallback_prompt = fallback_texts.get(lang, fallback_texts["ja"])  # 安全フォールバック
-        text = _responses_text(fallback_prompt, model=model, max_output_tokens=400, timeout_s=60)
+        text, used_model = _responses_text(fallback_prompt, model=model, max_output_tokens=400, timeout_s=60, reasoning_effort=reasoning_effort)
+        print(f"フォールバック回答生成: 使用モデル={used_model}")
         return {
             "type": "rag",
             "text": text.strip(),
@@ -1127,6 +1177,7 @@ def answer_with_rag(
                 "lang": lang,
                 "references": [],
                 "similarity_threshold": similarity_threshold,
+                "model_used": used_model,
             },
         }
 
@@ -1136,12 +1187,14 @@ def answer_with_rag(
         history_qa,
         lang=lang,
         model=model,
+        reasoning_effort=reasoning_effort,
         max_history_in_prompt=max_history_in_prompt,
     )
 
     answer_text = gen.get("answer", "").strip()
     used_ids = set(gen.get("used_source_ids", []))
     evidence = gen.get("evidence", [])
+    model_used = gen.get("model_used", "unknown")
     used_references = [r for r in references if r.get("sid") in used_ids] if used_ids else references
 
     # Strip inline citation tags like [S1], [S2] from the displayed answer
@@ -1161,6 +1214,7 @@ def answer_with_rag(
             "used_source_ids": list(used_ids) if used_ids else [r.get("sid") for r in references],
             "evidence": evidence,
             "similarity_threshold": similarity_threshold,
+            "model_used": model_used,
         },
     }
 
@@ -1187,7 +1241,8 @@ def orchestrate(
     *,
     similarity_threshold: float = 0.3,
     max_history_in_prompt: int = 6,
-    model: str = "gpt-4o-mini",  # 修正: 正しいモデル名
+    model: str = "gpt-4.1-nano",
+    reasoning_effort: str = "low",
     reactive_default_lang: str = "ja",
 ) -> Dict[str, Any]:
     """Front agent → (必要時) RAG の逐次フロー。
@@ -1212,6 +1267,7 @@ def orchestrate(
             similarity_threshold=similarity_threshold,
             max_history_in_prompt=max_history_in_prompt,
             model=model,
+            reasoning_effort=reasoning_effort,
         )
     except UnsupportedLanguageError:
         return {

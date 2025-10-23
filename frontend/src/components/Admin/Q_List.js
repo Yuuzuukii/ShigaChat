@@ -630,6 +630,16 @@ const Q_List = () => {
         } catch (error) {
           console.error("文法チェック設定の再読み込みに失敗:", error);
         }
+      } else {
+        // 単一言語編集時：自言語のみ文法チェックを有効にする（即時反映）
+        try {
+          const key = `${questionId}:${language}`;
+          setGrammarCheckSettings(prev => ({ ...prev, [key]: true }));
+          // サーバー側の設定も合わせて更新（失敗しても致命ではない）
+          await updateGrammarCheckSetting(questionId, true);
+        } catch (e) {
+          console.warn('Failed to set grammar check enabled for current language:', e);
+        }
       }
 
       try {
@@ -925,7 +935,7 @@ const Q_List = () => {
             mounted ? "opacity-100" : "opacity-0"
           }`}
         >
-          <div className="w-full">
+          <div className="w-full pb-20">
             {/* カテゴリタイトル */}
             <div className="mb-8 text-center">
               {(() => {
@@ -1248,10 +1258,10 @@ const Q_List = () => {
           </div>
 
           {/* 戻るボタン */}
-          <div className="mt-4 text-center">
+          <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
             <button 
               onClick={() => navigate && navigate("/admin/QuestionAdmin")}
-              className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2 mx-auto"
+              className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
             >
               <ArrowLeft className="w-5 h-5" />
               {t.backButton || "戻る"}

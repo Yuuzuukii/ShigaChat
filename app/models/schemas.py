@@ -40,6 +40,10 @@ class Question(BaseModel):
     text: str
     # Optional similarity threshold for RAG retrieval (0.0–1.0). Defaults server-side to 0.3
     similarity_threshold: Optional[float] = None
+    # Optional model selection (gpt-4.1-nano, gpt-5-nano, gpt-5-mini)
+    model: Optional[str] = None
+    # Optional reasoning effort for GPT-5 models (minimal, low, high)
+    reasoning_effort: Optional[str] = None
 
 class AnswerEditRequest(BaseModel):
     answer_id: int

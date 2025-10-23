@@ -11,7 +11,7 @@ router = APIRouter()
 
 # /register エンドポイントの作成
 @router.post("/register")
-def register_user(user: User):
+async def register_user(user: User):
     # ニックネームの重複を確認
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
@@ -32,7 +32,7 @@ def register_user(user: User):
 
     return {"message": "登録が完了しました"}
 
-def get_current_user(token: str = Depends(oauth2_scheme)):
+async def get_current_user(token: str = Depends(oauth2_scheme)):
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id: int = payload.get("id")
@@ -50,7 +50,7 @@ def get_current_user(token: str = Depends(oauth2_scheme)):
 
 
 @router.get("/current_user")
-def current_user_info(current_user: dict = Depends(get_current_user)):
+async def current_user_info(current_user: dict = Depends(get_current_user)):
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
         cursor.execute(f"SELECT * FROM user WHERE id = {ph}", (current_user["id"],))
@@ -66,7 +66,7 @@ def current_user_info(current_user: dict = Depends(get_current_user)):
     }
 
 @router.post("/token")
-def login_for_access_token(
+async def login_for_access_token(
     form_data: OAuth2PasswordRequestForm = Depends()
 ):
     ph = get_placeholder()
@@ -94,7 +94,7 @@ def login_for_access_token(
 
 # /user_delete エンドポイントを追加
 @router.delete("/user_delete")
-def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
+async def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
     if current_user != user.name:
         raise HTTPException(status_code=403, detail="Permission denied")
 
@@ -123,7 +123,7 @@ def delete_user(user: UserLogin, current_user: str = Depends(get_current_user)):
     return {"message": "ユーザー情報が削除されました"}
 
 @router.post("/change_language")
-def change_language(language: str, token: str = Depends(oauth2_scheme)):
+async def change_language(language: str, token: str = Depends(oauth2_scheme)):
     try:
         # トークンをデコードしてユーザー情報を取得
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])

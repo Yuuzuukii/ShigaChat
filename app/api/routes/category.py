@@ -10,7 +10,7 @@ from api.routes.user import current_user_info
 router = APIRouter()
 
 @router.get("/category_translation/{category_id}")
-def get_translated_category(
+async def get_translated_category(
     category_id: int,
     current_user: dict = Depends(current_user_info)
 ):
@@ -36,7 +36,7 @@ def get_translated_category(
 
 
 @router.get("/category/{category_id}")
-def get_category_questions(
+async def get_category_questions(
     category_id: int,
     current_user: dict = Depends(current_user_info)
 ):
@@ -102,7 +102,7 @@ def get_category_questions(
     }
 
 @router.get("/category_admin/{category_id}")
-def get_category_questions_admin(
+async def get_category_questions_admin(
     category_id: int,
     current_user: dict = Depends(current_user_info)
 ):
@@ -182,7 +182,7 @@ def get_category_questions_admin(
     }
 
 @router.get("/get_category_by_question")
-def get_category_by_question(question_id: int = Query(..., description="質問ID")):
+async def get_category_by_question(question_id: int = Query(..., description="質問ID")):
     """
     `question_id` をクエリパラメータとして受け取り、対応する `category_id` を取得する API
     """
@@ -199,7 +199,7 @@ def get_category_by_question(question_id: int = Query(..., description="質問ID
     return {"category_id": category_id}
 
 @router.post("/categorize_question")
-def categorize_question(question: str, language_id: int) -> Tuple[int, str]:
+async def categorize_question(question: str, language_id: int) -> Tuple[int, str]:
     """
     質問をカテゴリに分ける関数
     - ユーザーの `spoken_language` に基づいて適切な `language_id` を選択

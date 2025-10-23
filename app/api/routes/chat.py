@@ -144,4 +144,3 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
         "reason": f"reactive:{task_type}",
         "task_type": task_type,
     }
-

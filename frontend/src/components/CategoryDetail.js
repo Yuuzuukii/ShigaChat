@@ -24,6 +24,7 @@ import {
   Siren,
   CloudLightning,
   Tag,
+  ArrowLeft
 } from "lucide-react";
 
 // カテゴリアイコンのマッピング（Q_List.jsと同じ）
@@ -314,9 +315,7 @@ function CategoryDetail() {
                             onClick={() => navigate(-1)} 
                             className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
                         >
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                            </svg>
+                            <ArrowLeft className="w-5 h-5" />
                             {t.backButton}
                         </button>
                     </div>

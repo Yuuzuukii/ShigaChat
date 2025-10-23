@@ -5,7 +5,7 @@ from api.routes.user import current_user_info
 router = APIRouter()
 
 @router.get("/search_with_language")
-def search_keywords(keywords: str, current_user: dict = Depends(current_user_info)):
+async def search_keywords(keywords: str, current_user: dict = Depends(current_user_info)):
     
     results = []
     keyword_list = []
@@ -57,7 +57,7 @@ def search_keywords(keywords: str, current_user: dict = Depends(current_user_inf
 
     return sorted_results
 
-def search_keyword(keyword: str, language_id: int):
+async def search_keyword(keyword: str, language_id: int):
     """
     キーワードと言語IDを基にQA情報を検索する。
     """
