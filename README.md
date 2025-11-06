@@ -1,6 +1,6 @@
 # ShigaChat
 ShigaChat公開用
-URL: https://si-lab.org/shigachat/
+URL:
 
 
 ## システムの説明
