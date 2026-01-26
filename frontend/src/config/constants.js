@@ -1,12 +1,8 @@
 const appEnv = process.env.REACT_APP_ENV; // local or deploy
 
-export const BASE_PATH =
-  appEnv === "deploy" ? "/shigachat" : "/";
+export const BASE_PATH = process.env.REACT_APP_BASE_PATH || "/";
 
-export const API_BASE_URL =
-  appEnv === "deploy"
-    ? "https://si-lab.org/shigachat/api"
-    : "http://localhost:8000";
+export const API_BASE_URL = process.env.REACT_APP_API_URL || "http://localhost:8000";
 
 export const translations = {
   ja: {
