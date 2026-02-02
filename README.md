@@ -42,3 +42,5 @@ URL: https://www.s-i-a.or.jp/qa
 	 
 		以上を実行するとuvicorn（アプリケーション）とnginx（フロントエンド）、MySQL（データベース）が構築されます。フロントエンド側（nginx）のポートをブラウザで開いてください。
 
+
+aaa
