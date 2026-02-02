@@ -93,6 +93,7 @@ MySQLからPostgreSQLへのデータ移行（初回セットアップ時）。
 | `dump_postgres.sh` | PostgreSQLデータベース全体をSQLファイルにダンプ |
 | `restore_postgres.sh` | ダンプファイルからPostgreSQLを復元 |
 | `migrate_add_summary.sh` | `threads.summary` カラム追加マイグレーション |
+| `migrate_unify_schema.sh` | すべてのテーブルを `shigachat` スキーマに統一 |
 | `migrate_mysql_to_postgres.sh` | MySQL→PostgreSQL初回移行 (非推奨: 既に移行済み) |
 | `pgloader.load` | pgloader設定ファイル |
 | `migrate_mysql_to_postgres.load` | pgloader詳細設定 (環境変数テンプレート) |
