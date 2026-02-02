@@ -1,12 +1,13 @@
 from datetime import datetime
 from typing import List, Tuple, Optional
 
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 
 from database_utils import get_db_cursor, get_placeholder
 from models.schemas import Question
 from api.routes.user import current_user_info
 from api.routes.question import get_answer as backend_get_answer
+from api.rag.summarizer import save_thread_summary
 from api.utils.reactive import (
     classify_intent,
     resolve_target_text,
@@ -41,7 +42,7 @@ def _get_last_5_history(thread_id: int) -> List[Tuple[str, str]]:
 
 
 @router.post("/respond")
-async def respond(request: Question, current_user: dict = Depends(current_user_info)):
+async def respond(request: Question, background_tasks: BackgroundTasks, current_user: dict = Depends(current_user_info)):
     """
     Router agent:
     - If question clearly matches a reactive task (translate/summarize/rewrite), handle locally.
@@ -68,10 +69,10 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
 
         if assigned_thread_id is None:
             cursor.execute(
-                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
+                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph}) RETURNING id",
                 (user_id, datetime.now()),
             )
-            assigned_thread_id = cursor.lastrowid
+            assigned_thread_id = cursor.fetchone()['id']
             conn.commit()
 
     # Load last 5 turns for routing
@@ -83,6 +84,7 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
         # Delegate to backend (RAG)
         backend_result = await backend_get_answer(
             Question(thread_id=assigned_thread_id, text=question_text),
+            background_tasks,
             current_user,
         )
         # Ensure no modification of backend answer
@@ -96,6 +98,7 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
         # Not enough info to run reactive task → delegate to backend
         backend_result = await backend_get_answer(
             Question(thread_id=assigned_thread_id, text=question_text),
+            background_tasks,
             current_user,
         )
         backend_result.update({"route": "backend", "reason": "insufficient_reactive_context"})
@@ -116,6 +119,7 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
         # On LLM error, fallback to backend
         backend_result = await backend_get_answer(
             Question(thread_id=assigned_thread_id, text=question_text),
+            background_tasks,
             current_user,
         )
         backend_result.update({"route": "backend", "reason": f"reactive_error:{str(e)}"})
@@ -135,6 +139,8 @@ async def respond(request: Question, current_user: dict = Depends(current_user_i
             (datetime.now(), assigned_thread_id),
         )
         conn.commit()
+
+    background_tasks.add_task(save_thread_summary, assigned_thread_id, question_text, answer_text)
 
     return {
         "route": "frontend",

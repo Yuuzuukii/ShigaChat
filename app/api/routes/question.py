@@ -1,14 +1,12 @@
 from datetime import datetime
-from fastapi import APIRouter, HTTPException, Depends, Query
+from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from config import language_mapping
 from database_utils import get_db_cursor, get_placeholder
 from api.routes.user import current_user_info
 from models.schemas import Question
-from api.utils.RAG import (
-    LanguageDetectionError,
-    UnsupportedLanguageError,
-    answer_with_rag,
-)
+from api.rag.orchestrator import answer_with_rag_pg
+from api.rag.detect import detect_language
+from api.rag.summarizer import save_thread_summary
 import json
 
 router = APIRouter()
@@ -21,17 +19,15 @@ def _ensure_thread_qa_has_rag_column() -> None:
     try:
         with get_db_cursor() as (cursor, conn):
             cursor.execute("""
-                SELECT COUNT(*) FROM information_schema.COLUMNS 
-                WHERE TABLE_SCHEMA = DATABASE() 
-                AND TABLE_NAME = 'thread_qa' 
-                AND COLUMN_NAME = 'rag_qa'
+                SELECT COUNT(*) AS cnt FROM information_schema.columns
+                WHERE table_name = 'thread_qa'
+                AND column_name = 'rag_qa'
             """)
             row = cursor.fetchone()
-            cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-            if cnt == 0:
+            if row['cnt'] == 0:
                 cursor.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
                 conn.commit()
-    
+
     except Exception:
         # Don't crash API path if migration fails; let main ops proceed.
         pass
@@ -41,15 +37,29 @@ def _ensure_thread_qa_has_type_column() -> None:
     try:
         with get_db_cursor() as (cursor, conn):
             cursor.execute("""
-                SELECT COUNT(*) FROM information_schema.COLUMNS 
-                WHERE TABLE_SCHEMA = DATABASE() 
-                AND TABLE_NAME = 'thread_qa' 
-                AND COLUMN_NAME = 'type'
+                SELECT COUNT(*) AS cnt FROM information_schema.columns
+                WHERE table_name = 'thread_qa'
+                AND column_name = 'type'
             """)
             row = cursor.fetchone()
-            cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-            if cnt == 0:
+            if row['cnt'] == 0:
                 cursor.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
+                conn.commit()
+    except Exception:
+        pass
+
+def _ensure_threads_has_summary_column() -> None:
+    """Ensure threads table has a summary TEXT column for rolling conversation summary."""
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt FROM information_schema.columns
+                WHERE table_name = 'threads'
+                AND column_name = 'summary'
+            """)
+            row = cursor.fetchone()
+            if row['cnt'] == 0:
+                cursor.execute("ALTER TABLE threads ADD COLUMN summary TEXT")
                 conn.commit()
     except Exception:
         pass
@@ -92,9 +102,9 @@ async def load_data_from_database():
     
     try:
         with get_db_cursor() as (cursor, conn):
-            cursor.execute("""SELECT question_translation.question_id, texts FROM question_translation 
-                JOIN question ON question_translation.question_id=question.question_id 
-                WHERE question.title="official" AND
+            cursor.execute("""SELECT question_translation.question_id, texts FROM question_translation
+                JOIN question ON question_translation.question_id=question.question_id
+                WHERE question.title='official' AND
                 question_translation.language_id=1 AND
                 question.public=1""")
             questions = cursor.fetchall()
@@ -109,8 +119,8 @@ async def load_data_from_database():
                 print("⚠️ No answers found in `answer_translation` table")
 
             questions_and_answers = []
-            for (question_id, question_text), (answer_text,) in zip(questions, answers):
-                questions_and_answers.append((question_id, f"Q: {question_text}\nA: {answer_text}"))
+            for q_row, a_row in zip(questions, answers):
+                questions_and_answers.append((q_row['question_id'], f"Q: {q_row['texts']}\nA: {a_row['texts']}"))
 
         print(f"✅ データベースから取得した Q&A の数: {len(questions_and_answers)}")
 
@@ -129,17 +139,17 @@ async def create_thread(current_user: dict = Depends(current_user_info)):
     try:
         with get_db_cursor() as (cursor, conn):
             cursor.execute(
-                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
+                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph}) RETURNING id",
                 (user_id, datetime.now()),
             )
-            new_id = cursor.lastrowid
+            new_id = cursor.fetchone()['id']
             conn.commit()
             return {"thread_id": int(new_id)}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"DBエラー: {str(e)}")
 
 @router.post("/get_answer")
-async def get_answer(request: Question, current_user: dict = Depends(current_user_info)):
+async def get_answer(request: Question, background_tasks: BackgroundTasks, current_user: dict = Depends(current_user_info)):
     question_text = request.text
     req_thread_id = request.thread_id
     user_id = current_user["id"]
@@ -160,10 +170,10 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
 
             if assigned_thread_id is None:
                 cursor.execute(
-                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
+                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph}) RETURNING id",
                     (user_id, datetime.now()),
                 )
-                assigned_thread_id = cursor.lastrowid
+                assigned_thread_id = cursor.fetchone()['id']
                 conn.commit()
 
         # ---- 履歴の取得（逐次フローの reactive で参照するので先に取る） ----------
@@ -177,37 +187,35 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             past_qa_rows = cursor.fetchall()
         history_qa = list(reversed(past_qa_rows))  # [(user, bot), ...] の昇順に
 
-        # ---- 回答生成：RAG 専用に固定 ---------------------------------------
-        # UIから受け取った similarity_threshold（未指定時は 0.3）を適用
+        # ---- 回答生成：pgvector RAG 版 ---------------------------------------
         sim_th = request.similarity_threshold if (hasattr(request, 'similarity_threshold') and request.similarity_threshold is not None) else 0.3
         try:
             sim_th = max(0.0, min(1.0, float(sim_th)))
         except Exception:
             sim_th = 0.3
 
-        # モデルとreasoning_effortは固定（ユーザー選択を無効化）
-        model = "gpt-5-nano"
-        reasoning_effort = "minimal"
-
-        resp = answer_with_rag(
+        resp = answer_with_rag_pg(
             question_text=question_text,
-            history_qa=history_qa,
+            thread_id=assigned_thread_id,
             similarity_threshold=sim_th,
-            max_history_in_prompt=6,
-            model=model,
-            reasoning_effort=reasoning_effort,
+            top_k=5,
         )
 
         # RAG専用応答を展開
         answer_text = resp.get("text", "").strip()
         meta = resp.get("meta", {}) or {}
         references = meta.get("references", []) if isinstance(meta, dict) else []
+        used_source_ids = meta.get("used_source_ids", []) if isinstance(meta, dict) else []
         action_type = "rag"
 
-        # ---- 保存用に rag_qa を JSON 化 -------------------------------------
-        rag_qa = references if isinstance(references, list) else []
+        # used_source_ids でフィルタ（LLMが実際に参照した出典のみ）
+        if used_source_ids:
+            rag_qa = [r for r in references if r.get("sid") in used_source_ids]
+        else:
+            rag_qa = references if isinstance(references, list) else []
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
+        _ensure_threads_has_summary_column()
         with get_db_cursor() as (cursor, conn):
             _ensure_thread_qa_has_rag_column()  # 既存のマイグレーションヘルパ
             _ensure_thread_qa_has_type_column() # 新規：type列
@@ -235,22 +243,23 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
             )
             conn.commit()
 
+        # ---- バックグラウンドで要約を生成・保存 ------------------------------------
+        background_tasks.add_task(save_thread_summary, assigned_thread_id, question_text, answer_text)
+
         # ---- レスポンス -----------------------------------------------------------
+        # meta.references をフィルタ済みに差し替え
+        meta["references"] = rag_qa
         return {
             "thread_id": assigned_thread_id,
             "question": question_text,
             "answer": answer_text,
-            "type": action_type,          # 追加：UI が出し分けできるように
-            "meta": meta,                 # 追加：lang / references / threshold など
+            "type": action_type,
+            "meta": meta,
         }
 
     # ---- 例外ハンドリング（運用時に応じて整理） -----------------------------------
-    except UnsupportedLanguageError as e:
-        error_detail = f"Unsupported language detected: {str(e)}"
-        print(f"❌ {error_detail}")
-        raise HTTPException(status_code=400, detail=error_detail)
-    except LanguageDetectionError as e:
-        error_detail = f"Language detection failed: {str(e)}"
+    except ValueError as e:
+        error_detail = f"Language or translation error: {str(e)}"
         print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
     except RuntimeError as e:

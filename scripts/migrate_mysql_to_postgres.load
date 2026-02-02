@@ -1,0 +1,60 @@
+/*
+ * pgloader script: MySQL -> PostgreSQL migration for ShigaChat
+ *
+ * Usage:
+ *   pgloader scripts/migrate_mysql_to_postgres.load
+ *
+ * Environment variables required:
+ *   MYSQL_HOST, MYSQL_PORT, MYSQL_USER, MYSQL_PASSWORD, MYSQL_DATABASE
+ *   PGHOST, PGPORT, PGUSER, PGPASSWORD, PGDATABASE
+ *
+ * Or edit the connection strings below directly.
+ */
+
+LOAD DATABASE
+    FROM mysql://{{MYSQL_USER}}:{{MYSQL_PASSWORD}}@{{MYSQL_HOST}}:{{MYSQL_PORT}}/{{MYSQL_DATABASE}}
+    INTO postgresql://{{PGUSER}}:{{PGPASSWORD}}@{{PGHOST}}:{{PGPORT}}/{{PGDATABASE}}
+
+WITH
+    include drop,
+    create tables,
+    create indexes,
+    reset sequences,
+    foreign keys,
+    batch rows = 1000,
+    prefetch rows = 1000
+
+SET
+    work_mem to '128MB',
+    maintenance_work_mem to '512MB'
+
+CAST
+    type tinyint to boolean using tinyint-to-boolean,
+    type int with extra auto_increment to serial,
+    type bigint with extra auto_increment to bigserial
+
+INCLUDING ONLY TABLE NAMES MATCHING
+    'QA',
+    'answer',
+    'answer_translation',
+    'answer_translation_history',
+    'category',
+    'category_translation',
+    'history',
+    'language',
+    'notifications',
+    'notifications_translation',
+    'question',
+    'question_grammar_check',
+    'question_translation',
+    'user',
+    'search_history',
+    'thread_qa',
+    'threads'
+
+BEFORE LOAD DO
+    $$ DROP SCHEMA IF EXISTS public CASCADE; $$,
+    $$ CREATE SCHEMA public; $$
+
+AFTER LOAD DO
+    $$ CREATE EXTENSION IF NOT EXISTS vector; $$;

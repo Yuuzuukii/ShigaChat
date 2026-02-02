@@ -52,15 +52,15 @@ def _register_question_background(
                 _ensure_notifications_question_id()
                 try:
                     cursor.execute(
-                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
+                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}) RETURNING id",
                         (-1, False, datetime.now(), '[]', question_id),
                     )
                 except Exception:
                     cursor.execute(
-                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph})",
+                        f"INSERT INTO notifications (user_id, is_read, time, global_read_users, question_id) VALUES ({ph}, {ph}, {ph}, {ph}, {ph}) RETURNING id",
                         (user_id, False, datetime.now(), '[]', question_id),
                     )
-                notification_id = cursor.lastrowid
+                notification_id = cursor.fetchone()['id']
                 conn.commit()
 
                 cursor.execute(f"SELECT language_id, texts FROM question_translation WHERE question_id = {ph}", (question_id,))
@@ -91,7 +91,7 @@ def _register_question_background(
                 }
                 nickname = None
                 try:
-                    cursor.execute(f"SELECT name FROM user WHERE id = {ph}", (user_id,))
+                    cursor.execute(f'SELECT name FROM "user" WHERE id = {ph}', (user_id,))
                     r = cursor.fetchone()
                     nickname = (r and (r.get('name') if isinstance(r, dict) else r[0])) or "user"
                 except Exception:
@@ -133,13 +133,13 @@ def _ensure_system_user() -> None:
     try:
         ph = get_placeholder()
         with get_db_cursor() as (cur, conn):
-            cur.execute(f"SELECT id FROM user WHERE id = {ph}", (-1,))
+            cur.execute(f'SELECT id FROM "user" WHERE id = {ph}', (-1,))
             row = cur.fetchone()
             if not row:
                 try:
                     # Insert minimal row. Adjust columns as per existing schema.
                     cur.execute(
-                        f"INSERT INTO user (id, name, password, spoken_language) VALUES ({ph}, {ph}, {ph}, {ph})",
+                        f'INSERT INTO "user" (id, name, password, spoken_language) VALUES ({ph}, {ph}, {ph}, {ph})',
                         (-1, "__system__", "", "English"),
                     )
                     conn.commit()
@@ -153,15 +153,18 @@ def _ensure_answer_translation_history() -> None:
         with get_db_cursor() as (cur, conn):
             cur.execute("""
                     CREATE TABLE IF NOT EXISTS answer_translation_history (
-                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        id SERIAL PRIMARY KEY,
                         answer_id INT NOT NULL,
                         language_id INT NOT NULL,
                         texts TEXT NOT NULL,
-                        edited_at DATETIME NOT NULL,
+                        edited_at TIMESTAMP NOT NULL,
                         editor_user_id INT,
-                        editor_name TEXT,
-                        INDEX idx_ath_answer_lang (answer_id, language_id)
+                        editor_name TEXT
                     )
+                """)
+            cur.execute("""
+                    CREATE INDEX IF NOT EXISTS idx_ath_answer_lang
+                    ON answer_translation_history (answer_id, language_id)
                 """)
             conn.commit()
     except Exception:
@@ -176,8 +179,8 @@ def _ensure_question_grammar_check_table():
                         question_id INT NOT NULL,
                         language_id INT NOT NULL,
                         grammar_check_enabled BOOLEAN DEFAULT FALSE,
-                        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-                        updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         PRIMARY KEY (question_id, language_id),
                         FOREIGN KEY (question_id) REFERENCES question (question_id),
                         FOREIGN KEY (language_id) REFERENCES language (id)
@@ -192,14 +195,12 @@ def _ensure_notifications_question_id():
     try:
         with get_db_cursor() as (cur, conn):
                 cur.execute("""
-                    SELECT COUNT(*) FROM information_schema.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
-                    AND TABLE_NAME = 'notifications' 
-                    AND COLUMN_NAME = 'question_id'
+                    SELECT COUNT(*) AS cnt FROM information_schema.columns
+                    WHERE table_name = 'notifications'
+                    AND column_name = 'question_id'
                 """)
                 row = cur.fetchone()
-                cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-                if cnt == 0:
+                if row['cnt'] == 0:
                     cur.execute("ALTER TABLE notifications ADD COLUMN question_id INT")
                     conn.commit()
     except Exception:
@@ -209,25 +210,22 @@ def _ensure_question_editor_columns():
     try:
         with get_db_cursor() as (cur, conn):
                 cur.execute("""
-                    SELECT COUNT(*) FROM information_schema.COLUMNS 
-                    WHERE TABLE_SCHEMA = DATABASE() 
-                    AND TABLE_NAME = 'question' 
-                    AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
+                    SELECT COUNT(*) AS cnt FROM information_schema.columns
+                    WHERE table_name = 'question'
+                    AND column_name IN ('last_editor_id', 'last_edited_at')
                 """)
                 row = cur.fetchone()
-                existing_cols = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-                if existing_cols < 2:
+                if row['cnt'] < 2:
                     cur.execute("""
-                        SELECT COLUMN_NAME FROM information_schema.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'question' 
-                        AND COLUMN_NAME IN ('last_editor_id', 'last_edited_at')
+                        SELECT column_name FROM information_schema.columns
+                        WHERE table_name = 'question'
+                        AND column_name IN ('last_editor_id', 'last_edited_at')
                     """)
-                    cols = [r['COLUMN_NAME'] for r in cur.fetchall()]
+                    cols = [r['column_name'] for r in cur.fetchall()]
                     if "last_editor_id" not in cols:
                         cur.execute("ALTER TABLE question ADD COLUMN last_editor_id INT")
                     if "last_edited_at" not in cols:
-                        cur.execute("ALTER TABLE question ADD COLUMN last_edited_at DATETIME")
+                        cur.execute("ALTER TABLE question ADD COLUMN last_edited_at TIMESTAMP")
                     conn.commit()
     except Exception:
         pass
@@ -260,12 +258,12 @@ async def answer_edit(request: dict, background_tasks: BackgroundTasks, current_
 
             # 🔍 `question` テーブルから 投稿者 と 直近編集者 を取得
             _ensure_question_editor_columns()
-            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) AS prev_editor_id FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} の投稿者が見つかりません")
             question_owner_id = row['user_id']
-            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
+            prev_editor_id = row['prev_editor_id']
 
             # ベクトルの無効化は言語確定後に実行
 
@@ -480,10 +478,10 @@ async def answer_edit(request: dict, background_tasks: BackgroundTasks, current_
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id()
                 cursor.execute(
-                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph}) RETURNING id",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
-                notification_id = cursor.lastrowid  # 挿入された通知のID
+                notification_id = cursor.fetchone()['id']
                 conn.commit()
 
                 # 🔹 `notifications_translation` に翻訳を追加
@@ -608,14 +606,14 @@ async def official_question(request: dict, current_user: dict = Depends(current_
 
             # 🔍 投稿者と直近編集者を取得
             _ensure_question_editor_columns()
-            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) AS prev_editor_id FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
             question_owner_id = row['user_id']
-            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
+            prev_editor_id = row['prev_editor_id']
 
             # 🔄 title を更新
             cursor.execute(f"UPDATE question SET title={ph} WHERE question_id={ph}", (new_title, question_id))
@@ -640,10 +638,10 @@ async def official_question(request: dict, current_user: dict = Depends(current_
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id()
                 cursor.execute(
-                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph}) RETURNING id",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
-                notification_id = cursor.lastrowid  # 挿入された通知のID
+                notification_id = cursor.fetchone()['id']
                 conn.commit()
 
                 # 🔹 `notifications_translation` に翻訳を追加
@@ -695,14 +693,14 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
 
             # 🔍 質問の投稿者・直近編集者を取得
             _ensure_question_editor_columns()
-            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) FROM question WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) AS prev_editor_id FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
             question_owner_id = row['user_id']
-            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
+            prev_editor_id = row['prev_editor_id']
 
             # 🔹 `QA` から `id` と `answer_id` を取得
             cursor.execute(f"SELECT id, answer_id FROM QA WHERE question_id = {ph}", (question_id,))
@@ -758,10 +756,10 @@ async def delete_question(request: QuestionRequest, current_user: dict = Depends
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id()
                 cursor.execute(
-                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph}) RETURNING id",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
-                notification_id = cursor.lastrowid  # 挿入された通知のID
+                notification_id = cursor.fetchone()['id']
                 conn.commit()
                 
                 # 🔹 `notifications_translation` に翻訳を追加（編集者名を含める）
@@ -812,14 +810,14 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
 
             # 🔍 質問の投稿者・直近編集者 と 元のカテゴリIDを取得
             _ensure_question_editor_columns()
-            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id), category_id FROM question WHERE question_id = {ph}", (question_id,))
+            cursor.execute(f"SELECT user_id, COALESCE(last_editor_id, user_id) AS prev_editor_id, category_id FROM question WHERE question_id = {ph}", (question_id,))
             row = cursor.fetchone()
 
             if row is None:
                 raise HTTPException(status_code=404, detail=f"質問 {question_id} が見つかりません")
 
             question_owner_id = row['user_id']
-            prev_editor_id = row['COALESCE(last_editor_id, user_id)']
+            prev_editor_id = row['prev_editor_id']
             original_category_id = row['category_id']
 
             # 📌 各言語でカテゴリ名を取得（`category_translation` テーブルから）
@@ -849,10 +847,10 @@ async def change_category(request: moveCategoryRequest, current_user: dict = Dep
                 # 🔹 `notifications` に通知を追加
                 _ensure_notifications_question_id()
                 cursor.execute(
-                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph})",
+                    f"INSERT INTO notifications (user_id, is_read, time, question_id) VALUES ({ph}, {ph}, {ph}, {ph}) RETURNING id",
                     (prev_editor_id, False, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), question_id),
                 )
-                notification_id = cursor.lastrowid  # 挿入された通知のID
+                notification_id = cursor.fetchone()['id']
                 conn.commit()
 
                 # 🔹 各言語の翻訳を `notifications_translation` に追加（編集者名を含める）
@@ -905,12 +903,12 @@ async def register_question(
         cursor.execute(
             f"""
             INSERT INTO question (category_id, time, language_id, user_id, title, content, public)
-            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph})
+            VALUES ({ph}, {ph}, {ph}, {ph}, {ph}, {ph}, {ph}) RETURNING question_id
             """,
             (request.category_id, japan_time, language_id, user_id, "", request.content, request.public)
         )
 
-        question_id = cursor.lastrowid
+        question_id = cursor.fetchone()['question_id']
 
         # 元言語の質問を question_translation に格納
         cursor.execute(
@@ -943,11 +941,11 @@ async def register_question(
         cursor.execute(
             f"""
             INSERT INTO answer (time, language_id)
-            VALUES ({ph}, {ph})
+            VALUES ({ph}, {ph}) RETURNING id
             """,
             (datetime.utcnow(), language_id)
         )
-        answer_id = cursor.lastrowid
+        answer_id = cursor.fetchone()['id']
         
         conn.commit()  # 回答挿入後にコミット
         

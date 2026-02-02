@@ -205,8 +205,8 @@ def question_translate(question_id: int, target_language_id: int, current_user: 
             cursor.execute(f"""
                 INSERT INTO question_translation (question_id, language_id, texts)
                 VALUES ({ph}, {ph}, {ph})
-                ON DUPLICATE KEY UPDATE texts = {ph}
-            """, (question_id, target_language_id, translated_text, translated_text))
+                ON CONFLICT (question_id, language_id) DO UPDATE SET texts = EXCLUDED.texts
+            """, (question_id, target_language_id, translated_text))
             conn.commit()
 
         except Exception as e:

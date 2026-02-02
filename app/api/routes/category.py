@@ -138,15 +138,15 @@ async def get_category_questions_admin(
                 question.category_id AS category_id,
                 question.time AS time,
                 COALESCE(question.last_edited_at, question.time) AS last_edited_at,
-                user.name AS user_name,
+                "user".name AS user_name,
                 editor.name AS editor_name
             FROM QA
             JOIN question ON QA.question_id = question.question_id
             JOIN answer ON QA.answer_id = answer.id
             JOIN question_translation ON question.question_id = question_translation.question_id
             JOIN answer_translation ON answer.id = answer_translation.answer_id
-            JOIN user ON question.user_id = user.id
-            LEFT JOIN user AS editor ON question.last_editor_id = editor.id
+            JOIN "user" ON question.user_id = "user".id
+            LEFT JOIN "user" AS editor ON question.last_editor_id = editor.id
             WHERE question.category_id = {ph} AND 
             question_translation.language_id = {ph} AND 
             answer_translation.language_id = {ph}

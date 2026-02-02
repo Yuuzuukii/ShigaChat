@@ -298,33 +298,28 @@ async def apply_action(payload: ActionPayload, current_user: dict = Depends(curr
 
             if assigned_thread_id is None:
                 cur.execute(
-                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph})",
+                    f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph}) RETURNING id",
                     (user_id, datetime.now()),
                 )
-                assigned_thread_id = cur.lastrowid
+                assigned_thread_id = cur.fetchone()['id']
 
             # Ensure columns exist: rag_qa, type
             try:
-                    # Check if columns exist in MySQL
                     cur.execute("""
-                        SELECT COUNT(*) FROM information_schema.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'thread_qa' 
-                        AND COLUMN_NAME = 'rag_qa'
+                        SELECT COUNT(*) AS cnt FROM information_schema.columns
+                        WHERE table_name = 'thread_qa'
+                        AND column_name = 'rag_qa'
                     """)
                     row = cur.fetchone()
-                    cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-                    if cnt == 0:
+                    if row['cnt'] == 0:
                         cur.execute("ALTER TABLE thread_qa ADD COLUMN rag_qa TEXT")
                     cur.execute("""
-                        SELECT COUNT(*) FROM information_schema.COLUMNS 
-                        WHERE TABLE_SCHEMA = DATABASE() 
-                        AND TABLE_NAME = 'thread_qa' 
-                        AND COLUMN_NAME = 'type'
+                        SELECT COUNT(*) AS cnt FROM information_schema.columns
+                        WHERE table_name = 'thread_qa'
+                        AND column_name = 'type'
                     """)
                     row = cur.fetchone()
-                    cnt = row['COUNT(*)'] if isinstance(row, dict) and 'COUNT(*)' in row else (list(row.values())[0] if isinstance(row, dict) else row[0])
-                    if cnt == 0:
+                    if row['cnt'] == 0:
                         cur.execute("ALTER TABLE thread_qa ADD COLUMN type TEXT")
                     conn.commit()
             except Exception:

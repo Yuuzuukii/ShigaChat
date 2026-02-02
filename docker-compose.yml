@@ -36,15 +36,15 @@ services:
       - "8000:8000"
     environment:
       TZ: "Asia/Tokyo"
-      MYSQL_HOST: mysql
-      MYSQL_PORT: 3306
-      MYSQL_DATABASE: ShigaChat
-      MYSQL_USER: shigachat
-      MYSQL_PASSWORD: shigachatpass
+      PG_HOST: postgres
+      PG_PORT: 5432
+      PG_DATABASE: shigachat
+      PG_USER: postgres
+      PG_PASSWORD: postgres
     env_file:
       - .env
     depends_on:
-      mysql:
+      postgres:
         condition: service_healthy
     networks:
       - app-network
@@ -76,9 +76,30 @@ services:
       timeout: 10s
       retries: 3
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: shigachat-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: shigachat
+      TZ: "Asia/Tokyo"
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks:
+      - app-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 networks:
   app-network:
     driver: bridge
 
 volumes:
   mysql_data:
+  pgdata:

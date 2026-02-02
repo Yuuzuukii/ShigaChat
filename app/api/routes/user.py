@@ -15,7 +15,7 @@ async def register_user(user: User):
     # ニックネームの重複を確認
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
-        cursor.execute(f"SELECT id FROM user WHERE name = {ph}", (user.name,))
+        cursor.execute(f'SELECT id FROM "user" WHERE name = {ph}', (user.name,))
         existing_user = cursor.fetchone()
 
     if existing_user:
@@ -25,7 +25,7 @@ async def register_user(user: User):
     hashed_password = hash_password(user.password)
     with get_db_cursor() as (cursor, conn):
         cursor.execute(f"""
-        INSERT INTO user (name, password, spoken_language)
+        INSERT INTO "user" (name, password, spoken_language)
         VALUES ({ph}, {ph}, {ph})
         """, (user.name, hashed_password, user.spoken_language))
         conn.commit()
@@ -53,7 +53,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
 async def current_user_info(current_user: dict = Depends(get_current_user)):
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
-        cursor.execute(f"SELECT * FROM user WHERE id = {ph}", (current_user["id"],))
+        cursor.execute(f'SELECT * FROM "user" WHERE id = {ph}', (current_user["id"],))
         user = cursor.fetchone()
 
     if user is None:
@@ -71,7 +71,7 @@ async def login_for_access_token(
 ):
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
-        cursor.execute(f"SELECT id, password, spoken_language FROM user WHERE name = {ph}", (form_data.username,))
+        cursor.execute(f'SELECT id, password, spoken_language FROM "user" WHERE name = {ph}', (form_data.username,))
         db_user = cursor.fetchone()
 
     if db_user is None:
@@ -100,7 +100,7 @@ async def delete_user(user: UserLogin, current_user: str = Depends(get_current_u
 
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
-        cursor.execute(f"SELECT password FROM user WHERE name = {ph}", (user.name,))
+        cursor.execute(f'SELECT password FROM "user" WHERE name = {ph}', (user.name,))
         db_user = cursor.fetchone()
 
     if db_user is None:
@@ -115,7 +115,7 @@ async def delete_user(user: UserLogin, current_user: str = Depends(get_current_u
     # ユーザーを削除
     try:
         with get_db_cursor() as (cursor, conn):
-            cursor.execute(f"DELETE FROM user WHERE name = {ph}", (user.name,))
+            cursor.execute(f'DELETE FROM "user" WHERE name = {ph}', (user.name,))
             conn.commit()
     except Exception:
         raise HTTPException(status_code=500, detail="データベースエラーが発生しました")
@@ -134,7 +134,7 @@ async def change_language(language: str, token: str = Depends(oauth2_scheme)):
         # データベースを更新
         ph = get_placeholder()
         with get_db_cursor() as (cursor, conn):
-            cursor.execute(f"UPDATE user SET spoken_language = {ph} WHERE id = {ph}", (language, user_id))
+            cursor.execute(f'UPDATE "user" SET spoken_language = {ph} WHERE id = {ph}', (language, user_id))
             conn.commit()
 
         # 新しいトークンを発行
