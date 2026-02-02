@@ -57,6 +57,19 @@ RAG会話履歴要約機能のために、`threads` テーブルに `summary TEX
 - スキーマ自動検出 (`shigachat` or `public`)
 - 実行後にテーブル定義を表示
 
+### スキーマ統一
+
+すべてのテーブルを `shigachat` スキーマに統一します（`public` スキーマからの移動）。
+
+```bash
+./scripts/migrate_unify_schema.sh
+```
+
+**特徴:**
+- 冪等性あり（既に統一済みなら何もしない）
+- `public` スキーマにあるすべてのアプリケーションテーブルを自動検出して移動
+- 実行後にスキーマ分布とテーブル一覧を表示
+
 ## MySQL → PostgreSQL 移行
 
 ### pgloader を使った移行
