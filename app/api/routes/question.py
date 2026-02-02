@@ -199,6 +199,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
             thread_id=assigned_thread_id,
             similarity_threshold=sim_th,
             top_k=5,
+            user_spoken_language=current_user.get("spoken_language"),
         )
 
         # RAG専用応答を展開
