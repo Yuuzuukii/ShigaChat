@@ -1,7 +1,7 @@
 ---
 name: "[Feature]"
 about: 機能追加の要望
-title: ''
+title: "[Bug]"
 labels: ''
 assignees: ''
 
