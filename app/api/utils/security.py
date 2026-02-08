@@ -7,7 +7,7 @@ from passlib.context import CryptContext
 from config import SECRET_KEY
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30  # トークンの有効期限（分）
+ACCESS_TOKEN_EXPIRE_MINUTES = 480  # トークンの有効期限（8時間）
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/user/token")
 
