@@ -127,6 +127,8 @@
 | S04 | キーワード検索 | keyword.js | キーワード入力、結果一覧表示 |
 | S05 | カテゴリ一覧 | Category.js | 13カテゴリの円形レイアウト |
 | S06 | カテゴリ詳細 | CategoryDetail.js | カテゴリ別Q&A一覧 |
+| S07 | Not Found（404） | NotFound.js | 存在しないページアクセス時のエラー画面 |
+| S08 | メンテナンス | Maintenance.js | メンテナンス中の案内画面 |
 
 ### C) 情報・データログ
 

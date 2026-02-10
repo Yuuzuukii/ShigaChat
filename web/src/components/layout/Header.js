@@ -1,0 +1,57 @@
+/**
+ * Header - トップヘッダーバー（S00）
+ */
+import React from "react";
+import { Link } from "react-router-dom";
+import { PanelLeft, PanelLeftClose } from "lucide-react";
+import { Button } from "../ui/button";
+import LanguageSelector from "./LanguageSelector";
+
+export default function Header({ isDrawerOpen, onToggleDrawer, language, onLanguageChange, notificationSlot }) {
+  return (
+    <div
+      className="fixed top-0 left-0 right-0 z-40 border-b border-blue-100 bg-white/70 px-5 py-3 backdrop-blur"
+      style={{ marginLeft: isDrawerOpen ? "18rem" : "3.5rem", transition: "margin-left 300ms ease" }}
+    >
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleDrawer}
+            aria-label={isDrawerOpen ? "Collapse sidebar" : "Expand sidebar"}
+            className="transition-all duration-200 hover:bg-blue-100 hover:shadow-md hover:scale-110"
+          >
+            {isDrawerOpen ? (
+              <PanelLeftClose className="h-5 w-5 transition-all duration-200 hover:text-blue-700" />
+            ) : (
+              <PanelLeft className="h-5 w-5 transition-all duration-200 hover:text-blue-700" />
+            )}
+          </Button>
+          <div className="flex items-center gap-5">
+            <Link to="/home" className="flex items-center">
+              <span className="text-2xl font-bold" style={{ color: "#0056b3", fontWeight: 700, textShadow: "1px 1px 2px rgba(0,0,0,0.1)", letterSpacing: "1px" }}>
+                ShigaChat
+              </span>
+            </Link>
+            <div className="flex items-center gap-2">
+              <a href="https://www.s-i-a.or.jp" target="_blank" rel="noopener noreferrer" aria-label="SIA website">
+                <img src="./sia.png" alt="SIA" className="h-9 w-auto rounded-md object-contain" />
+              </a>
+              <span className="text-zinc-400">×</span>
+              <a href="https://www.si-lab.org/index-ja.html" target="_blank" rel="noopener noreferrer" aria-label="SI-LAB website">
+                <img src="./silab.png" alt="SILAB" className="h-12 w-auto rounded-md object-contain" />
+              </a>
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-4">
+          {notificationSlot}
+          <div className="hidden sm:flex">
+            <LanguageSelector value={language} onChange={onLanguageChange} />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
