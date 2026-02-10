@@ -1,4 +1,3 @@
-<!-- filepath: /Users/yuzuki/Desktop/ShigaChat/docs/test/test_spec.md -->
 # テスト仕様書（総合テスト）
 
 ## システム名
