@@ -154,6 +154,10 @@ jobs:
 
           chmod 600 ~/.ssh/config
 
+      - name: Show deploy key fingerprint
+        run: |
+          ssh-keygen -y -f ~/.ssh/deploy_key | ssh-keygen -lf -
+
       # ─── 接続テスト ───
       - name: Debug SSH
         run: |
