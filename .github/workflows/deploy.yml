@@ -38,7 +38,7 @@
 #   REACT_APP_API_URL   = https://si-lab.org/shigachat/api
 #   REACT_APP_BASE_PATH = "/shigachat"
 #
-##############################################################################
+###############################################################################
 
 name: Deploy to Production (main)
 
