@@ -13,11 +13,11 @@ from dotenv import load_dotenv
 load_dotenv()
 
 PG_CONFIG = {
-    'host': os.getenv('PG_HOST', 'postgres'),
-    'port': int(os.getenv('PG_PORT', 5432)),
-    'user': os.getenv('PG_USER', 'postgres'),
-    'password': os.getenv('PG_PASSWORD', 'postgres'),
-    'dbname': os.getenv('PG_DATABASE', 'shigachat'),
+    'host': os.getenv('PG_HOST'),
+    'port': int(os.getenv('PG_PORT', '5432')),
+    'user': os.getenv('PG_USER'),
+    'password': os.getenv('PG_PASSWORD'),
+    'dbname': os.getenv('PG_DATABASE'),
     'autocommit': False,
 }
 

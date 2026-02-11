@@ -1,0 +1,189 @@
+##############################################################################
+# ShigaChat – 本番デプロイ (main ブランチ → ProxyJump SSH)
+#
+# ■ トリガー
+#   - main ブランチへの push
+#   - 手動実行 (workflow_dispatch)
+#
+# ■ ビルドコマンド
+#   npm run build:deploy  →  env-cmd -f .env.deploy react-scripts build
+#
+# ■ ネットワーク構成
+#   GitHub Actions (クラウド)
+#       │ SSH (ポート22)
+#       ▼
+#   踏み台サーバー (Global-Albatross)  ← グローバル IP
+#       │ ProxyJump
+#       ▼
+#   デプロイ先サーバー (Swan 等)       ← プライベート IP
+#
+# ■ 必要な GitHub Secrets
+#
+#   ── 踏み台サーバー ──
+#   PROXY_HOST         : 踏み台のグローバル IP      (例: 133.19.45.15)
+#   PROXY_USER         : 踏み台の SSH ユーザー名    (例: silab)
+#   PROXY_PORT         : 踏み台の SSH ポート        (例: 22)
+#
+#   ── デプロイ先サーバー ──
+#   DEPLOY_HOST        : デプロイ先のプライベート IP  (例: 10.40.34.3)
+#   DEPLOY_USER        : デプロイ先の SSH ユーザー名  (例: masuo)
+#   DEPLOY_PORT        : デプロイ先の SSH ポート      (例: 22)
+#   DEPLOY_PATH        : リモート側の配置パス
+#
+#   ── 共通 ──
+#   DEPLOY_SSH_KEY     : SSH 秘密鍵
+#   ENV_FILE           : 本番用 .env ファイルの中身
+#
+# ■ フロントエンド環境変数（ワークフローに直書き）
+#   REACT_APP_API_URL   = https://si-lab.org/shigachat/api
+#   REACT_APP_BASE_PATH = "/shigachat"
+#
+##############################################################################
+
+name: Deploy to Production (main)
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/services/masuo/ShigaChat_latest' }}
+
+jobs:
+  # ---------------------------------------------------------------
+  # Job 1: React フロントエンドのビルド
+  # ---------------------------------------------------------------
+  build-frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install dependencies
+        working-directory: web
+        run: npm ci
+
+      - name: Create .env.deploy
+        working-directory: web
+        run: |
+          cat > .env.deploy << 'EOF'
+          REACT_APP_API_URL=https://si-lab.org/shigachat/api
+          REACT_APP_BASE_PATH="/shigachat"
+          EOF
+
+      - name: Build
+        working-directory: web
+        run: npm run build:deploy
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-build
+          path: web/build/
+          retention-days: 1
+
+  # ---------------------------------------------------------------
+  # Job 2: ProxyJump 経由デプロイ
+  # ---------------------------------------------------------------
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-frontend
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download frontend build
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-build
+          path: nginx/build/
+
+      - name: Create .env file
+        run: |
+          cat <<'EOF' > .env
+          ${{ secrets.ENV_FILE }}
+          EOF
+
+      # ─── SSH & ProxyJump の設定 ───
+      - name: Setup SSH with ProxyJump
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 秘密鍵を配置
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # 踏み台のホスト鍵を取得
+          ssh-keyscan -p ${{ secrets.PROXY_PORT || 22 }} \
+            ${{ secrets.PROXY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+          # ProxyJump 経由でデプロイ先のホスト鍵も取得
+          ssh -i ~/.ssh/deploy_key \
+              -p ${{ secrets.PROXY_PORT || 22 }} \
+              -o StrictHostKeyChecking=no \
+              ${{ secrets.PROXY_USER }}@${{ secrets.PROXY_HOST }} \
+              "ssh-keyscan -p ${{ secrets.DEPLOY_PORT || 22 }} ${{ secrets.DEPLOY_HOST }} 2>/dev/null" \
+              >> ~/.ssh/known_hosts 2>/dev/null || true
+
+          # ~/.ssh/config に踏み台 & デプロイ先を定義
+          cat > ~/.ssh/config << SSHEOF
+          Host bastion
+            HostName ${{ secrets.PROXY_HOST }}
+            User ${{ secrets.PROXY_USER }}
+            Port ${{ secrets.PROXY_PORT || 22 }}
+            IdentityFile ~/.ssh/deploy_key
+            StrictHostKeyChecking no
+
+          Host target
+            HostName ${{ secrets.DEPLOY_HOST }}
+            User ${{ secrets.DEPLOY_USER }}
+            Port ${{ secrets.DEPLOY_PORT || 22 }}
+            IdentityFile ~/.ssh/deploy_key
+            ProxyJump bastion
+            StrictHostKeyChecking no
+          SSHEOF
+
+          chmod 600 ~/.ssh/config
+
+      # ─── 接続テスト ───
+      - name: Test SSH connection
+        run: |
+          ssh target "echo '✅ SSH connection via ProxyJump successful!'"
+
+      # ─── ファイル転送 (rsync over ProxyJump) ───
+      - name: Sync files to remote server
+        run: |
+          rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='__pycache__' \
+            --exclude='*.pyc' \
+            --exclude='app/app.log' \
+            --exclude='web/node_modules' \
+            -e "ssh" \
+            ./ target:${{ env.DEPLOY_PATH }}/
+
+      # ─── Docker Compose でデプロイ ───
+      - name: Deploy on remote server
+        run: |
+          ssh target "cd ${{ env.DEPLOY_PATH }} && \
+            docker compose pull && \
+            docker compose build --no-cache && \
+            docker compose up -d && \
+            docker compose ps"
+
+      # ─── クリーンアップ ───
+      - name: Cleanup SSH credentials
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key
+          rm -f ~/.ssh/config
