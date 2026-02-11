@@ -49,6 +49,22 @@ jobs:
           REACT_APP_BASE_PATH=""
           EOF
 
+      # バックエンド用 .env を作成（Docker Compose 用）
+      - name: Create .env (backend)
+        run: |
+          cat > .env << 'EOF'
+          PG_HOST=postgres
+          PG_PORT=5432
+          PG_DATABASE=shigachat
+          PG_USER=postgres
+          PG_PASSWORD=postgres
+          OPENAI_API_KEY=dummy
+          SECRET_KEY=dummy
+          EOF
+
+      - name: Docker Compose up
+        run: docker compose up -d --build
+
       - name: Build (dev)
         working-directory: web
         run: npm run build
