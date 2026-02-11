@@ -23,6 +23,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      NGINX_PORT: 80
     steps:
       - name: Checkout
         uses: actions/checkout@v4
