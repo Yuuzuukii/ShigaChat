@@ -29,7 +29,7 @@ export function useLanguage() {
         setLanguageState(code);
       }
     }
-  }, [user?.spokenLanguage]);
+  }, [user?.spokenLanguage, language]);
 
   // グローバルイベントで同期
   useEffect(() => {

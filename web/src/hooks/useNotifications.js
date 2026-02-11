@@ -49,7 +49,7 @@ export function useNotifications({ token, userId, language, onUnauthorized }) {
   // 初回ロード & 言語変更時
   useEffect(() => {
     if (userId && token) refresh();
-  }, [userId, token, language]);
+  }, [userId, token, language, refresh]);
 
   // ポップアップ外クリックで閉じる
   useEffect(() => {
@@ -89,7 +89,7 @@ export function useNotifications({ token, userId, language, onUnauthorized }) {
       console.error("通知の既読処理エラー:", error);
       try { await refresh(); } catch {}
     }
-  }, [token, navigate, refresh, onUnauthorized]);
+  }, [navigate, refresh, onUnauthorized]);
 
   const onGlobalNotificationMove = useCallback(async (notification) => {
     const questionId = notification.question_id ?? (() => {
@@ -111,7 +111,7 @@ export function useNotifications({ token, userId, language, onUnauthorized }) {
     } catch (error) {
       console.error("通知の既読処理エラー:", error);
     }
-  }, [token, navigate, refresh, onUnauthorized]);
+  }, [navigate, refresh, onUnauthorized]);
 
   const markAllRead = useCallback(async () => {
     try { await markAllPersonalRead({ onUnauthorized }); } catch {}

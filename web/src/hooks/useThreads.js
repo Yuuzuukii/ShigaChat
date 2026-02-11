@@ -25,25 +25,25 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     } catch { return {}; }
   });
 
-  const saveOverrides = (obj) => {
+  const saveOverrides = useCallback((obj) => {
     try { localStorage.setItem(`thread_title_overrides_${userId ?? "nouser"}`, JSON.stringify(obj)); } catch {}
-  };
+  }, [userId]);
 
   // ─── helpers ───
 
-  const toClientThreads = (arr = []) =>
+  const toClientThreads = useCallback((arr = []) =>
     (arr || []).map((th) => ({
       id: String(th.thread_id ?? th.id),
       title: threadTitleOverrides[String(th.thread_id ?? th.id)] ?? th.title,
       lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
-    }));
+    })), [threadTitleOverrides]);
 
-  const saveMsgsLS = (threadId, msgsArr) => {
+  const saveMsgsLS = useCallback((threadId, msgsArr) => {
     try { localStorage.setItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`, JSON.stringify(msgsArr)); } catch {}
-  };
-  const loadMsgsLS = (threadId) => {
+  }, [userId]);
+  const loadMsgsLS = useCallback((threadId) => {
     try { return JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`)) || []; } catch { return []; }
-  };
+  }, [userId]);
 
   // ─── load threads ───
 
@@ -58,7 +58,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     } catch {} finally {
       setThreadsLoading(false);
     }
-  }, [token, userId, threadTitleOverrides]);
+  }, [token, userId, onUnauthorized, toClientThreads]);
 
   // Initial load
   useEffect(() => {
@@ -70,7 +70,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
       const fromParam = params.get("tid");
       if (fromParam) setCurrentThreadId(String(fromParam));
     })();
-  }, [token, userId]);
+  }, [token, userId, loadThreads]);
 
   // URL ?tid= の変化を追跡
   useEffect(() => {
@@ -79,7 +79,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     if (tid && String(tid) !== String(currentThreadId)) {
       setCurrentThreadId(String(tid));
     }
-  }, [location.search]);
+  }, [location.search, currentThreadId]);
 
   // ─── load messages ───
 
@@ -108,7 +108,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     } finally {
       setMessagesLoading(false);
     }
-  }, [token, userId]);
+  }, [token, loadMsgsLS, onUnauthorized, saveMsgsLS]);
 
   // Auto-load messages on thread switch
   useEffect(() => {
@@ -118,12 +118,12 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     } else {
       setMessages([]);
     }
-  }, [currentThreadId, token]);
+  }, [currentThreadId, token, loadThreadMessages]);
 
   // Persist messages
   useEffect(() => {
     if (currentThreadId) saveMsgsLS(currentThreadId, messages);
-  }, [messages, currentThreadId]);
+  }, [messages, currentThreadId, saveMsgsLS]);
 
   // ─── thread CRUD ───
 
@@ -150,7 +150,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
       saveOverrides(updated);
       return updated;
     });
-  }, [t]);
+  }, [t, saveOverrides]);
 
   const removeThread = useCallback(async (id) => {
     const threadId = String(id);
@@ -169,7 +169,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
       setThreads((prev) => prev.filter((th) => String(th.id) !== threadId));
       if (String(threadId) === String(currentThreadId)) startNewChat();
     }
-  }, [token, currentThreadId, t, loadThreads, startNewChat]);
+  }, [token, currentThreadId, t, loadThreads, startNewChat, onUnauthorized]);
 
   // ─── event listeners ───
 

@@ -7,6 +7,7 @@ import { UserContext } from "../contexts/UserContext";
 
 export function useAuth({ requireAuth = true } = {}) {
   const ctx = useContext(UserContext);
+  const { fetchUser } = ctx;
   const navigate = useNavigate();
 
   const redirectToLogin = useCallback(
@@ -33,11 +34,11 @@ export function useAuth({ requireAuth = true } = {}) {
   useEffect(() => {
     const handleTokenUpdate = () => {
       const latestToken = localStorage.getItem("token");
-      if (latestToken) ctx.fetchUser(latestToken);
+      if (latestToken) fetchUser(latestToken);
     };
     window.addEventListener("tokenUpdated", handleTokenUpdate);
     return () => window.removeEventListener("tokenUpdated", handleTokenUpdate);
-  }, [ctx.fetchUser]);
+  }, [fetchUser]);
 
   return {
     user: ctx.user,
