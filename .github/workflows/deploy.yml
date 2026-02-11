@@ -179,6 +179,7 @@ jobs:
             --exclude='*.pyc' \
             --exclude='app/app.log' \
             --exclude='web/node_modules' \
+            --exclude='nginx/log/' \
             -e "ssh" \
             ./ target:${{ env.DEPLOY_PATH }}/
 
