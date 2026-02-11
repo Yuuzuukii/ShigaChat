@@ -156,7 +156,9 @@ jobs:
 
       # ─── 接続テスト ───
       - name: Debug SSH
-        run: |
+        run: 
+          ssh-keygen -lf ~/.ssh/shigachat_deploy_key.pub
+          ssh -G target | egrep 'user|hostname|port|proxyjump|identityfile'
           ls -la ~/.ssh
           ssh -vvv target "echo ok"
 
