@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -18,7 +19,12 @@ from openai import OpenAI
 
 from api.rag.vector_store import _get_conn, EMBEDDING_MODEL, EMBEDDING_DIM
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    return OpenAI(api_key=api_key)
 
 
 @dataclass
@@ -39,7 +45,7 @@ class SearchResult:
 def embed_query(text: str) -> np.ndarray:
     """Embed query text using the same model as vector_store."""
     try:
-        resp = client.embeddings.create(input=[text], model=EMBEDDING_MODEL)
+        resp = _get_openai_client().embeddings.create(input=[text], model=EMBEDDING_MODEL)
     except Exception as e:
         raise RuntimeError(f"Failed to embed query: {e}") from e
     return np.array(resp.data[0].embedding, dtype="float32")

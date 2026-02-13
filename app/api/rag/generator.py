@@ -6,17 +6,23 @@ from __future__ import annotations
 
 import os
 import re
+from functools import lru_cache
 from typing import Tuple
 
 from openai import OpenAI
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    return OpenAI(api_key=api_key)
 
 
 # LLMを呼び出して回答テキストを取得する
 def generate_answer(prompt: str, model: str = None) -> Tuple[str, str]:
     model = model or os.getenv("LLM_MODEL", "gpt-5-nano")
-    resp = client.responses.create(
+    resp = _get_openai_client().responses.create(
         model=model,
         input=prompt,
         reasoning={

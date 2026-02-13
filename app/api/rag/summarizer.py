@@ -6,18 +6,24 @@ Generates rolling summaries in English for internal use in RAG prompts.
 from __future__ import annotations
 
 import os
+from functools import lru_cache
 from typing import Optional
 
 from openai import OpenAI
 
 from database_utils import get_db_cursor, get_placeholder
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    return OpenAI(api_key=api_key)
 
 
 def _summarize_call(prompt: str) -> str:
     model = os.getenv("LLM_MODEL", "gpt-5-nano")
-    resp = client.responses.create(
+    resp = _get_openai_client().responses.create(
         model=model,
         input=prompt,
         reasoning={"effort": "minimal"},

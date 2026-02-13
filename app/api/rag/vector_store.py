@@ -17,6 +17,7 @@ from __future__ import annotations
 import os
 import datetime as dt
 from dataclasses import dataclass
+from functools import lru_cache
 from typing import Optional
 
 import numpy as np
@@ -46,7 +47,12 @@ def _get_pg_config():
         "dbname": os.getenv("PG_DATABASE"),
     }
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    return OpenAI(api_key=api_key)
 
 
 @dataclass
@@ -167,7 +173,7 @@ def ensure_schema(dim: int = EMBEDDING_DIM) -> None:
 def embed_payload(question_text: str, answer_text: str) -> np.ndarray:
     payload = f"Q: {question_text}\nA: {answer_text}"
     try:
-        resp = client.embeddings.create(input=[payload], model=EMBEDDING_MODEL)
+        resp = _get_openai_client().embeddings.create(input=[payload], model=EMBEDDING_MODEL)
     except Exception as e:
         raise RuntimeError(f"Failed to create embedding: {e}") from e
     return np.array(resp.data[0].embedding, dtype="float32")

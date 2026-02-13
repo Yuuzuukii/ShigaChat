@@ -75,9 +75,9 @@ async def get_category_questions(
             WHERE question.category_id = {ph} AND 
             question_translation.language_id = {ph} AND 
             answer_translation.language_id = {ph} AND
-            question.public = {ph}
+            question.public = TRUE
             """,
-            (category_id, language_id, language_id, 1)
+            (category_id, language_id, language_id)
         )
         qa_list = cursor.fetchall()
 

@@ -12,6 +12,30 @@ import json
 router = APIRouter()
 
 # --- Helpers ---------------------------------------------------------------
+_OPENAI_KEY_MISSING_MESSAGES = {
+    "日本語": "APIキーが設定されていません",
+    "English": "API key is not set",
+    "Tiếng Việt": "API key chưa được thiết lập",
+    "中文": "尚未设置 API 密钥",
+    "한국어": "API 키가 설정되지 않았습니다",
+    "Português": "A chave de API não está configurada",
+    "Español": "La clave de API no está configurada",
+    "Tagalog": "Hindi naka-set ang API key",
+    "Bahasa Indonesia": "Kunci API belum disetel",
+}
+
+
+def _localize_runtime_error(detail: str, spoken_language: str) -> str:
+    """Map known backend errors to localized user-facing messages."""
+    normalized = (detail or "").lower()
+    if "openai_api_key is not set" in normalized:
+        return _OPENAI_KEY_MISSING_MESSAGES.get(
+            spoken_language,
+            _OPENAI_KEY_MISSING_MESSAGES["English"],
+        )
+    return detail
+
+
 def _ensure_thread_qa_has_rag_column() -> None:
     """Ensure thread_qa table has a rag_qa TEXT column to store JSON.
     Safe to call often; adds the column only if missing.
@@ -264,7 +288,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
         print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
     except RuntimeError as e:
-        error_detail = str(e)
+        error_detail = _localize_runtime_error(str(e), current_user.get("spoken_language", "English"))
         print(f"❌ Runtime error: {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
     except HTTPException:

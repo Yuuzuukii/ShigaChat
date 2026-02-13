@@ -4,6 +4,7 @@ import json
 import hashlib
 from pathlib import Path
 from collections import defaultdict
+from functools import lru_cache
 from typing import Optional, List, Dict, Tuple, Any
 import re
 import dotenv
@@ -30,8 +31,14 @@ class UnsupportedLanguageError(ValueError):
 # ----------------------------------------------------------------------------
 
 dotenv.load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
+
+
+@lru_cache(maxsize=1)
+def _get_openai_client() -> OpenAI:
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY is not set")
+    return OpenAI(api_key=api_key)
 
 VECTOR_DIR = Path("./api/utils/vectors")
 VECTOR_DIR.mkdir(parents=True, exist_ok=True)
@@ -72,7 +79,7 @@ def detect_lang(text: str) -> str:
 
 def get_embedding(text: str):
     try:
-        resp = client.embeddings.create(input=[text], model="text-embedding-3-small")
+        resp = _get_openai_client().embeddings.create(input=[text], model="text-embedding-3-small")
     except Exception as e:  # 必要なら型を絞る
         raise RuntimeError(f"Embedding取得に失敗: {e}") from e
     return resp.data[0].embedding
@@ -943,7 +950,7 @@ def _responses_text(
     Returns:
         Tuple[str, str]: (生成されたテキスト, 使用されたモデル名)
     """
-    client_req = client.with_options(timeout=timeout_s)
+    client_req = _get_openai_client().with_options(timeout=timeout_s)
 
     # GPT-4.1-nano
     # if model == "gpt-4.1-nano":
