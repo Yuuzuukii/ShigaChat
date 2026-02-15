@@ -68,8 +68,28 @@ export default function RegisterPage() {
       setLoading(true);
       try {
         const res = await postRegister(name, password, spokenLanguage);
-      if (res.status === 409) { setNameErrorKey("errorDuplicateUser"); return; }
-      if (!res.ok) throw new Error();
+      if (!res.ok) {
+        let detail = "";
+        try {
+          const body = await res.json();
+          detail = String(body?.detail || "");
+        } catch {
+          detail = "";
+        }
+
+        // Backend may return 400 or 409 for duplicate usernames.
+        if (
+          res.status === 409 ||
+          (res.status === 400 &&
+            (detail.includes("既に使用されています") ||
+              detail.toLowerCase().includes("already")))
+        ) {
+          setNameErrorKey("errorDuplicateUser");
+          return;
+        }
+
+        throw new Error();
+      }
       setSuccessKey("successRegistration");
       setTimeout(() => navigate("/login"), 1500);
     } catch {
