@@ -72,6 +72,7 @@ export default function LoginPage() {
     setErrorMessage("");
     if (!nickname.trim()) { setNicknameErrorKey("errorEmptyNickname"); return; }
     if (!password.trim()) { setPasswordErrorKey("errorEmptyPassword"); return; }
+    if (!/^[A-Za-z0-9]{8,}$/.test(password)) { setPasswordErrorKey("errorPasswordTooShort"); return; }
 
     setLoading(true);
     try {
