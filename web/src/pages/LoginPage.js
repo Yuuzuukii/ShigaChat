@@ -22,7 +22,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [nicknameErrorKey, setNicknameErrorKey] = useState("");
   const [passwordErrorKey, setPasswordErrorKey] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessageKey, setErrorMessageKey] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, setToken, setUser } = useContext(UserContext);
@@ -69,7 +69,7 @@ export default function LoginPage() {
   const handleLogin = async () => {
     setNicknameErrorKey("");
     setPasswordErrorKey("");
-    setErrorMessage("");
+    setErrorMessageKey("");
     if (!nickname.trim()) { setNicknameErrorKey("errorEmptyNickname"); return; }
     if (!password.trim()) { setPasswordErrorKey("errorEmptyPassword"); return; }
     if (!/^[A-Za-z0-9]{8,}$/.test(password)) { setPasswordErrorKey("errorPasswordTooShort"); return; }
@@ -78,8 +78,11 @@ export default function LoginPage() {
     try {
       const loginRes = await postLogin(nickname, password);
       if (!loginRes.ok) {
-        if (loginRes.status === 401) { setErrorMessage(t.errorInvalidLogin); }
-        else { setErrorMessage(t.errorServerConnection); }
+        if (loginRes.status === 401 || loginRes.status === 404) {
+          // Show credential errors under the password field.
+          setPasswordErrorKey("errorInvalidLogin");
+        }
+        else { setErrorMessageKey("errorServerConnection"); }
         return;
       }
       const { access_token } = await loginRes.json();
@@ -97,7 +100,7 @@ export default function LoginPage() {
       localStorage.removeItem("redirectAfterLogin");
       navigate(redirectPath && redirectPath !== "/login" && redirectPath !== "/" ? redirectPath : "/home", { replace: true });
     } catch (error) {
-      setErrorMessage(t.errorServerConnection);
+      setErrorMessageKey("errorServerConnection");
       console.error("ログインエラー:", error);
     } finally {
       setLoading(false);
@@ -143,8 +146,8 @@ export default function LoginPage() {
                 )}
               </div>
 
-              {errorMessage && (
-                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{errorMessage}</div>
+              {errorMessageKey && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[errorMessageKey]}</div>
               )}
 
               <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
