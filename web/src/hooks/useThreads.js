@@ -135,12 +135,26 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   }, [navigate]);
 
   const startNewChat = useCallback(() => {
-    setCurrentThreadId(null);
+    // Already on an empty draft thread: keep current state, don't create another.
+    if (String(currentThreadId || "").startsWith("tmp-") && messages.length === 0) {
+      navigate(`/home?tid=${encodeURIComponent(String(currentThreadId))}`);
+      return;
+    }
+
+    const tempId = `tmp-${Date.now()}`;
+    const nowIso = new Date().toISOString();
+    const defaultTitle = t?.newChat || "新しいチャット";
+
+    // Insert a visible draft thread immediately in the sidebar.
+    setThreads((prev) => [
+      { id: tempId, title: defaultTitle, lastUpdated: nowIso },
+      ...prev,
+    ]);
+
+    setCurrentThreadId(tempId);
     setMessages([]);
-    const url = new URL(window.location);
-    url.searchParams.delete("tid");
-    window.history.replaceState({}, "", url.toString());
-  }, []);
+    navigate(`/home?tid=${encodeURIComponent(tempId)}`);
+  }, [navigate, t, currentThreadId, messages.length]);
 
   const renameThread = useCallback((id, title) => {
     const newTitle = title || t?.newChat || "新しいチャット";

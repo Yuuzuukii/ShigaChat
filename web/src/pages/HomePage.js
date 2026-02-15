@@ -234,7 +234,7 @@ export default function HomePage() {
             <div className="absolute top-3 left-3 z-10">
               <button
                 onClick={startNewChat}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-transform duration-200 hover:scale-105 group text-sm font-medium"
+                className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-px active:shadow-none group text-sm font-medium"
                 title={t?.newChat || "新しいチャット"}
               >
                 <Plus className="h-4 w-4 group-hover:scale-110 transition-transform" />

@@ -107,8 +107,8 @@ export default function AppSidebar({
                 <div className="flex items-center justify-between px-2">
                   <div className="text-xs font-semibold text-zinc-500">{t?.threads || "スレッド"}</div>
                   <button
-                    onClick={() => { onStartNewChat(); navigate("/home"); }}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all group"
+                    onClick={onStartNewChat}
+                    className="flex items-center gap-1 px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-150 group hover:-translate-y-px hover:shadow-sm active:translate-y-px active:shadow-none"
                     title={t?.newChat || "新しいチャット"}
                   >
                     <Plus className="h-3 w-3 group-hover:rotate-90 transition-transform duration-200" />
