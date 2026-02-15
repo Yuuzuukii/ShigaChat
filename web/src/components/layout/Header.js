@@ -29,8 +29,12 @@ export default function Header({ isDrawerOpen, onToggleDrawer, language, onLangu
             )}
           </Button>
           <div className="flex items-center gap-5">
-            <Link to="/home" className="flex items-center">
-              <span className="text-2xl font-bold" style={{ color: "#0056b3", fontWeight: 700, textShadow: "1px 1px 2px rgba(0,0,0,0.1)", letterSpacing: "1px" }}>
+            <Link
+              to="/home"
+              aria-label="Go to home"
+              className="group inline-flex items-center transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-px focus-visible:outline-none"
+            >
+              <span className="text-2xl font-bold transition-all duration-150 group-hover:text-blue-700 group-hover:drop-shadow-[0_2px_2px_rgba(0,86,179,0.28)] group-active:drop-shadow-none" style={{ color: "#0056b3", fontWeight: 700, textShadow: "1px 1px 2px rgba(0,0,0,0.1)", letterSpacing: "1px" }}>
                 ShigaChat
               </span>
             </Link>

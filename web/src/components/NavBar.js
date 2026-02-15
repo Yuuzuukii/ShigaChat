@@ -445,9 +445,13 @@ export default function Navbar({ children }) {
               {isDrawerOpen ? <PanelLeftClose className="h-5 w-5 transition-all duration-200 hover:text-blue-700" /> : <PanelLeft className="h-5 w-5 transition-all duration-200 hover:text-blue-700" />}
             </Button>
             <div className="flex items-center gap-5">
-              <Link to="/home" className="flex items-center">
+              <Link
+                to="/home"
+                aria-label="Go to home"
+                className="group inline-flex items-center transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-px focus-visible:outline-none"
+              >
                 <span
-                  className="text-2xl font-bold text-blue-800"
+                  className="text-2xl font-bold text-blue-800 transition-all duration-150 group-hover:text-blue-700 group-hover:drop-shadow-[0_2px_2px_rgba(0,86,179,0.28)] group-active:drop-shadow-none"
                   style={{
                     color: '#0056b3',
                     fontWeight: 700,
