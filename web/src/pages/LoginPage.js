@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "../components/ui/card"
 export default function LoginPage() {
   const [nickname, setNickname] = useState("");
   const [password, setPassword] = useState("");
+  const [nicknameErrorKey, setNicknameErrorKey] = useState("");
+  const [passwordErrorKey, setPasswordErrorKey] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -65,9 +67,11 @@ export default function LoginPage() {
   }, [user, navigate]);
 
   const handleLogin = async () => {
+    setNicknameErrorKey("");
+    setPasswordErrorKey("");
     setErrorMessage("");
-    if (!nickname.trim()) { setErrorMessage(t.errorEmptyNickname); return; }
-    if (!password.trim()) { setErrorMessage(t.errorEmptyPassword); return; }
+    if (!nickname.trim()) { setNicknameErrorKey("errorEmptyNickname"); return; }
+    if (!password.trim()) { setPasswordErrorKey("errorEmptyPassword"); return; }
 
     setLoading(true);
     try {
@@ -120,6 +124,9 @@ export default function LoginPage() {
               <div className="space-y-2">
                 <Label htmlFor="nickname" className="text-blue-900">{t.nickname}</Label>
                 <Input id="nickname" placeholder={t.nickname} value={nickname} onChange={(e) => setNickname(e.target.value)} autoComplete="username" className="h-11 rounded-xl border-blue-200 bg-white/90 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400" />
+                {nicknameErrorKey && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[nicknameErrorKey]}</div>
+                )}
               </div>
 
               <div className="space-y-2">
@@ -130,6 +137,9 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>
                 </div>
+                {passwordErrorKey && (
+                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[passwordErrorKey]}</div>
+                )}
               </div>
 
               {errorMessage && (
