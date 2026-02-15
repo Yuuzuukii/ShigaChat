@@ -4,7 +4,7 @@ import { Toaster as SonnerToaster } from "sonner";
 export const Toaster = ({ isDrawerOpen = false, ...props }) => {
   return (
     <SonnerToaster
-      position="top-right"
+      position="bottom-right"
       expand={true}
       richColors={true}
       closeButton={true}
