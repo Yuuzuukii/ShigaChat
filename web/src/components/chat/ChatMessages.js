@@ -8,8 +8,19 @@ import MessageBubble from "./MessageBubble";
 
 export default function ChatMessages({
   messages, messagesLoading, currentThreadId, t, navigate,
-  messagesContainerRef, messagesEndRef,
+  messagesContainerRef, messagesEndRef, suppressEntranceAnimation = false,
 }) {
+  const renderedMessages = !messagesLoading && messages.length > 0 && messages.map((m, index) => (
+    <MessageBubble
+      key={m.id}
+      message={m}
+      index={index}
+      t={t}
+      navigate={navigate}
+      suppressEntranceAnimation={suppressEntranceAnimation}
+    />
+  ));
+
   return (
     <div className="flex-1 overflow-y-auto p-4" ref={messagesContainerRef}>
       <div className="mx-auto w-full max-w-4xl h-full">
@@ -37,11 +48,13 @@ export default function ChatMessages({
         )}
 
         {/* Messages */}
-        <AnimatePresence mode="popLayout">
-          {!messagesLoading && messages.length > 0 && messages.map((m, index) => (
-            <MessageBubble key={m.id} message={m} index={index} t={t} navigate={navigate} />
-          ))}
-        </AnimatePresence>
+        {suppressEntranceAnimation ? (
+          <div>{renderedMessages}</div>
+        ) : (
+          <AnimatePresence mode="popLayout">
+            {renderedMessages}
+          </AnimatePresence>
+        )}
       </div>
       <div ref={messagesEndRef} />
     </div>

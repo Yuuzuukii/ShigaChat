@@ -20,7 +20,19 @@ function formatDateTime(val) {
   } catch { return String(val); }
 }
 
-export default function MessageBubble({ message: m, index, t, navigate }) {
+export default function MessageBubble({ message: m, index, t, navigate, suppressEntranceAnimation = false }) {
+  if (suppressEntranceAnimation) {
+    return (
+      <div className={`mb-6 ${m.role === "user" ? "flex justify-end" : ""}`}>
+        {m.role === "user" ? (
+          <UserBubble m={m} t={t} />
+        ) : (
+          <AssistantBubble m={m} t={t} navigate={navigate} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <motion.div
       key={m.id}

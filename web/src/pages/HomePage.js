@@ -2,7 +2,7 @@
  * HomePage - S03 ホーム/チャット画面
  * home.js(1563行)から分割リファクタ。ロジックはuseThreadsフック + services/api.jsに移行済み
  */
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
@@ -33,6 +33,7 @@ export default function HomePage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [actionMessage, setActionMessage] = useState("");
+  const [suppressThreadSwitchAnimation, setSuppressThreadSwitchAnimation] = useState(false);
 
   const [similarity, setSimilarity] = useState(() => {
     const v = localStorage.getItem("rag_similarity_threshold");
@@ -42,6 +43,8 @@ export default function HomePage() {
 
   const messagesEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const needsThreadSwitchScrollRef = useRef(false);
+  const prevThreadIdRef = useRef(currentThreadId);
 
   const scrollToBottom = useCallback(() => {
     try {
@@ -50,6 +53,44 @@ export default function HomePage() {
       else messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
     } catch {}
   }, []);
+
+  const scrollToBottomImmediate = useCallback(() => {
+    try {
+      const el = messagesContainerRef.current;
+      if (el) el.scrollTop = el.scrollHeight;
+      else messagesEndRef.current?.scrollIntoView({ block: "end" });
+    } catch {}
+  }, []);
+
+  // Thread switch detection
+  useEffect(() => {
+    if (prevThreadIdRef.current !== currentThreadId) {
+      needsThreadSwitchScrollRef.current = true;
+      setSuppressThreadSwitchAnimation(true);
+      prevThreadIdRef.current = currentThreadId;
+    }
+  }, [currentThreadId]);
+
+  // Keep view fixed at latest message when switching threads.
+  useEffect(() => {
+    if (!needsThreadSwitchScrollRef.current) return;
+    if (messagesLoading) return;
+    const raf = requestAnimationFrame(() => {
+      scrollToBottomImmediate();
+      needsThreadSwitchScrollRef.current = false;
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [messagesLoading, messages.length, scrollToBottomImmediate]);
+
+  // Disable message entrance animation only for the first paint after switching threads.
+  useEffect(() => {
+    if (!suppressThreadSwitchAnimation) return;
+    if (messagesLoading) return;
+    const raf = requestAnimationFrame(() => {
+      setSuppressThreadSwitchAnimation(false);
+    });
+    return () => cancelAnimationFrame(raf);
+  }, [suppressThreadSwitchAnimation, messagesLoading, messages.length]);
 
   const onUnauthorized = useCallback(() => {
     navigate("/login");
@@ -260,6 +301,7 @@ export default function HomePage() {
                 messages={messages}
                 messagesLoading={messagesLoading}
                 currentThreadId={currentThreadId}
+                suppressEntranceAnimation={suppressThreadSwitchAnimation}
                 t={t}
                 navigate={navigate}
                 messagesContainerRef={messagesContainerRef}
