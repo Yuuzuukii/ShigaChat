@@ -32,6 +32,7 @@ export default function HomePage() {
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [errorMessageKey, setErrorMessageKey] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [suppressThreadSwitchAnimation, setSuppressThreadSwitchAnimation] = useState(false);
 
@@ -103,11 +104,22 @@ export default function HomePage() {
     try { localStorage.setItem("rag_similarity_threshold", String(clamped)); } catch {}
   };
 
+  useEffect(() => {
+    if (input.trim()) {
+      setErrorMessage("");
+      setErrorMessageKey("");
+    }
+  }, [input]);
+
   // ─── Send message ───
   const sendMessage = async () => {
-    if (!token) { setErrorMessage(t.errorLogin); onUnauthorized(); return; }
+    if (!token) { setErrorMessageKey("errorLogin"); setErrorMessage(""); onUnauthorized(); return; }
     const text = input.trim();
-    if (!text) return;
+    if (!text) {
+      setErrorMessageKey("enterquestion");
+      setErrorMessage("");
+      return;
+    }
 
     let threadId = currentThreadId;
     if (!threadId) {
@@ -127,6 +139,7 @@ export default function HomePage() {
     setInput("");
     setLoading(true);
     setErrorMessage("");
+    setErrorMessageKey("");
 
     try {
       const isTemp = String(threadId).startsWith("tmp-");
@@ -183,6 +196,7 @@ export default function HomePage() {
       } catch {}
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== "typing"));
+      setErrorMessageKey("");
       setErrorMessage(e.message);
     } finally {
       setLoading(false);
@@ -191,7 +205,7 @@ export default function HomePage() {
 
   // ─── Action (translate / summarize / simplify) ───
   const applyAction = async (type, targetLangOverride = null) => {
-    if (!token) { setErrorMessage(t.errorLogin); onUnauthorized(); return; }
+    if (!token) { setErrorMessageKey("errorLogin"); setErrorMessage(""); onUnauthorized(); return; }
     scrollToBottom();
 
     const lastAssistantIdx = [...messages].map((m, i) => ({ m, i })).reverse().find((x) => x.m.role === "assistant" && !x.m.typing)?.i;
@@ -250,6 +264,7 @@ export default function HomePage() {
       }
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== "action-typing"));
+      setErrorMessageKey("");
       setErrorMessage(e.message || String(e));
     } finally {
       setActionLoading(false);
@@ -310,7 +325,8 @@ export default function HomePage() {
               <ChatInput
                 input={input} setInput={setInput}
                 loading={loading} actionLoading={actionLoading}
-                errorMessage={errorMessage} actionMessage={actionMessage}
+                errorMessage={errorMessageKey ? (t?.[errorMessageKey] || errorMessage) : errorMessage}
+                actionMessage={actionMessage}
                 t={t} onSend={sendMessage} onApplyAction={applyAction}
                 similarity={similarity} onSimilarityChange={handleSimilarityChange}
               />
