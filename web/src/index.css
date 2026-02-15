@@ -19,3 +19,9 @@ main {
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
 }
+
+/* Edge's native password reveal/clear buttons conflict with custom eye toggle */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none !important;
+}
