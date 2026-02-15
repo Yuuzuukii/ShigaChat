@@ -44,6 +44,11 @@ export default function LoginPage() {
   }, [changeLanguageLocal]);
 
   const handleNavigate = (path) => {
+    // Login -> Register should not prompt; move immediately.
+    if (path === "/register") {
+      navigate(path);
+      return;
+    }
     if (hasInput) {
       setPendingNavPath(path);
       setShowLeaveDialog(true);
