@@ -168,8 +168,8 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
 
   const removeThread = useCallback(async (id) => {
     const threadId = String(id);
-    if (!window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？")) return;
-    if (!token) return;
+    if (!window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？")) return false;
+    if (!token) return false;
     try {
       const resp = await deleteThreadApi(threadId, { onUnauthorized });
       if (resp.ok) {
@@ -177,11 +177,14 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
         if (String(threadId) === String(currentThreadId)) {
           startNewChat();
         }
+        return true;
       }
+      return false;
     } catch (e) {
       console.error("Error deleting thread:", e);
       setThreads((prev) => prev.filter((th) => String(th.id) !== threadId));
       if (String(threadId) === String(currentThreadId)) startNewChat();
+      return false;
     }
   }, [token, currentThreadId, t, loadThreads, startNewChat, onUnauthorized]);
 

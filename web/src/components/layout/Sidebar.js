@@ -62,8 +62,10 @@ export default function AppSidebar({
   const cancelInlineRename = () => { setEditingThreadId(null); setEditingTitle(""); };
 
   const handleDeleteThread = async (thread) => {
-    await onDeleteThread(thread.id);
-    toast.success(t?.threadDeletedSuccess || "スレッドを削除しました", { duration: 3000 });
+    const deleted = await onDeleteThread(thread.id);
+    if (deleted) {
+      toast.success(t?.threadDeletedSuccess || "スレッドを削除しました", { duration: 3000 });
+    }
     setOpenThreadMenuId(null);
   };
 
