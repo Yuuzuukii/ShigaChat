@@ -14,7 +14,7 @@ export const UserProvider = ({ children }) => {
   });
 
   const [token, setToken] = useState(() => localStorage.getItem("token") || null);
-  const [language, setLanguage] = useState("ja");
+  const [language, setLanguage] = useState("en");
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchUser = (currentToken) => {
@@ -76,7 +76,7 @@ export const UserProvider = ({ children }) => {
     localStorage.removeItem("user");
     setToken(null);
     setUser(null);
-    setLanguage("ja");
+    setLanguage("en");
     if (typeof window !== "undefined") window.dispatchEvent(new Event("userLoggedOut"));
   };
 

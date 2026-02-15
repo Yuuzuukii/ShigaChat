@@ -33,6 +33,14 @@ export default function LoginPage() {
 
   const hasInput = nickname.trim() !== "" || password.trim() !== "";
 
+  // Spec requirement: unauthenticated login page defaults to English.
+  useEffect(() => {
+    const hasToken = !!localStorage.getItem("token");
+    if (!hasToken) {
+      changeLanguageLocal("en");
+    }
+  }, [changeLanguageLocal]);
+
   const handleNavigate = (path) => {
     if (hasInput) {
       setPendingNavPath(path);

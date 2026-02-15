@@ -11,14 +11,14 @@ export function useLanguage() {
   const { user, setUser, setToken } = useContext(UserContext);
 
   const [language, setLanguageState] = useState(() => {
-    // 初期値: localStorage → ユーザープロファイル → "ja"
+    // 初期値: localStorage → ユーザープロファイル → "en"
     const stored = localStorage.getItem("shigachat_lang");
     if (stored && translations[stored]) return stored;
     if (user?.spokenLanguage) {
       const code = languageLabelToCode[user.spokenLanguage];
       if (code) return code;
     }
-    return "ja";
+    return "en";
   });
 
   // ユーザープロファイル変更を追跡
@@ -41,7 +41,18 @@ export function useLanguage() {
     return () => window.removeEventListener("languageChanged", handler);
   }, []);
 
-  const t = translations[language] || translations.ja;
+  // First-time bootstrap: if language is not set, persist English default.
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("shigachat_lang");
+      if (!stored) {
+        localStorage.setItem("shigachat_lang", "en");
+        setLanguageState("en");
+      }
+    } catch {}
+  }, []);
+
+  const t = translations[language] || translations.en;
 
   /**
    * UIの言語を切り替え + サーバーにも反映
