@@ -7,6 +7,7 @@ from models.schemas import Question
 from api.rag.orchestrator import answer_with_rag_pg
 from api.rag.detect import detect_language
 from api.rag.summarizer import save_thread_summary
+from api.utils.reactive import title_text
 import json
 
 router = APIRouter()
@@ -24,6 +25,42 @@ _OPENAI_KEY_MISSING_MESSAGES = {
     "Bahasa Indonesia": "Kunci API belum disetel",
 }
 
+_THREAD_TITLE_MAX_CHARS_BY_LANG = {
+    # Japanese baseline
+    "ja": 15,
+    "zh": 15,
+    "ko": 15,
+    # Latin scripts: roughly equivalent visual density
+    "en": 30,
+    "vi": 24,
+    "pt": 28,
+    "es": 28,
+    "tl": 26,
+    "id": 26,
+}
+_THREAD_TITLE_LANG_CODE = {
+    "日本語": "ja",
+    "English": "en",
+    "Tiếng Việt": "vi",
+    "中文": "zh",
+    "한국어": "ko",
+    "Português": "pt",
+    "Español": "es",
+    "Tagalog": "tl",
+    "Bahasa Indonesia": "id",
+}
+_UNTITLED_BY_LANGUAGE = {
+    "日本語": "無題",
+    "English": "Untitled",
+    "Tiếng Việt": "Không tiêu đề",
+    "中文": "无标题",
+    "한국어": "제목 없음",
+    "Português": "Sem título",
+    "Español": "Sin título",
+    "Tagalog": "Walang pamagat",
+    "Bahasa Indonesia": "Tanpa judul",
+}
+
 
 def _localize_runtime_error(detail: str, spoken_language: str) -> str:
     """Map known backend errors to localized user-facing messages."""
@@ -34,6 +71,58 @@ def _localize_runtime_error(detail: str, spoken_language: str) -> str:
             _OPENAI_KEY_MISSING_MESSAGES["English"],
         )
     return detail
+
+
+def _ensure_threads_has_thread_title_column() -> None:
+    try:
+        with get_db_cursor() as (cursor, conn):
+            cursor.execute("""
+                SELECT COUNT(*) AS cnt FROM information_schema.columns
+                WHERE table_name = 'threads'
+                AND column_name = 'thread_title'
+            """)
+            row = cursor.fetchone()
+            if row['cnt'] == 0:
+                cursor.execute("ALTER TABLE threads ADD COLUMN thread_title TEXT")
+                conn.commit()
+    except Exception:
+        pass
+
+
+def _fit_thread_title(text: str) -> str:
+    return " ".join((text or "").split()).strip()
+
+
+def _fallback_thread_title(spoken_language: str) -> str:
+    return _UNTITLED_BY_LANGUAGE.get(spoken_language, _UNTITLED_BY_LANGUAGE["English"])
+
+
+def _generate_thread_title(question_text: str, spoken_language: str) -> str:
+    lang_code = _THREAD_TITLE_LANG_CODE.get(spoken_language, "en")
+    try:
+        detected_iso, _ = detect_language(question_text)
+        if detected_iso:
+            lang_code = detected_iso
+    except Exception:
+        pass
+
+    max_chars = _THREAD_TITLE_MAX_CHARS_BY_LANG.get(lang_code, 15)
+    source_text = question_text
+    for _ in range(3):
+        try:
+            generated = title_text(
+                source_text,
+                lang_code,
+                max_chars=max_chars,
+                strict=True,
+            )
+            candidate = _fit_thread_title(generated)
+            if candidate and len(candidate) <= max_chars:
+                return candidate
+            source_text = f"Shorten this title to <= {max_chars} chars:\n{generated}"
+        except Exception:
+            break
+    return _fallback_thread_title(spoken_language)
 
 
 def _ensure_thread_qa_has_rag_column() -> None:
@@ -210,6 +299,13 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
             """, (assigned_thread_id,))
             past_qa_rows = cursor.fetchall()
         history_qa = list(reversed(past_qa_rows))  # [(user, bot), ...] の昇順に
+        is_first_turn = len(history_qa) == 0
+        generated_thread_title = None
+        if is_first_turn:
+            generated_thread_title = _generate_thread_title(
+                question_text,
+                current_user.get("spoken_language", "English"),
+            )
 
         # ---- 回答生成：pgvector RAG 版 ---------------------------------------
         sim_th = request.similarity_threshold if (hasattr(request, 'similarity_threshold') and request.similarity_threshold is not None) else 0.3
@@ -241,6 +337,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
         _ensure_threads_has_summary_column()
+        _ensure_threads_has_thread_title_column()
         with get_db_cursor() as (cursor, conn):
             _ensure_thread_qa_has_rag_column()  # 既存のマイグレーションヘルパ
             _ensure_thread_qa_has_type_column() # 新規：type列
@@ -262,10 +359,16 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
                     """,
                     (assigned_thread_id, question_text, answer_text, json.dumps(rag_qa, ensure_ascii=False)),
                 )
-            cursor.execute(
-                f"UPDATE threads SET last_updated = {ph} WHERE id = {ph}",
-                (datetime.now(), assigned_thread_id),
-            )
+            if generated_thread_title:
+                cursor.execute(
+                    f"UPDATE threads SET last_updated = {ph}, thread_title = {ph} WHERE id = {ph}",
+                    (datetime.now(), generated_thread_title, assigned_thread_id),
+                )
+            else:
+                cursor.execute(
+                    f"UPDATE threads SET last_updated = {ph} WHERE id = {ph}",
+                    (datetime.now(), assigned_thread_id),
+                )
             conn.commit()
 
         # ---- バックグラウンドで要約を生成・保存 ------------------------------------
@@ -276,6 +379,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
         meta["references"] = rag_qa
         return {
             "thread_id": assigned_thread_id,
+            "thread_title": generated_thread_title,
             "question": question_text,
             "answer": answer_text,
             "type": action_type,
@@ -460,8 +564,9 @@ async def get_user_threads(current_user: dict = Depends(current_user_info)):
     ph = get_placeholder()
     try:
         with get_db_cursor() as (cursor, conn):
+            _ensure_threads_has_thread_title_column()
             cursor.execute(f"""
-                SELECT id, last_updated FROM threads
+                SELECT id, last_updated, thread_title FROM threads
                 WHERE user_id = {ph}
                 ORDER BY last_updated DESC
             """, (user_id,))
@@ -472,20 +577,32 @@ async def get_user_threads(current_user: dict = Depends(current_user_info)):
                 thread_id = thread_data['id']
                 last_updated = thread_data['last_updated']
                 
-                # 各スレッドの最初の質問を取得してタイトルにする
-                cursor.execute(f"""
-                    SELECT question FROM thread_qa
-                    WHERE thread_id = {ph}
-                    ORDER BY created_at ASC
-                    LIMIT 1
-                """, (thread_id,))
-                first_question = cursor.fetchone()
-                
-                if first_question:
-                    q_text = first_question['question']
-                    title = q_text[:50] + "..." if len(q_text) > 50 else q_text
-                else:
-                    title = "無題のスレッド"
+                title = (thread_data.get("thread_title") or "").strip()
+                if not title:
+                    # 既存スレッドの補完: 初回質問からタイトルを生成して保存
+                    cursor.execute(f"""
+                        SELECT question FROM thread_qa
+                        WHERE thread_id = {ph}
+                        ORDER BY created_at ASC
+                        LIMIT 1
+                    """, (thread_id,))
+                    first_question = cursor.fetchone()
+                    if first_question:
+                        q_text = first_question['question']
+                        title = _generate_thread_title(
+                            q_text,
+                            current_user.get("spoken_language", "English"),
+                        )
+                        try:
+                            cursor.execute(
+                                f"UPDATE threads SET thread_title = {ph} WHERE id = {ph}",
+                                (title, thread_id),
+                            )
+                            conn.commit()
+                        except Exception:
+                            pass
+                    else:
+                        title = _fallback_thread_title(current_user.get("spoken_language", "English"))
                 
                 threads.append({
                     "thread_id": thread_id,

@@ -32,11 +32,18 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   // ─── helpers ───
 
   const toClientThreads = useCallback((arr = []) =>
-    (arr || []).map((th) => ({
-      id: String(th.thread_id ?? th.id),
-      title: threadTitleOverrides[String(th.thread_id ?? th.id)] ?? th.title,
-      lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
-    })), [threadTitleOverrides]);
+    (arr || []).map((th) => {
+      const id = String(th.thread_id ?? th.id);
+      const serverTitle = String(th.title || "").trim();
+      const overrideTitle = String(threadTitleOverrides[id] || "").trim();
+      const looksOldAutoTruncated = /\.\.\.$|…$/.test(overrideTitle);
+      const title = overrideTitle && !looksOldAutoTruncated ? overrideTitle : serverTitle;
+      return {
+        id,
+        title,
+        lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
+      };
+    }), [threadTitleOverrides]);
 
   const saveMsgsLS = useCallback((threadId, msgsArr) => {
     try { localStorage.setItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`, JSON.stringify(msgsArr)); } catch {}

@@ -411,16 +411,23 @@ def outline_text(text: str, output_lang_code: str) -> str:
     resp = _llm().invoke([HumanMessage(content=prompt)])
     return resp.content.strip()
 
-def title_text(text: str, output_lang_code: str) -> str:
+def title_text(text: str, output_lang_code: str, max_chars: int = 20, strict: bool = False) -> str:
     _q, _a, has_qa = _extract_answer_block(text)
     if has_qa:
         text = _a
     lang_name = _LANG_NAME.get(output_lang_code, "Japanese")
+    max_chars = max(1, int(max_chars))
+    strict_rule = "- This limit is mandatory. Do not exceed it." if strict else "- Keep it as short as possible."
     prompt = (
-        f"Generate a single-line, informative title in {lang_name}.\n- ~20 characters if possible.\n- No quotes or prefixes.\n\nText:\n{text}"
+        f"Summarize the user question into a thread title in {lang_name}.\n"
+        f"- Must be {max_chars} characters or fewer.\n"
+        f"{strict_rule}\n"
+        f"- Output only one line.\n"
+        f"- No quotes or prefixes.\n\nText:\n{text}"
     )
     resp = _llm().invoke([HumanMessage(content=prompt)])
-    return resp.content.strip()
+    out = resp.content.strip()
+    return out.splitlines()[0].strip() if out else ""
 
 def keywords_text(text: str, output_lang_code: str) -> str:
     _q, _a, has_qa = _extract_answer_block(text)

@@ -51,7 +51,7 @@ export default function ChatMessages({
         {suppressEntranceAnimation ? (
           <div>{renderedMessages}</div>
         ) : (
-          <AnimatePresence mode="popLayout">
+          <AnimatePresence mode="sync">
             {renderedMessages}
           </AnimatePresence>
         )}

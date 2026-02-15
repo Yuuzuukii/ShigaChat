@@ -121,7 +121,13 @@ export default function HomePage() {
       return;
     }
 
-    let threadId = currentThreadId;
+    const tidFromUrl = (() => {
+      try { return new URLSearchParams(window.location.search).get("tid"); } catch { return null; }
+    })();
+    let threadId = currentThreadId || tidFromUrl;
+    if (threadId && String(threadId) !== String(currentThreadId)) {
+      setCurrentThreadId(String(threadId));
+    }
     if (!threadId) {
       const id = `tmp-${Date.now()}`;
       skipNextThreadLoad.current = true;
@@ -135,7 +141,7 @@ export default function HomePage() {
     const isFirstMessage = messages.length === 0;
 
     setMessages((prev) => [...prev, userMsg, typingMsg]);
-    setTimeout(scrollToBottom, 0);
+    setTimeout(scrollToBottomImmediate, 0);
     setInput("");
     setLoading(true);
     setErrorMessage("");
@@ -163,11 +169,11 @@ export default function HomePage() {
             const oldVal = localStorage.getItem(oldKey);
             if (oldVal !== null) { localStorage.setItem(newKey, oldVal); localStorage.removeItem(oldKey); }
           } catch {}
+          // Keep current optimistic messages; avoid reload flicker on tmp -> real thread migration.
+          skipNextThreadLoad.current = true;
           setCurrentThreadId(newId);
           threadId = newId;
-          const url = new URL(window.location);
-          url.searchParams.set("tid", newId);
-          window.history.replaceState({}, "", url.toString());
+          navigate(`/home?tid=${encodeURIComponent(newId)}`, { replace: true });
           try { window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId })); } catch {}
         }
       }
@@ -180,7 +186,8 @@ export default function HomePage() {
       setMessages((prev) => [...prev.filter((m) => m.id !== "typing"), asstMsg]);
 
       if (isFirstMessage) {
-        const newTitle = text.slice(0, 50) + (text.length > 50 ? "..." : "");
+        const serverTitle = typeof data?.thread_title === "string" ? data.thread_title.trim() : "";
+        const newTitle = serverTitle || (t?.newChat || "New Chat");
         renameThread(threadId, newTitle);
         try { window.dispatchEvent(new CustomEvent("threadTitleChanged", { detail: { threadId, title: newTitle } })); } catch {}
       }
@@ -222,7 +229,7 @@ export default function HomePage() {
     const actionMsg = { id: crypto.randomUUID(), role: "user", type: "action", content: actionText, time: new Date().toISOString() };
     const typingMsg = { id: "action-typing", role: "assistant", type: "action", content: "…", typing: true };
     setMessages((prev) => [...prev, actionMsg, typingMsg]);
-    setTimeout(scrollToBottom, 0);
+    setTimeout(scrollToBottomImmediate, 0);
 
     setActionLoading(true);
     setActionMessage("");
@@ -252,9 +259,7 @@ export default function HomePage() {
         const oldId = String(currentThreadId || "");
         if (newId !== oldId) {
           setCurrentThreadId(newId);
-          const url = new URL(window.location);
-          url.searchParams.set("tid", newId);
-          window.history.replaceState({}, "", url.toString());
+          navigate(`/home?tid=${encodeURIComponent(newId)}`, { replace: true });
           try { window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId })); } catch {}
         }
         try {

@@ -126,7 +126,7 @@ export default function AppSidebar({
                       <li key={th.id} className="group relative">
                         <div className={`flex items-center justify-between rounded px-2 py-1.5 text-sm transition-all duration-200 ${(isActive || isMenuOpen || isEditing) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-zinc-900"} hover:bg-blue-50 hover:text-blue-700`}>
                           {!isEditing ? (
-                            <button className="flex-1 truncate text-left" onClick={() => onSelectThread(th.id)} title={th.title}>
+                            <button className="flex-1 whitespace-normal break-words text-left leading-snug" onClick={() => onSelectThread(th.id)} title={th.title}>
                               {th.title}
                             </button>
                           ) : (
