@@ -92,8 +92,11 @@ export default function RegisterPage() {
       }
       setSuccessKey("successRegistration");
       setTimeout(() => navigate("/login"), 1500);
-    } catch {
-      setErrorKey("errorRegistration");
+    } catch (error) {
+      const isNetworkError =
+        error instanceof TypeError ||
+        String(error?.message || "").toLowerCase().includes("failed to fetch");
+      setErrorKey(isNetworkError ? "errorServerConnection" : "errorRegistration");
     } finally {
       setLoading(false);
     }
