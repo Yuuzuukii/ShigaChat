@@ -23,8 +23,11 @@ export default function RegisterPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [spokenLanguage, setSpokenLanguage] = useState("");
-  const [success, setSuccess] = useState("");
-  const [error, setError] = useState("");
+  const [nameErrorKey, setNameErrorKey] = useState("");
+  const [passwordErrorKey, setPasswordErrorKey] = useState("");
+  const [spokenLanguageErrorKey, setSpokenLanguageErrorKey] = useState("");
+  const [successKey, setSuccessKey] = useState("");
+  const [errorKey, setErrorKey] = useState("");
   const [loading, setLoading] = useState(false);
   const { t, changeLanguageLocal, language } = useLanguage();
   const navigate = useNavigate();
@@ -51,23 +54,26 @@ export default function RegisterPage() {
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
+    setNameErrorKey("");
+    setPasswordErrorKey("");
+    setSpokenLanguageErrorKey("");
+    setErrorKey("");
+    setSuccessKey("");
 
-    if (!name.trim()) { setError(t.errorEmptyNickname); return; }
-    if (!password.trim()) { setError(t.errorEmptyPassword); return; }
-    if (password.length < 8) { setError(t.errorPasswordTooShort); return; }
-    if (!spokenLanguage) { setError(t.errorEmptyLanguage); return; }
+    if (!name.trim()) { setNameErrorKey("errorEmptyNickname"); return; }
+    if (!password.trim()) { setPasswordErrorKey("errorEmptyPassword"); return; }
+    if (password.length < 8) { setPasswordErrorKey("errorPasswordTooShort"); return; }
+    if (!spokenLanguage) { setSpokenLanguageErrorKey("errorEmptyLanguage"); return; }
 
-    setLoading(true);
-    try {
-      const res = await postRegister(name, password, spokenLanguage);
-      if (res.status === 409) { setError(t.errorDuplicateUser); return; }
+      setLoading(true);
+      try {
+        const res = await postRegister(name, password, spokenLanguage);
+      if (res.status === 409) { setNameErrorKey("errorDuplicateUser"); return; }
       if (!res.ok) throw new Error();
-      setSuccess(t.successRegistration);
+      setSuccessKey("successRegistration");
       setTimeout(() => navigate("/login"), 1500);
     } catch {
-      setError(t.errorRegistration);
+      setErrorKey("errorRegistration");
     } finally {
       setLoading(false);
     }
@@ -101,6 +107,7 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label htmlFor="nickname" className="text-blue-900">{t.nickname}</Label>
                 <Input id="nickname" placeholder={t.nickname} value={name} onChange={(e) => setName(e.target.value)} autoComplete="username" className="h-11 rounded-xl border-blue-200 bg-white/90 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400" />
+                {nameErrorKey && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[nameErrorKey]}</div>}
               </div>
 
               <div className="space-y-2">
@@ -111,6 +118,7 @@ export default function RegisterPage() {
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                   </Button>
                 </div>
+                {passwordErrorKey && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[passwordErrorKey]}</div>}
               </div>
 
               <div className="space-y-2">
@@ -125,10 +133,11 @@ export default function RegisterPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {spokenLanguageErrorKey && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[spokenLanguageErrorKey]}</div>}
               </div>
 
-              {error && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{error}</div>}
-              {success && <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">{success}</div>}
+              {errorKey && <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">{t[errorKey]}</div>}
+              {successKey && <div className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700" role="status">{t[successKey]}</div>}
 
               <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
                 <Button type="submit" disabled={loading} className="group h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg ring-1 ring-blue-300 transition-all hover:shadow-blue-200">
