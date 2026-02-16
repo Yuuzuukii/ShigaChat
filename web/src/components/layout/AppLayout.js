@@ -7,10 +7,8 @@ import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
 import { useThreads } from "../../hooks/useThreads";
-import { useNotifications } from "../../hooks/useNotifications";
 import Header from "./Header";
 import AppSidebar from "./Sidebar";
-import NotificationPopup from "../notifications/NotificationPopup";
 import { Toaster } from "../ui/toaster";
 
 export default function AppLayout() {
@@ -27,7 +25,6 @@ export default function AppLayout() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const threadHook = useThreads({ token, userId, t, onUnauthorized });
-  const notifHook = useNotifications({ token, userId, language, onUnauthorized });
 
   if (!user) return null; // 認証ガードがリダイレクト中
 
@@ -58,23 +55,6 @@ export default function AppLayout() {
         onToggleDrawer={() => setIsDrawerOpen((v) => !v)}
         language={language}
         onLanguageChange={changeLanguage}
-        notificationSlot={
-          <NotificationPopup
-            notifications={notifHook.notifications}
-            globalNotifications={notifHook.globalNotifications}
-            unreadCount={notifHook.unreadCount}
-            showPopup={notifHook.showPopup}
-            popupRef={notifHook.popupRef}
-            activeTab={notifHook.activeTab}
-            setActiveTab={notifHook.setActiveTab}
-            userId={userId}
-            t={t}
-            onToggle={notifHook.togglePopup}
-            onNotificationMove={notifHook.onNotificationMove}
-            onGlobalNotificationMove={notifHook.onGlobalNotificationMove}
-            onMarkAllRead={notifHook.markAllRead}
-          />
-        }
       />
 
       {/* Page content */}
@@ -87,7 +67,7 @@ export default function AppLayout() {
           scrollBehavior: "smooth",
         }}
       >
-        <Outlet context={{ language, t, changeLanguage, threadHook, notifHook }} />
+        <Outlet context={{ language, t, changeLanguage, threadHook }} />
       </main>
 
       <Toaster isDrawerOpen={isDrawerOpen} />
