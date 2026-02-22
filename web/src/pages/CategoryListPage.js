@@ -9,6 +9,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { categoryList, categoryColors } from "../config/categories";
+import { fetchCategoryTranslation } from "../services/api";
+import { toast } from "../lib/utils";
 import { Button } from "../components/ui/button";
 import {
   IdCard, HeartHandshake, Stethoscope, PiggyBank, Briefcase,
@@ -49,6 +51,7 @@ export default function CategoryListPage() {
   const navigate = useNavigate();
   const [hoveredCategoryId, setHoveredCategoryId] = useState(null);
   const ringRef = useRef(null);
+  const hasCheckedCategoryApiRef = useRef(false);
 
   // CSS @property(--spin) 非対応時のフォールバック
   useEffect(() => {
@@ -111,6 +114,35 @@ export default function CategoryListPage() {
       el.removeEventListener("focusout", onLeave);
     };
   }, []);
+
+  // バックエンド停止時にカテゴリ取得失敗トーストを表示するための疎通チェック
+  useEffect(() => {
+    if (hasCheckedCategoryApiRef.current) return;
+    hasCheckedCategoryApiRef.current = true;
+
+    let cancelled = false;
+    const sampleCategoryId = categoryList?.[0]?.id;
+    if (!sampleCategoryId) return;
+
+    async function verifyCategoryApi() {
+      try {
+        const resp = await fetchCategoryTranslation(sampleCategoryId);
+        if (!resp.ok) throw new Error("category_api_unavailable");
+      } catch (error) {
+        console.error("カテゴリ一覧API疎通エラー:", error);
+        if (!cancelled) {
+          toast.error(t?.categoryError || "カテゴリの取得に失敗しました", {
+            duration: 4000,
+          });
+        }
+      }
+    }
+
+    verifyCategoryApi();
+    return () => {
+      cancelled = true;
+    };
+  }, [t]);
 
   return (
     <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
