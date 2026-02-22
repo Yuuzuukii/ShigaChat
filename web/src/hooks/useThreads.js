@@ -4,6 +4,7 @@
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { fetchUserThreads, fetchThreadMessages, deleteThread as deleteThreadApi } from "../services/api";
+import { toast } from "../lib/utils";
 
 const LS_MSGS_PREFIX = "chat_msgs_";
 
@@ -17,6 +18,7 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const skipNextThreadLoad = useRef(false);
+  const hasShownThreadFetchErrorToastRef = useRef(false);
 
   const [threadTitleOverrides, setThreadTitleOverrides] = useState(() => {
     try {
@@ -51,6 +53,14 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   const loadMsgsLS = useCallback((threadId) => {
     try { return JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`)) || []; } catch { return []; }
   }, [userId]);
+  const notifyThreadFetchError = useCallback(() => {
+    if (hasShownThreadFetchErrorToastRef.current) return;
+    hasShownThreadFetchErrorToastRef.current = true;
+    toast.error(t?.threadFetchError || "スレッドの取得に失敗しました", { duration: 4000 });
+  }, [t]);
+  const clearThreadFetchErrorNotice = useCallback(() => {
+    hasShownThreadFetchErrorToastRef.current = false;
+  }, []);
 
   // ─── load threads ───
 
@@ -59,13 +69,21 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     try {
       setThreadsLoading(true);
       const resp = await fetchUserThreads({ onUnauthorized });
-      if (!resp.ok) return;
+      if (!resp.ok) {
+        notifyThreadFetchError();
+        return;
+      }
       const data = await resp.json();
       setThreads(toClientThreads(data.threads || []));
-    } catch {} finally {
+      clearThreadFetchErrorNotice();
+    } catch (error) {
+      if (!String(error?.message || "").includes("認証エラー")) {
+        notifyThreadFetchError();
+      }
+    } finally {
       setThreadsLoading(false);
     }
-  }, [token, userId, onUnauthorized, toClientThreads]);
+  }, [token, userId, onUnauthorized, toClientThreads, notifyThreadFetchError, clearThreadFetchErrorNotice]);
 
   // Initial load
   useEffect(() => {
@@ -107,15 +125,20 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
         });
         setMessages(clientMessages);
         saveMsgsLS(threadId, clientMessages);
+        clearThreadFetchErrorNotice();
       } else {
         setMessages(loadMsgsLS(threadId));
+        notifyThreadFetchError();
       }
-    } catch {
+    } catch (error) {
       setMessages(loadMsgsLS(threadId));
+      if (!String(error?.message || "").includes("認証エラー")) {
+        notifyThreadFetchError();
+      }
     } finally {
       setMessagesLoading(false);
     }
-  }, [token, loadMsgsLS, onUnauthorized, saveMsgsLS]);
+  }, [token, loadMsgsLS, onUnauthorized, saveMsgsLS, notifyThreadFetchError, clearThreadFetchErrorNotice]);
 
   // Auto-load messages on thread switch
   useEffect(() => {
