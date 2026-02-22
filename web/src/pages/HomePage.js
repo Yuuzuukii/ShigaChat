@@ -33,8 +33,18 @@ const DB_ERROR_PATTERNS = [
   /server closed the connection/i,
 ];
 
+const ANSWER_GENERATION_ERROR_PATTERNS = [
+  /api[-_\s]?key/i,
+  /apiキー/i,
+  /openai/i,
+  /openai_api_key/i,
+  /insufficient_quota/i,
+  /rate limit/i,
+  /model/i,
+];
+
 function normalizeRequestError(error, t) {
-  const fallback = t?.failtogetanswer || "回答の取得に失敗しました";
+  const fallback = t?.answerGenerationFailed || "回答を生成できませんでした";
   const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
   const raw = String(
     (error && typeof error === "object" && "message" in error && error.message) ||
@@ -44,8 +54,11 @@ function normalizeRequestError(error, t) {
   const isNetworkError =
     error instanceof TypeError ||
     NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+  const isAnswerGenerationError =
+    ANSWER_GENERATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
 
   if (isNetworkError) return dbMessage;
+  if (isAnswerGenerationError) return fallback;
   if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return dbMessage;
   return raw || fallback;
 }
