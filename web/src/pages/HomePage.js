@@ -11,9 +11,44 @@ import ChatMessages from "../components/chat/ChatMessages";
 import ChatInput from "../components/chat/ChatInput";
 import { postGetAnswer, postAction, fetchUserThreads } from "../services/api";
 import { languageCodeToLabel } from "../config/i18n";
+import { toast } from "../lib/utils";
 
 const DEFAULT_SIMILARITY = 0.3;
 const LS_MSGS_PREFIX = "chat_msgs_";
+
+const NETWORK_ERROR_PATTERNS = [
+  /failed to fetch/i,
+  /network\s?error/i,
+  /load failed/i,
+];
+
+const DB_ERROR_PATTERNS = [
+  /データベース/i,
+  /\bdb\b/i,
+  /\bdatabase\b/i,
+  /psycopg/i,
+  /connection refused/i,
+  /could not connect/i,
+  /connection to server/i,
+  /server closed the connection/i,
+];
+
+function normalizeRequestError(error, t) {
+  const fallback = t?.failtogetanswer || "回答の取得に失敗しました";
+  const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
+  const raw = String(
+    (error && typeof error === "object" && "message" in error && error.message) ||
+      error ||
+      ""
+  ).trim();
+  const isNetworkError =
+    error instanceof TypeError ||
+    NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+
+  if (isNetworkError) return dbMessage;
+  if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return dbMessage;
+  return raw || fallback;
+}
 
 export default function HomePage() {
   const { language, t, threadHook } = useOutletContext();
@@ -203,8 +238,10 @@ export default function HomePage() {
       } catch {}
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== "typing"));
+      const normalizedMessage = normalizeRequestError(e, t);
       setErrorMessageKey("");
-      setErrorMessage(e.message);
+      setErrorMessage(normalizedMessage);
+      toast.error(normalizedMessage, { duration: 4000 });
     } finally {
       setLoading(false);
     }
@@ -269,8 +306,10 @@ export default function HomePage() {
       }
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== "action-typing"));
+      const normalizedMessage = normalizeRequestError(e, t);
       setErrorMessageKey("");
-      setErrorMessage(e.message || String(e));
+      setErrorMessage(normalizedMessage);
+      toast.error(normalizedMessage, { duration: 4000 });
     } finally {
       setActionLoading(false);
     }
