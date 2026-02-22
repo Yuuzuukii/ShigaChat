@@ -67,8 +67,13 @@ function normalizeActionError(error, actionType, t) {
   const isNetworkError =
     error instanceof TypeError ||
     NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+  const isActionInternalError =
+    /^action failed:/i.test(raw) ||
+    /openai/i.test(raw) ||
+    /api[-_\s]?key/i.test(raw);
 
   if (isNetworkError) return fallback;
+  if (isActionInternalError) return fallback;
   if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return fallback;
   return raw || fallback;
 }
