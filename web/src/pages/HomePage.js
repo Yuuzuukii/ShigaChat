@@ -50,6 +50,29 @@ function normalizeRequestError(error, t) {
   return raw || fallback;
 }
 
+function getActionErrorFallback(actionType, t) {
+  if (actionType === "translate") return t?.translationFailed || "翻訳に失敗しました";
+  if (actionType === "summarize") return t?.summarizeFailed || "要約に失敗しました";
+  if (actionType === "simplify") return t?.rewriteFailed || "書き換えに失敗しました";
+  return t?.failtogetanswer || "回答の取得に失敗しました";
+}
+
+function normalizeActionError(error, actionType, t) {
+  const fallback = getActionErrorFallback(actionType, t);
+  const raw = String(
+    (error && typeof error === "object" && "message" in error && error.message) ||
+      error ||
+      ""
+  ).trim();
+  const isNetworkError =
+    error instanceof TypeError ||
+    NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+
+  if (isNetworkError) return fallback;
+  if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return fallback;
+  return raw || fallback;
+}
+
 export default function HomePage() {
   const { language, t, threadHook } = useOutletContext();
   const navigate = useNavigate();
@@ -282,7 +305,7 @@ export default function HomePage() {
       }, { onUnauthorized });
 
       if (!res.ok) {
-        let msg = t.failtogetanswer;
+        let msg = getActionErrorFallback(type, t);
         try { const err = await res.json(); msg = err?.detail || msg; } catch {}
         throw new Error(msg);
       }
@@ -306,7 +329,7 @@ export default function HomePage() {
       }
     } catch (e) {
       setMessages((prev) => prev.filter((m) => m.id !== "action-typing"));
-      const normalizedMessage = normalizeRequestError(e, t);
+      const normalizedMessage = normalizeActionError(e, type, t);
       setErrorMessageKey("");
       setErrorMessage(normalizedMessage);
       toast.error(normalizedMessage, { duration: 4000 });
