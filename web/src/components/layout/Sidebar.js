@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { Home, Search, Layers, Plus, MoreHorizontal, Pencil, Trash2, Check, X as XIcon, LogOut } from "lucide-react";
 import { Sidebar as SidebarUI, SidebarHeader, SidebarContent } from "../ui/sidebar";
 import Tooltip from "../common/Tooltip";
+import ConfirmDialog from "../common/ConfirmDialog";
 
 export default function AppSidebar({
   isOpen, user, threads, activeThreadId, t,
@@ -22,6 +23,7 @@ export default function AppSidebar({
   const [editingThreadId, setEditingThreadId] = useState(null);
   const [editingTitle, setEditingTitle] = useState("");
   const editInputRef = useRef(null);
+  const [deleteTargetThread, setDeleteTargetThread] = useState(null);
 
   // User menu
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -62,9 +64,14 @@ export default function AppSidebar({
   const cancelInlineRename = () => { setEditingThreadId(null); setEditingTitle(""); };
 
   const handleDeleteThread = async (thread) => {
-    const deleted = await onDeleteThread(thread.id);
+    const deleted = await onDeleteThread(thread.id, { skipConfirm: true });
     if (deleted) {
       toast.success(t?.threadDeletedSuccess || "スレッドを削除しました", { duration: 3000 });
+    } else {
+      toast.error(t?.threadDeletedError || "スレッドの削除に失敗しました", {
+        description: t?.threadDeletedErrorDescription || "エラーが発生しました。もう一度お試しください。",
+        duration: 4000,
+      });
     }
     setOpenThreadMenuId(null);
   };
@@ -209,13 +216,30 @@ export default function AppSidebar({
           </button>
           <button className="mt-0.5 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => {
             const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
-            if (th) handleDeleteThread(th);
+            if (th) {
+              setDeleteTargetThread(th);
+              setOpenThreadMenuId(null);
+            }
           }}>
             <Trash2 className="h-4 w-4" />
             <span>{t?.delete || "削除"}</span>
           </button>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleteTargetThread}
+        title={t?.confirmDeleteThread || "スレッドを削除しますか？"}
+        message={deleteTargetThread?.title || ""}
+        confirmLabel={t?.delete || "削除"}
+        cancelLabel={t?.cancel || "キャンセル"}
+        onCancel={() => setDeleteTargetThread(null)}
+        onConfirm={async () => {
+          const target = deleteTargetThread;
+          setDeleteTargetThread(null);
+          if (target) await handleDeleteThread(target);
+        }}
+      />
     </>
   );
 }
