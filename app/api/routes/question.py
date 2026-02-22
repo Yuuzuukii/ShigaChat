@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
 from config import language_mapping
 from database_utils import get_db_cursor, get_placeholder
@@ -23,6 +24,42 @@ _OPENAI_KEY_MISSING_MESSAGES = {
     "Español": "La clave de API no está configurada",
     "Tagalog": "Hindi naka-set ang API key",
     "Bahasa Indonesia": "Kunci API belum disetel",
+}
+
+_LANG_TRANSLATION_ERROR_PREFIX = {
+    "日本語": "言語または翻訳エラー: {detail}",
+    "English": "Language or translation error: {detail}",
+    "Tiếng Việt": "Lỗi ngôn ngữ hoặc dịch thuật: {detail}",
+    "中文": "语言或翻译错误：{detail}",
+    "한국어": "언어 또는 번역 오류: {detail}",
+    "Português": "Erro de idioma ou tradução: {detail}",
+    "Español": "Error de idioma o traducción: {detail}",
+    "Tagalog": "Error sa wika o pagsasalin: {detail}",
+    "Bahasa Indonesia": "Kesalahan bahasa atau terjemahan: {detail}",
+}
+
+_LANG_DETECTION_FAILED_MESSAGES = {
+    "日本語": "言語を特定できませんでした。",
+    "English": "Could not detect the language.",
+    "Tiếng Việt": "Không thể xác định ngôn ngữ.",
+    "中文": "无法识别语言。",
+    "한국어": "언어를 식별할 수 없습니다.",
+    "Português": "Não foi possível detectar o idioma.",
+    "Español": "No se pudo detectar el idioma.",
+    "Tagalog": "Hindi matukoy ang wika.",
+    "Bahasa Indonesia": "Tidak dapat mendeteksi bahasa.",
+}
+
+_UNSUPPORTED_LANGUAGE_MESSAGES = {
+    "日本語": "未対応の言語です: {code}",
+    "English": "Unsupported language: {code}",
+    "Tiếng Việt": "Ngôn ngữ chưa được hỗ trợ: {code}",
+    "中文": "不支持的语言：{code}",
+    "한국어": "지원되지 않는 언어입니다: {code}",
+    "Português": "Idioma não suportado: {code}",
+    "Español": "Idioma no compatible: {code}",
+    "Tagalog": "Hindi suportadong wika: {code}",
+    "Bahasa Indonesia": "Bahasa tidak didukung: {code}",
 }
 
 _THREAD_TITLE_MAX_CHARS_BY_LANG = {
@@ -71,6 +108,41 @@ def _localize_runtime_error(detail: str, spoken_language: str) -> str:
             _OPENAI_KEY_MISSING_MESSAGES["English"],
         )
     return detail
+
+
+def _localize_value_error(detail: str, spoken_language: str) -> str:
+    msg = (detail or "").strip()
+
+    # detect.py: detect_language() errors
+    if msg == "言語を特定できませんでした。":
+        return _LANG_DETECTION_FAILED_MESSAGES.get(
+            spoken_language,
+            _LANG_DETECTION_FAILED_MESSAGES["English"],
+        )
+
+    unsupported_match = re.match(r"^未対応の言語です:\s*(.+)$", msg)
+    if unsupported_match:
+        code = unsupported_match.group(1).strip()
+        template = _UNSUPPORTED_LANGUAGE_MESSAGES.get(
+            spoken_language,
+            _UNSUPPORTED_LANGUAGE_MESSAGES["English"],
+        )
+        return template.format(code=code)
+
+    missing_code_match = re.match(r"^languageテーブルにコード\s+(.+?)\s+が存在しません。$", msg)
+    if missing_code_match:
+        code = missing_code_match.group(1).strip()
+        template = _UNSUPPORTED_LANGUAGE_MESSAGES.get(
+            spoken_language,
+            _UNSUPPORTED_LANGUAGE_MESSAGES["English"],
+        )
+        return template.format(code=code)
+
+    template = _LANG_TRANSLATION_ERROR_PREFIX.get(
+        spoken_language,
+        _LANG_TRANSLATION_ERROR_PREFIX["English"],
+    )
+    return template.format(detail=msg or "Unknown error")
 
 
 def _ensure_threads_has_thread_title_column() -> None:
@@ -388,7 +460,10 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
 
     # ---- 例外ハンドリング（運用時に応じて整理） -----------------------------------
     except ValueError as e:
-        error_detail = f"Language or translation error: {str(e)}"
+        error_detail = _localize_value_error(
+            str(e),
+            current_user.get("spoken_language", "English"),
+        )
         print(f"❌ {error_detail}")
         raise HTTPException(status_code=400, detail=error_detail)
     except RuntimeError as e:
