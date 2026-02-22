@@ -16,6 +16,7 @@ export default function KeywordSearchPage() {
   const { language, t } = useOutletContext();
 
   const [keyword, setKeyword] = useState("");
+  const [keywordError, setKeywordError] = useState("");
   const [results, setResults] = useState([]);
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
@@ -44,9 +45,10 @@ export default function KeywordSearchPage() {
 
   const handleSearch = async () => {
     if (!keyword.trim()) {
-      alert(t.enterKeyword);
+      setKeywordError(t.keywordRequired || "キーワードを入力してください");
       return;
     }
+    setKeywordError("");
 
     setHasSearched(true);
     setLastSearchedTerm(keyword.trim());
@@ -112,7 +114,10 @@ export default function KeywordSearchPage() {
                   type="text"
                   placeholder={t.enterKeyword}
                   value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
+                  onChange={(e) => {
+                    setKeyword(e.target.value);
+                    if (keywordError) setKeywordError("");
+                  }}
                   onKeyDown={onKeyDown}
                   className="w-full rounded-lg border border-blue-200 bg-white px-4 py-3 text-zinc-800 shadow-inner focus:outline-none focus:ring-2 focus:ring-blue-300"
                 />
@@ -123,6 +128,11 @@ export default function KeywordSearchPage() {
                   {t.search}
                 </button>
               </div>
+              {keywordError && (
+                <div className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {keywordError}
+                </div>
+              )}
             </div>
 
             {/* 検索ワード表示 */}
