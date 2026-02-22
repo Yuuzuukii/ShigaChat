@@ -10,6 +10,7 @@ import { useParams, useNavigate, useSearchParams, useOutletContext } from "react
 import { fetchCategoryTranslation, fetchCategoryQuestions, addHistory as addHistoryApi } from "../services/api";
 import { categoryList } from "../config/categories";
 import RichText from "../components/common/RichText";
+import { toast } from "../lib/utils";
 import {
   IdCard, HeartHandshake, Stethoscope, PiggyBank, Briefcase,
   GraduationCap, Heart, Baby, Home, Receipt, HelpingHand,
@@ -85,7 +86,11 @@ export default function CategoryDetailPage() {
         if (!cancelled) setQuestions(qaData.questions || []);
       } catch (error) {
         console.error("カテゴリ詳細エラー:", error);
-        if (!cancelled) setQuestions([]);
+        if (!cancelled) {
+          setQuestions([]);
+          const message = String(error?.message || "").trim() || t.qaFetchError;
+          toast.error(message, { duration: 4000 });
+        }
       }
     }
 
