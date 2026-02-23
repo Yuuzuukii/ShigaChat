@@ -103,6 +103,7 @@ async function readResponseErrorMessage(response) {
 
 function normalizeRequestError(error, t) {
   const fallback = t?.answerGenerationFailed || "回答を生成できませんでした";
+  const serverMessage = t?.errorServerConnection || "サーバーに接続できません";
   const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
   const raw = errorLikeToString(error);
   const isNetworkError =
@@ -113,7 +114,7 @@ function normalizeRequestError(error, t) {
   const isLanguageOrTranslationError =
     LANGUAGE_TRANSLATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
 
-  if (isNetworkError) return dbMessage;
+  if (isNetworkError) return serverMessage;
   if (isLanguageOrTranslationError) return t?.languageOrTranslationError || fallback;
   if (isAnswerGenerationError) return fallback;
   if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return dbMessage;

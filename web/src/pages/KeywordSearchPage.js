@@ -10,7 +10,7 @@ import { useOutletContext } from "react-router-dom";
 import { searchKeyword, addHistory as addHistoryApi } from "../services/api";
 import { categoryList } from "../config/categories";
 import RichText from "../components/common/RichText";
-import { FileText, Clock, Search as SearchIcon } from "lucide-react";
+import { Search as SearchIcon } from "lucide-react";
 import { toast } from "../lib/utils";
 
 function normalizeErrorDetail(detail) {
@@ -215,18 +215,20 @@ export default function KeywordSearchPage() {
                 }`}
               >
                 {results.length > 0 ? (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     {results.map((question) => (
                       <div
                         key={question.question_id}
                         id={`question-${question.question_id}`}
                         onClick={() => toggleAnswer(question.question_id)}
-                        className="cursor-pointer rounded-lg bg-zinc-50 p-4 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm"
+                        className="cursor-pointer rounded-lg bg-zinc-50 p-6 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm min-h-[120px]"
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex items-start gap-2 text-base font-semibold text-zinc-900 min-w-0 flex-1">
-                            <FileText className="h-4 w-4 text-zinc-500 mt-1 flex-shrink-0" />
-                            <div className="flex-1 min-w-0">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
+                            <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </svg>
+                            <div className="flex-1 min-w-0 leading-relaxed">
                               <RichText content={question.question_text || t.loading} />
                             </div>
                           </div>
@@ -237,15 +239,17 @@ export default function KeywordSearchPage() {
                           )}
                         </div>
 
-                        <div className="mt-1 text-sm text-zinc-500">
+                        <div className="mt-2 text-sm text-zinc-500">
                           {t.category}:{" "}
                           {categoryList?.find((cat) => cat.id === question.category_id)?.name?.[language] ||
                             categoryList?.find((cat) => cat.id === question.category_id)?.name?.ja ||
                             t.unknownCategory}
                         </div>
 
-                        <div className="mt-1 flex items-center justify-end gap-1 text-xs text-zinc-500">
-                          <Clock className="h-3 w-3 text-zinc-500" />
+                        <div className="mt-3 flex items-center justify-end gap-1 text-sm text-zinc-500">
+                          <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
                           <span>
                             {t.questionDate}
                             {new Date((question.update_time || "").replace(" ", "T")).toLocaleString()}
@@ -253,9 +257,9 @@ export default function KeywordSearchPage() {
                         </div>
 
                         {visibleAnswerId === question.question_id && (
-                          <div className="mt-3 rounded-md bg-blue-50/50 p-3 text-zinc-800">
-                            <div className="text-sm font-semibold text-zinc-700">{t.answer}</div>
-                            <div className="mt-1 text-sm leading-7 whitespace-pre-wrap break-words">
+                          <div className="mt-4 rounded-md bg-blue-50/50 p-4 text-zinc-800">
+                            <div className="text-sm font-semibold text-zinc-700 mb-2">{t.answer}</div>
+                            <div className="text-base leading-8 whitespace-pre-wrap break-words">
                               <RichText content={question.answer_text || t.loading} />
                             </div>
                           </div>
