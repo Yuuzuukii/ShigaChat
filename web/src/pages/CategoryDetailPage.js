@@ -34,6 +34,9 @@ const categoryIcons = {
   "category-sonota": Tag,
 };
 
+const ERROR_CATEGORY_NOT_FOUND = "category_not_found";
+const ERROR_QA_FETCH_FAILED = "qa_fetch_failed";
+
 export default function CategoryDetailPage() {
   const { categoryId } = useParams();
   const { language, t } = useOutletContext();
@@ -70,7 +73,10 @@ export default function CategoryDetailPage() {
       try {
         // カテゴリ名取得
         const catRes = await fetchCategoryTranslation(categoryId);
-        if (!catRes.ok) throw new Error(t.categorynotfound);
+        if (!catRes.ok) {
+          if (catRes.status === 404) throw new Error(ERROR_CATEGORY_NOT_FOUND);
+          throw new Error(ERROR_QA_FETCH_FAILED);
+        }
         const catData = await catRes.json();
         const rawName = catData["カテゴリ名"];
         const nameText =
@@ -81,14 +87,18 @@ export default function CategoryDetailPage() {
 
         // Q&A取得
         const qaRes = await fetchCategoryQuestions(categoryId, language);
-        if (!qaRes.ok) throw new Error(t.qaFetchError);
+        if (!qaRes.ok) throw new Error(ERROR_QA_FETCH_FAILED);
         const qaData = await qaRes.json();
         if (!cancelled) setQuestions(qaData.questions || []);
       } catch (error) {
         console.error("カテゴリ詳細エラー:", error);
         if (!cancelled) {
           setQuestions([]);
-          const message = String(error?.message || "").trim() || t.qaFetchError;
+          const code = String(error?.message || "").trim();
+          const message =
+            code === ERROR_CATEGORY_NOT_FOUND
+              ? (t?.categorynotfound || "カテゴリが見つかりません。")
+              : (t?.qaFetchError || "Q&Aの取得に失敗しました");
           toast.error(message, { duration: 4000 });
         }
       }

@@ -29,12 +29,9 @@ function TokenExpiredHandler() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const handleTokenExpired = (event) => {
+    const handleTokenExpired = () => {
       console.warn("🔒 トークンが切れました。ログインページにリダイレクトします。");
-      const redirectPath = event.detail?.redirectPath;
-      if (redirectPath && redirectPath !== "/login" && redirectPath !== "/") {
-        localStorage.setItem("redirectAfterLogin", redirectPath);
-      }
+      try { localStorage.removeItem("redirectAfterLogin"); } catch {}
       navigate("/login");
     };
 

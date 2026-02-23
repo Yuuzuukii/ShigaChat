@@ -43,21 +43,78 @@ const ANSWER_GENERATION_ERROR_PATTERNS = [
   /model/i,
 ];
 
-function normalizeRequestError(error, t) {
-  const fallback = t?.answerGenerationFailed || "回答を生成できませんでした";
-  const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
-  const raw = String(
+const LANGUAGE_TRANSLATION_ERROR_PATTERNS = [
+  /language or translation error/i,
+  /言語または翻訳エラー/i,
+  /未対応の言語です/i,
+  /unsupported language/i,
+  /could not detect the language/i,
+  /言語を特定できませんでした/i,
+];
+
+function errorLikeToString(error) {
+  return String(
     (error && typeof error === "object" && "message" in error && error.message) ||
       error ||
       ""
   ).trim();
+}
+
+function normalizeErrorDetail(detail) {
+  if (typeof detail === "string") return detail.trim();
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => {
+        if (typeof item === "string") return item.trim();
+        if (item && typeof item === "object") {
+          if (typeof item.msg === "string") return item.msg.trim();
+          if (typeof item.message === "string") return item.message.trim();
+        }
+        return "";
+      })
+      .filter(Boolean)
+      .join(" ")
+      .trim();
+  }
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") return detail.message.trim();
+    if (typeof detail.msg === "string") return detail.msg.trim();
+    try { return JSON.stringify(detail); } catch {}
+  }
+  return "";
+}
+
+async function readResponseErrorMessage(response) {
+  try {
+    const payload = await response.clone().json();
+    const fromJson = normalizeErrorDetail(
+      payload?.detail ?? payload?.error ?? payload?.message ?? payload
+    );
+    if (fromJson) return fromJson;
+  } catch {}
+
+  try {
+    const text = (await response.text()).trim();
+    if (text) return text;
+  } catch {}
+
+  return "";
+}
+
+function normalizeRequestError(error, t) {
+  const fallback = t?.answerGenerationFailed || "回答を生成できませんでした";
+  const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
+  const raw = errorLikeToString(error);
   const isNetworkError =
     error instanceof TypeError ||
     NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
   const isAnswerGenerationError =
     ANSWER_GENERATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+  const isLanguageOrTranslationError =
+    LANGUAGE_TRANSLATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
 
   if (isNetworkError) return dbMessage;
+  if (isLanguageOrTranslationError) return t?.languageOrTranslationError || fallback;
   if (isAnswerGenerationError) return fallback;
   if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return dbMessage;
   return raw || fallback;
@@ -72,11 +129,7 @@ function getActionErrorFallback(actionType, t) {
 
 function normalizeActionError(error, actionType, t) {
   const fallback = getActionErrorFallback(actionType, t);
-  const raw = String(
-    (error && typeof error === "object" && "message" in error && error.message) ||
-      error ||
-      ""
-  ).trim();
+  const raw = errorLikeToString(error);
   const isNetworkError =
     error instanceof TypeError ||
     NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
@@ -229,9 +282,8 @@ export default function HomePage() {
 
       const res = await postGetAnswer(payload, { onUnauthorized });
       if (!res.ok) {
-        let msg = t.failtogetanswer;
-        try { const err = await res.json(); msg = err?.detail || msg; } catch {}
-        throw new Error(msg);
+        const detail = await readResponseErrorMessage(res);
+        throw new Error(detail || t?.failtogetanswer || "回答の取得に失敗しました");
       }
       const data = await res.json();
 
@@ -323,9 +375,8 @@ export default function HomePage() {
       }, { onUnauthorized });
 
       if (!res.ok) {
-        let msg = getActionErrorFallback(type, t);
-        try { const err = await res.json(); msg = err?.detail || msg; } catch {}
-        throw new Error(msg);
+        const detail = await readResponseErrorMessage(res);
+        throw new Error(detail || getActionErrorFallback(type, t));
       }
       const data = await res.json();
       const asstMsg = { id: crypto.randomUUID(), role: "assistant", content: data?.result || "", time: new Date().toISOString() };

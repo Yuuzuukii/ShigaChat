@@ -65,9 +65,8 @@ export default function LoginPage() {
   // ログイン済みならリダイレクト
   useEffect(() => {
     if (user) {
-      const redirectPath = localStorage.getItem("redirectAfterLogin");
-      localStorage.removeItem("redirectAfterLogin");
-      navigate(redirectPath && redirectPath !== "/login" && redirectPath !== "/" ? redirectPath : "/home", { replace: true });
+      try { localStorage.removeItem("redirectAfterLogin"); } catch {}
+      navigate("/home", { replace: true });
     }
   }, [user, navigate]);
 
@@ -101,9 +100,8 @@ export default function LoginPage() {
       setUser(mapped);
       try { localStorage.setItem("user", JSON.stringify(mapped)); } catch {}
 
-      const redirectPath = localStorage.getItem("redirectAfterLogin");
-      localStorage.removeItem("redirectAfterLogin");
-      navigate(redirectPath && redirectPath !== "/login" && redirectPath !== "/" ? redirectPath : "/home", { replace: true });
+      try { localStorage.removeItem("redirectAfterLogin"); } catch {}
+      navigate("/home", { replace: true });
     } catch (error) {
       setErrorMessageKey("errorServerConnection");
       console.error("ログインエラー:", error);

@@ -11,6 +11,45 @@ import { searchKeyword, addHistory as addHistoryApi } from "../services/api";
 import { categoryList } from "../config/categories";
 import RichText from "../components/common/RichText";
 import { FileText, Clock, Search as SearchIcon } from "lucide-react";
+import { toast } from "../lib/utils";
+
+function normalizeErrorDetail(detail) {
+  if (typeof detail === "string") return detail.trim();
+  if (Array.isArray(detail)) return detail.map((item) => String(item ?? "")).join(" ").trim();
+  if (detail && typeof detail === "object") {
+    if (typeof detail.message === "string") return detail.message.trim();
+    if (typeof detail.msg === "string") return detail.msg.trim();
+  }
+  return "";
+}
+
+async function readResponseErrorMessage(response) {
+  try {
+    const payload = await response.clone().json();
+    const fromJson = normalizeErrorDetail(
+      payload?.detail ?? payload?.error ?? payload?.message ?? payload
+    );
+    if (fromJson) return fromJson;
+  } catch {}
+
+  try {
+    const text = (await response.text()).trim();
+    if (text) return text;
+  } catch {}
+
+  return "";
+}
+
+function isNoResultError(status, message) {
+  if (status === 404) return true;
+  const raw = String(message || "");
+  return (
+    /該当する.*見つかりません/i.test(raw) ||
+    /no matching/i.test(raw) ||
+    /not found/i.test(raw) ||
+    /見つかりません/i.test(raw)
+  );
+}
 
 export default function KeywordSearchPage() {
   const { language, t } = useOutletContext();
@@ -20,6 +59,7 @@ export default function KeywordSearchPage() {
   const [results, setResults] = useState([]);
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [showNoResults, setShowNoResults] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [lastSearchedTerm, setLastSearchedTerm] = useState("");
   const [mounted, setMounted] = useState(false);
@@ -44,26 +84,39 @@ export default function KeywordSearchPage() {
   }, [hasSearched]);
 
   const handleSearch = async () => {
-    if (!keyword.trim()) {
+    const trimmedKeyword = keyword.trim();
+    if (!trimmedKeyword) {
       setKeywordError(t.keywordRequired || "キーワードを入力してください");
       return;
     }
     setKeywordError("");
+    setShowNoResults(false);
 
     setHasSearched(true);
-    setLastSearchedTerm(keyword.trim());
+    setLastSearchedTerm(trimmedKeyword);
 
     try {
-      const response = await searchKeyword(keyword);
+      const normalizedKeyword =
+        language === "en" ? trimmedKeyword.toLowerCase() : trimmedKeyword;
+      const response = await searchKeyword(normalizedKeyword);
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || t.noResults);
+        const detail = await readResponseErrorMessage(response);
+        if (isNoResultError(response.status, detail)) {
+          setResults([]);
+          setShowNoResults(true);
+          return;
+        }
+        throw new Error(detail || t.keyworderror || "検索に失敗しました");
       }
       const data = await response.json();
-      setResults(Array.isArray(data) ? data : []);
+      const normalized = Array.isArray(data) ? data : [];
+      setResults(normalized);
+      setShowNoResults(normalized.length === 0);
     } catch (error) {
       console.error("検索エラー:", error?.message || error);
-      alert(t.keyworderror);
+      setResults([]);
+      setShowNoResults(false);
+      toast.error(t.keyworderror || "検索に失敗しました", { duration: 4000 });
     }
   };
 
@@ -210,9 +263,9 @@ export default function KeywordSearchPage() {
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : showNoResults ? (
                   <p className="text-center text-sm text-zinc-500">{t.noResults}</p>
-                )}
+                ) : null}
               </div>
             )}
           </div>

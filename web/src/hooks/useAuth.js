@@ -11,13 +11,8 @@ export function useAuth({ requireAuth = true } = {}) {
   const navigate = useNavigate();
 
   const redirectToLogin = useCallback(
-    (customPath = null) => {
-      try {
-        const path = customPath || window.location.pathname + window.location.search;
-        if (path && path !== "/login" && path !== "/" && !path.startsWith("/register")) {
-          localStorage.setItem("redirectAfterLogin", path);
-        }
-      } catch {}
+    () => {
+      try { localStorage.removeItem("redirectAfterLogin"); } catch {}
       navigate("/login");
     },
     [navigate]

@@ -30,15 +30,12 @@ export const UserProvider = ({ children }) => {
       .then((res) => {
         if (res.status === 401) {
           console.warn("⚠️ 401 Unauthorized - トークンを削除");
-          const currentPath = window.location?.pathname + window.location?.search;
-          if (currentPath && currentPath !== "/login" && currentPath !== "/") {
-            localStorage.setItem("redirectAfterLogin", currentPath);
-          }
+          try { localStorage.removeItem("redirectAfterLogin"); } catch {}
           setToken(null);
           localStorage.removeItem("token");
           localStorage.removeItem("user");
           if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("tokenExpired", { detail: { redirectPath: currentPath } }));
+            window.dispatchEvent(new CustomEvent("tokenExpired"));
           }
           throw new Error("認証エラー: トークンが無効です");
         }

@@ -1,23 +1,16 @@
 // Centralized login redirection helper
-export function redirectToLogin(navigate, customPath = null) {
+export function redirectToLogin(navigate) {
   try {
-    // customPathが指定されている場合はそれを使用、そうでなければ現在のパスを使用
-    const path = customPath || (window.location?.pathname + window.location?.search);
-    
-    // ログインページや新規登録ページ以外の場合のみリダイレクト先として保存
-    if (path && path !== "/new" && path !== "/" && !path.startsWith("/new")) {
-      localStorage.setItem("redirectAfterLogin", path);
-      console.log("📍 リダイレクト先を保存:", path);
-    }
+    localStorage.removeItem("redirectAfterLogin");
   } catch (error) {
-    console.warn("リダイレクト先の保存に失敗:", error);
+    console.warn("リダイレクト情報の削除に失敗:", error);
   }
   
   if (navigate) {
-    navigate("/new");
+    navigate("/login");
   } else {
     // navigateが利用できない場合は直接リダイレクト
-    window.location.href = "/new";
+    window.location.href = "/login";
   }
 }
 
@@ -29,8 +22,8 @@ export function handle401Error(navigate, error, customPath = null) {
   localStorage.removeItem("token");
   localStorage.removeItem("user");
   
-  // リダイレクト先を保存してログインページに移動
-  redirectToLogin(navigate, customPath);
+  // ログインページに移動
+  redirectToLogin(navigate);
   
   // トークン切れイベントを発火
   if (typeof window !== "undefined") {
@@ -74,4 +67,3 @@ export async function fetchWithAuth(url, options = {}, navigate = null) {
     throw error;
   }
 }
-
