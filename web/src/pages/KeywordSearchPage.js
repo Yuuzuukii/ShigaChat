@@ -211,7 +211,7 @@ export default function KeywordSearchPage() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-center text-sm text-zinc-500">{t.noQuestions}</p>
+                  <p className="text-center text-sm text-zinc-500">{t.noResults}</p>
                 )}
               </div>
             )}
