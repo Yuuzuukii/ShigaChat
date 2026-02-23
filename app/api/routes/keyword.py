@@ -1,4 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends
+import re
 from database_utils import get_db_cursor, get_placeholder
 from api.routes.user import current_user_info
 
@@ -25,10 +26,10 @@ async def search_keywords(keywords: str, current_user: dict = Depends(current_us
 
         language_id = language_row['id']
 
-    # キーワードを分割
+    # キーワードを分割（半角/全角スペース対応 + 空要素除外）
     tmp_keyword_list = keywords.split(" ")
     for keyword in tmp_keyword_list:
-        keyword_list.extend(keyword.split("　"))
+        keyword_list.extend([k for k in keyword.split("　") if k])
 
     # キーワードの言語で検索を実行
     for keyword in keyword_list:
@@ -37,12 +38,25 @@ async def search_keywords(keywords: str, current_user: dict = Depends(current_us
     # 検出された文を処理する
     if results:
         for result in results:
-            combined_text = result["question_text"] + result["answer_text"]
-            match_count = sum(keyword in combined_text for keyword in keyword_list)
+            combined_text = f"{result['question_text']}{result['answer_text']}"
+            combined_text_fold = combined_text.casefold()
+            match_count = sum(
+                keyword.casefold() in combined_text_fold
+                for keyword in keyword_list
+            )
             result["match_count"] = match_count
             for keyword in keyword_list:
-                result["question_text"] = result["question_text"].replace(keyword, f"<strong>{keyword}</strong>")
-                result["answer_text"] = result["answer_text"].replace(keyword, f"<strong>{keyword}</strong>")
+                if not keyword:
+                    continue
+                pattern = re.compile(re.escape(keyword), flags=re.IGNORECASE)
+                result["question_text"] = pattern.sub(
+                    lambda m: f"<strong>{m.group(0)}</strong>",
+                    result["question_text"],
+                )
+                result["answer_text"] = pattern.sub(
+                    lambda m: f"<strong>{m.group(0)}</strong>",
+                    result["answer_text"],
+                )
         sorted_results = sorted(results, key=lambda x: x["match_count"], reverse=True)
 
         # 重複する結果を削除
@@ -84,7 +98,7 @@ def search_keyword(keyword: str, language_id: int):
             JOIN question_translation ON QA.question_id = question_translation.question_id AND question_translation.language_id = {ph}
             JOIN question ON QA.question_id = question.question_id
             JOIN category ON question.category_id = category.id
-            WHERE question_translation.texts LIKE {ph} OR answer_translation.texts LIKE {ph}
+            WHERE question_translation.texts ILIKE {ph} OR answer_translation.texts ILIKE {ph}
         """, (language_id, language_id, keyword, keyword))
         search_results = cursor.fetchall()
         
