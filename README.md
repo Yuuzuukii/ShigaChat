@@ -5,7 +5,7 @@
 ChatGPTと検索拡張生成（RAG）を組み合わせることで、日常生活に関する質問に対して、迅速かつ地域特化の回答を提供する。
 ユーザの質問に対し、RAGは関連する既存のQ&Aデータベースを検索・参照し、ChatGPTにテキストを渡す。渡されたテキストをChatGPTが自然な形で回答生成し、ユーザに返す。
 
-対応言語：日本語、英語、ベトナム語、中国語、韓国語
+対応言語：日本語、English、Tiếng Việt、中文、한국어、Português、Español、Tagalog、Bahasa Indonesia
 
 ## 作成にあたってこだわった点、注意した点
 ユーザ体験の向上：質問の投稿から回答までの流れを直感的に設計。画面遷移や操作性に配慮し、初めて使う外国人ユーザでも使いやすいUIを意識。
@@ -20,27 +20,55 @@ URL: https://www.s-i-a.or.jp/qa
 
 1. 🌱 環境変数の設定
 
-	このプロジェクトでは、APIキーや秘密情報を `.env` ファイルに記述しています。
-	
-	.envファイルを作成し、以下の記述を行なってください。（実際のキーを入力してください。）
-	
-	```.env
-	OPENAI_API_KEY=your_openai_api_key_here
-	
-	SECRET_KEY=your_secret_key_here #ハッシュ用パスワード
-	```
- 
-  2. dockerセットアップ
+このプロジェクトでは、APIキーやDB接続情報を `.env` に設定します。
+プロジェクトルートに `.env` を作成し、以下を設定してください。
 
-		このプロジェクトはdockerを用いた仮想環境を構築することで動作します。docker composeが使用できるか確認してから、以下のコマンドをターミナル上で実行してください。
-	 
-		```
-	 	docker compose build
-		
-	 	docker compose up -d
-		```
-	 
-		以上を実行するとuvicorn（アプリケーション）とnginx（フロントエンド）、MySQL（データベース）が構築されます。フロントエンド側（nginx）のポートをブラウザで開いてください。
+```env
+# Required
+OPENAI_API_KEY=your_openai_api_key_here
+SECRET_KEY=your_secret_key_here
 
+PG_HOST=postgres
+PG_PORT=5432
+PG_DATABASE=shigachat
+PG_USER=postgres
+PG_PASSWORD=your_strong_password
 
-aaa
+# Optional (未設定時はデフォルト値を使用)
+NGINX_PORT=80
+LLM_MODEL=gpt-5-nano
+EMBEDDING_MODEL=text-embedding-3-small
+EMBEDDING_DIM=1536
+```
+
+2. 🐳 Dockerセットアップ
+
+Docker Composeが利用できることを確認し、以下を実行してください。
+
+```bash
+docker compose build
+docker compose up -d
+docker compose ps
+```
+
+`uvicorn`（アプリ）、`nginx`（フロント）、`postgres`（データベース）が起動します。
+
+3. 🗄️ データベースセットアップ（初回必須）
+
+初期スキーマと初期データを投入します。
+
+```bash
+./scripts/restore_postgres.sh --confirm
+```
+
+上記は `scripts/shigachat_dump.sql` を使ってDBを復元します（既存データは上書きされます）。
+別ファイルを使う場合は次のように指定してください。
+
+```bash
+./scripts/restore_postgres.sh --confirm /path/to/backup.sql
+```
+
+4. ✅ 動作確認
+
+- フロントエンド: `http://localhost:${NGINX_PORT:-80}`
+- API: `http://localhost:8000/docs`
