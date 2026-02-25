@@ -3,12 +3,12 @@
 __pycache__/
 *.pyc
 nginx/log/
+nginx/build
 env/
 .python-version
 __pycache__/
 *.py[cod]
 *$py.class
-
 /node_modules# runtime / generated
 *.db
 __pycache__/
