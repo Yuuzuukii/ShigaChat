@@ -67,6 +67,10 @@ jobs:
           cache: npm
           cache-dependency-path: web/package-lock.json
 
+      - name: Clean frontend build cache
+        working-directory: web
+        run: rm -rf build node_modules/.cache
+
       - name: Install dependencies
         working-directory: web
         run: npm ci
