@@ -2,6 +2,7 @@
 .env*
 __pycache__/
 *.pyc
+nginx/
 nginx/log/
 nginx/build
 env/
