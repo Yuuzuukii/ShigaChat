@@ -10,9 +10,12 @@ __pycache__/
 *.py[cod]
 *$py.class
 /node_modules# runtime / generated
+web/node_modules
 *.db
 __pycache__/
 *.pyc
 *.log
 app/app.log
 !app/ShigaChat.db
+backup/
+scripts/

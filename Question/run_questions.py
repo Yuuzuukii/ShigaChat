@@ -42,6 +42,20 @@ def _select_references(meta: Dict[str, Any]) -> List[Dict[str, Any]]:
     return refs
 
 
+def _select_qa_ids(meta: Dict[str, Any]) -> List[int]:
+    refs = _select_references(meta)
+    qa_ids: List[int] = []
+    for ref in refs:
+        qa_id = ref.get("qa_id")
+        if qa_id is None:
+            continue
+        try:
+            qa_ids.append(int(qa_id))
+        except (TypeError, ValueError):
+            continue
+    return qa_ids
+
+
 def _read_rows(path: str) -> List[Dict[str, str]]:
     with open(path, "r", encoding="utf-8-sig", newline="") as f:
         reader = csv.DictReader(f)
@@ -52,7 +66,7 @@ def _write_answers(path: str, rows: List[Dict[str, str]]) -> None:
     with open(path, "w", encoding="utf-8-sig", newline="") as f:
         writer = csv.DictWriter(
             f,
-            fieldnames=["相談内容", "回答内容", "回答に使用したQA資料"],
+            fieldnames=["相談内容", "回答内容", "回答に使用したQA_id"],
         )
         writer.writeheader()
         for row in rows:
@@ -73,15 +87,15 @@ def process_file(question_path: str) -> str:
         # 日本語での回答を強制
         result = answer_with_rag_pg(question_text, thread_id=None, force_lang="ja")
         meta = result.get("meta", {})
-        refs = _select_references(meta)
+        qa_ids = _select_qa_ids(meta)
         print(f"[{idx}/{total}] Answer: {result.get('text', '')}")
-        print(f"[{idx}/{total}] References: {len(refs)}")
+        print(f"[{idx}/{total}] QA IDs: {len(qa_ids)}")
 
         out_rows.append(
             {
                 "相談内容": question_text,
                 "回答内容": result.get("text", ""),
-                "回答に使用したQA資料": json.dumps(refs, ensure_ascii=False),
+                "回答に使用したQA_id": json.dumps(qa_ids, ensure_ascii=False),
             }
         )
 
