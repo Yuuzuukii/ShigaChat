@@ -28,8 +28,8 @@ def _fmt_summary(summary: Optional[str]) -> List[str]:
 
 def build_prompt_ja(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "あなたは滋賀県国際協会の情報のみを根拠に、事実ベースで簡潔に回答してください。",
-        "各文末に [S#] で出典を示し、JSONで返してください。",
+        "あなたは滋賀県国際協会の情報のみを根拠に、事実ベースで詳しく回答してください。",
+        "[S#] で出典を示し、JSONで返してください。answerには回答を、used_source_idsには使用した出典IDのリストを入れてください。",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -45,8 +45,8 @@ def build_prompt_ja(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_en(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "You are an assistant who answers concisely based only on information about the Shiga International Association.",
-        "Add [S#] citation for each sentence and return JSON only.",
+        "You are an assistant who answers concisely and factually based only on information from the Shiga International Association.",
+        "Cite sources with [S#] and return JSON. 'answer' should contain your response, and 'used_source_ids' should contain the list of source IDs used.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -62,8 +62,8 @@ def build_prompt_en(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_vi(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "Bạn chỉ trả lời dựa trên thông tin về Hiệp hội Quốc tế Shiga, ngắn gọn và có trích dẫn [S#] cho mỗi câu.",
-        "Trả về kết quả dạng JSON.",
+        "Bạn chỉ trả lời dựa trên thông tin về Hiệp hội Quốc tế Shiga, ngắn gọn và dựa trên thực tế.",
+        "Trích dẫn nguồn bằng [S#] và trả về JSON. 'answer' chứa câu trả lời, 'used_source_ids' chứa danh sách ID nguồn đã sử dụng.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -79,7 +79,8 @@ def build_prompt_vi(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_zh(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "你只能依据有关滋贺县国际协会的信息，简洁回答，每句附 [S#] 引用，并以 JSON 返回。",
+        "你只能依据有关滋贺县国际协会的信息，以事实为基础简洁回答。",
+        "使用 [S#] 标注出处，并以 JSON 返回。answer 为回答内容，used_source_ids 为使用的出处ID列表。",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -95,7 +96,8 @@ def build_prompt_zh(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_ko(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "당신은 시가현 국제협회 정보만을 근거로 간결하게 답변합니다. 각 문장에 [S#] 출처를 붙이고 JSON으로 반환하세요.",
+        "당신은 시가현 국제협회 정보만을 근거로 사실 기반으로 간결하게 답변합니다.",
+        "[S#] 로 출처를 표시하고 JSON으로 반환하세요. answer에는 답변을, used_source_ids에는 사용한 출처 ID 목록을 넣으세요.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -111,7 +113,8 @@ def build_prompt_ko(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_pt(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "Responda de forma concisa apenas com informações da Associação Internacional de Shiga, citando [S#] em cada frase. Saída em JSON.",
+        "Você é um assistente que responde de forma concisa e baseada em fatos, apenas com informações da Associação Internacional de Shiga.",
+        "Indique as fontes com [S#] e retorne em JSON. 'answer' deve conter a resposta e 'used_source_ids' a lista de IDs de fontes utilizadas.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -127,7 +130,8 @@ def build_prompt_pt(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_es(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "Responde de forma concisa basándote solo en la Asociación Internacional de Shiga, con citas [S#] en cada frase. Devuelve JSON.",
+        "Eres un asistente que responde de forma concisa y basada en hechos, solo con información de la Asociación Internacional de Shiga.",
+        "Indica las fuentes con [S#] y devuelve en JSON. 'answer' debe contener la respuesta y 'used_source_ids' la lista de IDs de fuentes utilizadas.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -143,7 +147,8 @@ def build_prompt_es(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_tl(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "Sumagot nang maikli batay lamang sa impormasyon tungkol sa Shiga International Association; lagyan ng [S#] bawat pangungusap. Ibalik bilang JSON.",
+        "Sumagot nang maikli at batay sa katotohanan lamang batay sa impormasyon tungkol sa Shiga International Association.",
+        "Ipakita ang pinagkunan gamit ang [S#] at ibalik bilang JSON. Ang 'answer' ay naglalaman ng sagot, at ang 'used_source_ids' ay naglalaman ng listahan ng mga ginamit na ID ng pinagkunan.",
         "",
     ]
     lines += _fmt_contexts(contexts)
@@ -159,7 +164,8 @@ def build_prompt_tl(question_text: str, contexts: List[Dict], summary: Optional[
 
 def build_prompt_id(question_text: str, contexts: List[Dict], summary: Optional[str] = None) -> str:
     lines = [
-        "Jawab singkat hanya berdasarkan informasi tentang Asosiasi Internasional Shiga, beri kutipan [S#] tiap kalimat. Kembalikan dalam JSON.",
+        "Jawab singkat dan berbasis fakta hanya berdasarkan informasi tentang Asosiasi Internasional Shiga.",
+        "Tunjukkan sumber dengan [S#] dan kembalikan dalam JSON. 'answer' berisi jawaban, dan 'used_source_ids' berisi daftar ID sumber yang digunakan.",
         "",
     ]
     lines += _fmt_contexts(contexts)
