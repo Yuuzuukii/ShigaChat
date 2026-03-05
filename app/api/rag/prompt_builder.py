@@ -5,7 +5,8 @@ LLMに渡すプロンプトを組み立てるモジュール。
 
 from __future__ import annotations
 
-from typing import List, Dict, Callable, Optional, Tuple
+import json
+from typing import List, Dict, Callable, Optional, Any
 
 
 def _fmt_contexts(contexts: List[Dict]) -> List[str]:
@@ -26,13 +27,22 @@ def _fmt_summary(summary: Optional[str]) -> List[str]:
     ]
 
 
-def _fmt_history(history_qa: Optional[List[Tuple[str, str]]]) -> List[str]:
+def _fmt_history(history_qa: Optional[List[Any]]) -> List[str]:
     if not history_qa:
         return []
     lines = ["", "[Recent conversation history]"]
-    for i, (q, a) in enumerate(history_qa, 1):
+    for i, item in enumerate(history_qa, 1):
+        if isinstance(item, dict):
+            q = item.get("question")
+            a = item.get("answer")
+            rag_qa = item.get("rag_qa")
+        else:
+            q, a = item
+            rag_qa = None
         lines.append(f"[H{i}] User: {q}")
         lines.append(f"[H{i}] Assistant: {a}")
+        if rag_qa:
+            lines.append(f"[H{i}] Retrieved DB context: {json.dumps(rag_qa, ensure_ascii=False)}")
     return lines
 
 
@@ -40,7 +50,7 @@ def build_prompt_ja(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "あなたは滋賀県国際協会の情報のみを根拠に、事実ベースで詳しく回答してください。",
@@ -63,7 +73,7 @@ def build_prompt_en(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "You are an assistant who answers concisely and factually based only on information from the Shiga International Association.",
@@ -86,7 +96,7 @@ def build_prompt_vi(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "Bạn chỉ trả lời dựa trên thông tin về Hiệp hội Quốc tế Shiga, ngắn gọn và dựa trên thực tế.",
@@ -109,7 +119,7 @@ def build_prompt_zh(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "你只能依据有关滋贺县国际协会的信息，以事实为基础简洁回答。",
@@ -132,7 +142,7 @@ def build_prompt_ko(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "당신은 시가현 국제협회 정보만을 근거로 사실 기반으로 간결하게 답변합니다.",
@@ -155,7 +165,7 @@ def build_prompt_pt(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "Você é um assistente que responde de forma concisa e baseada em fatos, apenas com informações da Associação Internacional de Shiga.",
@@ -178,7 +188,7 @@ def build_prompt_es(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "Eres un asistente que responde de forma concisa y basada en hechos, solo con información de la Asociación Internacional de Shiga.",
@@ -201,7 +211,7 @@ def build_prompt_tl(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "Sumagot nang maikli at batay sa katotohanan lamang batay sa impormasyon tungkol sa Shiga International Association.",
@@ -224,7 +234,7 @@ def build_prompt_id(
     question_text: str,
     contexts: List[Dict],
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     lines = [
         "Jawab singkat dan berbasis fakta hanya berdasarkan informasi tentang Asosiasi Internasional Shiga.",
@@ -261,7 +271,7 @@ def build_prompt(
     contexts: List[Dict],
     lang: str = "ja",
     summary: Optional[str] = None,
-    history_qa: Optional[List[Tuple[str, str]]] = None,
+    history_qa: Optional[List[Any]] = None,
 ) -> str:
     builder = _BUILDERS.get(lang, build_prompt_ja)
     return builder(question_text, contexts, summary=summary, history_qa=history_qa)

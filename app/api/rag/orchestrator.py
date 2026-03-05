@@ -6,7 +6,7 @@ MySQLで管理しているthread履歴を取り出し、pgvector検索→プロ�
 from __future__ import annotations
 
 import json
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 
 from database_utils import get_db_cursor, get_placeholder
 from api.rag.detect import detect_language
@@ -15,13 +15,13 @@ from api.rag.prompt_builder import build_prompt
 from api.rag.generator import generate_answer, strip_citations
 
 
-# thread_id から直近k件の会話履歴を取得
-def load_history(thread_id: int, k: int = 6) -> List[Tuple[str, str]]:
+# thread_id から直近k件の会話履歴を取得（rag_qa を含む）
+def load_history(thread_id: int, k: int = 6) -> List[Dict[str, Any]]:
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
         cursor.execute(
             f"""
-            SELECT question, answer
+            SELECT question, answer, rag_qa
             FROM thread_qa
             WHERE thread_id = {ph}
             ORDER BY created_at DESC
@@ -30,7 +30,24 @@ def load_history(thread_id: int, k: int = 6) -> List[Tuple[str, str]]:
             (thread_id,),
         )
         rows = cursor.fetchall() or []
-    history = [(r["question"], r["answer"]) for r in reversed(rows)]
+    history: List[Dict[str, Any]] = []
+    for r in reversed(rows):
+        rag_qa = []
+        raw_rag_qa = r.get("rag_qa")
+        if raw_rag_qa:
+            try:
+                parsed = json.loads(raw_rag_qa)
+                if isinstance(parsed, list):
+                    rag_qa = parsed
+            except (json.JSONDecodeError, TypeError):
+                rag_qa = []
+        history.append(
+            {
+                "question": r.get("question"),
+                "answer": r.get("answer"),
+                "rag_qa": rag_qa,
+            }
+        )
     return history
 
 
