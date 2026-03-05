@@ -67,7 +67,9 @@ def answer_with_rag_pg(
     """
     iso, language_id = detect_language(question_text)
     history_qa = load_history(thread_id, k=6) if thread_id else []
-    summary = load_summary(thread_id) if thread_id else None
+    recent_history_qa = history_qa[-3:] if history_qa else []
+    # summary = load_summary(thread_id) if thread_id else None  # 会話要約は一旦無効化
+    summary = None
 
     # プロンプト言語の決定: user設定を優先
     prompt_lang = iso  # デフォルトは質問文の言語
@@ -108,7 +110,13 @@ def answer_with_rag_pg(
             }
         )
 
-    prompt = build_prompt(question_text, ctx_list, lang=prompt_lang, summary=summary)
+    prompt = build_prompt(
+        question_text,
+        ctx_list,
+        lang=prompt_lang,
+        summary=summary,
+        history_qa=recent_history_qa,
+    )
     answer_text, model_used = generate_answer(prompt)
     clean_text = strip_citations(answer_text)
 
@@ -133,7 +141,7 @@ def answer_with_rag_pg(
             "used_source_ids": used_source_ids,
             "similarity_threshold": similarity_threshold,
             "model_used": model_used,
-            "history_used": len(history_qa),
+            "history_used": len(recent_history_qa),
             "summary_used": summary is not None,
         },
     }
