@@ -1,0 +1,20 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "eslint.workingDirectories": ["web"],
+  "[javascript]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  },
+  "workbench.colorCustomizations": {
+    "titleBar.activeBackground": "#1d4ed8", // タイトルバーの背景色
+    "titleBar.activeForeground": "#ffffff", // タイトルバーの文字色
+    "activityBar.background": "#1d4ed8", // アクティビティバーの背景色
+    "activityBar.foreground": "#ffffff" // アクティビティバーの文字色
+  }
+}

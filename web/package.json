@@ -48,7 +48,10 @@
     ]
   },
   "lint-staged": {
-    "src/**/*.{js,jsx}": "eslint --fix"
+    "src/**/*.{js,jsx,css}": [
+      "prettier --write",
+      "eslint --fix"
+    ]
   },
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
@@ -57,6 +60,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^16.3.2",
     "postcss": "^8.5.6",
+    "prettier": "^3.8.1",
     "tailwindcss": "^3.4.17"
   }
 }

@@ -64,11 +64,7 @@ export default function Home() {
   const loadMsgsLS = (threadId) => {
     try {
       return (
-        JSON.parse(
-          localStorage.getItem(
-            `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`
-          )
-        ) || []
+        JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`)) || []
       );
     } catch {
       return [];
@@ -80,12 +76,9 @@ export default function Home() {
       JSON.stringify(msgsArr)
     );
   };
-  const getCurrentThreadIdLS = () =>
-    localStorage.getItem(scopedKey(LS_CUR_THREAD_KEY));
-  const setCurrentThreadIdLS = (val) =>
-    localStorage.setItem(scopedKey(LS_CUR_THREAD_KEY), val);
-  const clearCurrentThreadIdLS = () =>
-    localStorage.removeItem(scopedKey(LS_CUR_THREAD_KEY));
+  const getCurrentThreadIdLS = () => localStorage.getItem(scopedKey(LS_CUR_THREAD_KEY));
+  const setCurrentThreadIdLS = (val) => localStorage.setItem(scopedKey(LS_CUR_THREAD_KEY), val);
+  const clearCurrentThreadIdLS = () => localStorage.removeItem(scopedKey(LS_CUR_THREAD_KEY));
   const [notifications, setNotifications] = useState([]);
   const [globalNotifications, setGlobalNotifications] = useState([]);
   const [showPopup, setShowPopup] = useState(false);
@@ -104,9 +97,7 @@ export default function Home() {
   const [similarity, setSimilarity] = useState(() => {
     const v = localStorage.getItem("rag_similarity_threshold");
     const n = v != null ? parseFloat(v) : DEFAULT_SIMILARITY;
-    return Number.isFinite(n)
-      ? Math.min(1, Math.max(0, n))
-      : DEFAULT_SIMILARITY;
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
   });
   // モデル選択の状態管理
   const [selectedModel, setSelectedModel] = useState(() => {
@@ -129,8 +120,7 @@ export default function Home() {
     (arr || []).map((th) => ({
       id: String(th.thread_id ?? th.id),
       title: th.title,
-      lastUpdated:
-        th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
+      lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
     }));
   // Server is the source of truth for threads now
 
@@ -176,12 +166,9 @@ export default function Home() {
 
       try {
         setThreadsLoading(true);
-        const response = await fetch(
-          `${API_BASE_URL}/question/get_user_threads`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
         if (response.status === 401) {
           redirectToLogin(navigate);
           return;
@@ -257,9 +244,7 @@ export default function Home() {
       }
 
       // Update local thread list
-      setThreads((prev) =>
-        prev.filter((t) => String(t.id) !== String(threadId))
-      );
+      setThreads((prev) => prev.filter((t) => String(t.id) !== String(threadId)));
     };
 
     window.addEventListener("threadDeleted", onThreadDeleted);
@@ -343,10 +328,8 @@ export default function Home() {
   // Notification popup outside-click
   useEffect(() => {
     const handleClickOutside = (event) => {
-      if (popupRef.current && !popupRef.current.contains(event.target))
-        setShowPopup(false);
-      if (actionRef.current && !actionRef.current.contains(event.target))
-        setShowLangPicker(false);
+      if (popupRef.current && !popupRef.current.contains(event.target)) setShowPopup(false);
+      if (actionRef.current && !actionRef.current.contains(event.target)) setShowLangPicker(false);
     };
     if (showPopup) document.addEventListener("click", handleClickOutside);
     if (showLangPicker) document.addEventListener("click", handleClickOutside);
@@ -372,9 +355,7 @@ export default function Home() {
 
     try {
       const response = await fetch(
-        `${API_BASE_URL}/question/get_thread_messages/${encodeURIComponent(
-          String(threadId)
-        )}`,
+        `${API_BASE_URL}/question/get_thread_messages/${encodeURIComponent(String(threadId))}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -402,8 +383,7 @@ export default function Home() {
               time: msg.created_at,
               rag_qa: msg.rag_qa || [],
               // 互換性: typeが空でも rag_qa があれば rag とみなす
-              type:
-                msg.type || (msg.rag_qa && msg.rag_qa.length > 0 ? "rag" : ""),
+              type: msg.type || (msg.rag_qa && msg.rag_qa.length > 0 ? "rag" : ""),
             });
           });
         }
@@ -501,9 +481,7 @@ export default function Home() {
 
   const handleSimilarityChange = (e) => {
     const n = parseFloat(e.target.value);
-    const clamped = Number.isFinite(n)
-      ? Math.min(1, Math.max(0, n))
-      : DEFAULT_SIMILARITY;
+    const clamped = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
     setSimilarity(clamped);
     try {
       localStorage.setItem("rag_similarity_threshold", String(clamped));
@@ -512,23 +490,24 @@ export default function Home() {
   const resetSimilarity = () => {
     setSimilarity(DEFAULT_SIMILARITY);
     try {
-      localStorage.setItem(
-        "rag_similarity_threshold",
-        String(DEFAULT_SIMILARITY)
-      );
+      localStorage.setItem("rag_similarity_threshold", String(DEFAULT_SIMILARITY));
     } catch {}
   };
 
   const handleModelChange = (val) => {
     const model = String(val);
     setSelectedModel(model);
-    try { localStorage.setItem("selected_model", model); } catch {}
+    try {
+      localStorage.setItem("selected_model", model);
+    } catch {}
   };
 
   const handleReasoningEffortChange = (val) => {
     const effort = String(val);
     setReasoningEffort(effort);
-    try { localStorage.setItem("reasoning_effort", effort); } catch {}
+    try {
+      localStorage.setItem("reasoning_effort", effort);
+    } catch {}
   };
 
   // --- Thread ops ---
@@ -591,13 +570,10 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE_URL}/question/delete_thread/${threadId}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${API_BASE_URL}/question/delete_thread/${threadId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (response.status === 401) {
         redirectToLogin(navigate);
@@ -605,10 +581,9 @@ export default function Home() {
       } else if (response.ok) {
         // サーバーから正常に削除された場合、サーバーから一覧を再取得
         try {
-          const resp2 = await fetch(
-            `${API_BASE_URL}/question/get_user_threads`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          const resp2 = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (resp2.status === 401) {
             redirectToLogin(navigate);
           } else if (resp2.ok) {
@@ -656,9 +631,7 @@ export default function Home() {
       const idx = threads.findIndex((t) => String(t.id) === threadId);
       const updated = threads.filter((t) => String(t.id) !== threadId);
       setThreads(updated);
-      localStorage.removeItem(
-        `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`
-      );
+      localStorage.removeItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`);
 
       if (threadId === String(currentThreadId)) {
         // 削除されたスレッドを表示中の場合、新しいチャット画面に遷移
@@ -798,9 +771,7 @@ export default function Home() {
 
           // Notify NavBar about the new active thread
           try {
-            window.dispatchEvent(
-              new CustomEvent("threadSelected", { detail: newId })
-            );
+            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
           } catch {}
         }
       }
@@ -811,10 +782,7 @@ export default function Home() {
         role: "assistant",
         content: data.answer,
         time: new Date().toISOString(),
-        rag_qa:
-          data.meta && Array.isArray(data.meta.references)
-            ? data.meta.references
-            : [],
+        rag_qa: data.meta && Array.isArray(data.meta.references) ? data.meta.references : [],
         type: data.type || "",
       };
 
@@ -926,8 +894,7 @@ export default function Home() {
         break;
       }
     }
-    const questionText =
-      lastUserIdx >= 0 ? messages[lastUserIdx].content || "" : "";
+    const questionText = lastUserIdx >= 0 ? messages[lastUserIdx].content || "" : "";
     const answerText = messages[lastAssistantIdx].content || "";
 
     // Add a user-side action bubble
@@ -939,9 +906,7 @@ export default function Home() {
     const actionText = `${t?.actionApplyPrefix || ""}${actionLabels[type]}${
       type === "translate"
         ? ` (${
-            languageCodeToLabel[targetLangOverride || language] ||
-            targetLangOverride ||
-            language
+            languageCodeToLabel[targetLangOverride || language] || targetLangOverride || language
           })`
         : ""
     }${t?.actionApplySuffix || ""}`;
@@ -1040,17 +1005,14 @@ export default function Home() {
 
           // Notify NavBar about the new active thread
           try {
-            window.dispatchEvent(
-              new CustomEvent("threadSelected", { detail: newId })
-            );
+            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
           } catch {}
         }
         // Refresh thread list timestamps
         try {
-          const resp = await fetch(
-            `${API_BASE_URL}/question/get_user_threads`,
-            { headers: { Authorization: `Bearer ${token}` } }
-          );
+          const resp = await fetch(`${API_BASE_URL}/question/get_user_threads`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (resp.ok) {
             const data2 = await resp.json();
             const serverThreads = toClientThreads(data2.threads || []);
@@ -1072,8 +1034,7 @@ export default function Home() {
     if (!val) return null;
     try {
       const s = String(val);
-      const isoish =
-        s.includes("T") || s.endsWith("Z") ? s : s.replace(" ", "T");
+      const isoish = s.includes("T") || s.endsWith("Z") ? s : s.replace(" ", "T");
       const d = new Date(isoish);
       if (isNaN(d.getTime())) return s;
       const out = d.toLocaleString();
@@ -1187,38 +1148,31 @@ export default function Home() {
 
             <div className="h-full flex flex-col">
               {/* Messages area with full width scrolling */}
-              <div
-                className="flex-1 overflow-y-auto p-4"
-                ref={messagesContainerRef}
-              >
+              <div className="flex-1 overflow-y-auto p-4" ref={messagesContainerRef}>
                 <div className="mx-auto w-full max-w-4xl h-full">
                   {messagesLoading && currentThreadId && (
                     <div className="flex h-full items-center justify-center">
                       <div className="flex flex-col items-center gap-3">
                         <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                        <p className="text-sm text-zinc-600">
-                          メッセージを読み込み中...
+                        <p className="text-sm text-zinc-600">メッセージを読み込み中...</p>
+                      </div>
+                    </div>
+                  )}
+                  {!messagesLoading && (!currentThreadId || messages.length === 0) && (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="text-center">
+                        <div className="mb-4 rounded-full bg-blue-100 p-4 mx-auto w-fit">
+                          <MessageCircle className="h-8 w-8 text-blue-600" />
+                        </div>
+                        <p className="text-lg font-medium text-zinc-800">
+                          {t?.askQuestion || "質問してみよう"}
+                        </p>
+                        <p className="text-xs text-zinc-500 mt-2">
+                          {t?.disclaimer || "ShigaChatの情報は正確でない場合があります"}
                         </p>
                       </div>
                     </div>
                   )}
-                  {!messagesLoading &&
-                    (!currentThreadId || messages.length === 0) && (
-                      <div className="flex items-center justify-center h-full">
-                        <div className="text-center">
-                          <div className="mb-4 rounded-full bg-blue-100 p-4 mx-auto w-fit">
-                            <MessageCircle className="h-8 w-8 text-blue-600" />
-                          </div>
-                          <p className="text-lg font-medium text-zinc-800">
-                            {t?.askQuestion || "質問してみよう"}
-                          </p>
-                          <p className="text-xs text-zinc-500 mt-2">
-                            {t?.disclaimer ||
-                              "ShigaChatの情報は正確でない場合があります"}
-                          </p>
-                        </div>
-                      </div>
-                    )}
 
                   <AnimatePresence mode="popLayout">
                     {!messagesLoading &&
@@ -1236,9 +1190,7 @@ export default function Home() {
                             stiffness: 200,
                             damping: 20,
                           }}
-                          className={`mb-6 ${
-                            m.role === "user" ? "flex justify-end" : ""
-                          }`}
+                          className={`mb-6 ${m.role === "user" ? "flex justify-end" : ""}`}
                         >
                           {m.role === "user" ? (
                             // ユーザーメッセージは吹き出し形式
@@ -1267,9 +1219,7 @@ export default function Home() {
                                     : t?.you || "あなた"}
                                 </span>
                               </div>
-                              <div className="text-sm leading-relaxed">
-                                {m.content}
-                              </div>
+                              <div className="text-sm leading-relaxed">{m.content}</div>
                             </div>
                           ) : (
                             // アシスタントメッセージはフラット形式
@@ -1301,16 +1251,14 @@ export default function Home() {
 
                               {/* Enhanced RAG section with simple text design */}
                               {!m.typing &&
-                                (m.type === "rag" ||
-                                  (m.rag_qa && m.rag_qa.length > 0)) && (
+                                (m.type === "rag" || (m.rag_qa && m.rag_qa.length > 0)) && (
                                   <details className="mt-4" open={false}>
                                     <summary className="cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none">
                                       <div className="flex items-center gap-2">
                                         <FileText className="h-4 w-4 text-zinc-500" />
                                         <span>
-                                          {t?.similarQuestions ||
-                                            "参考となる関連質問"}{" "}
-                                          ({m.rag_qa?.length || 0}件)
+                                          {t?.similarQuestions || "参考となる関連質問"} (
+                                          {m.rag_qa?.length || 0}件)
                                         </span>
                                         <ChevronDown className="h-3 w-3 text-zinc-400 transition-transform duration-200" />
                                       </div>
@@ -1319,51 +1267,36 @@ export default function Home() {
                                     {m.rag_qa && m.rag_qa.length > 0 ? (
                                       <div className="divide-y divide-zinc-200">
                                         {m.rag_qa.map((q, idx) => (
-                                          <details
-                                            key={idx}
-                                            className="group"
-                                            open={false}
-                                          >
+                                          <details key={idx} className="group" open={false}>
                                             <summary className="cursor-pointer px-4 py-3 hover:bg-zinc-50 transition-colors duration-200 list-none">
                                               <div className="flex items-start gap-3">
                                                 <div className="flex-1 min-w-0">
                                                   <div className="flex items-start justify-between gap-3">
                                                     <div className="flex-1 text-sm font-medium text-zinc-800 line-clamp-2">
-                                                      <RichText
-                                                        content={q.question}
-                                                      />
+                                                      <RichText content={q.question} />
                                                     </div>
-                                                    {q.category_id &&
-                                                      q.question_id && (
-                                                        <button
-                                                          className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors flex-shrink-0"
-                                                          title={
-                                                            t?.openInAdmin ||
-                                                            "質問管理で開く"
-                                                          }
-                                                          onClick={(e) => {
-                                                            e.preventDefault();
-                                                            e.stopPropagation();
-                                                            navigate(
-                                                              `/admin/category/${q.category_id}?id=${q.question_id}`
-                                                            );
-                                                          }}
-                                                        >
-                                                          <ExternalLink className="h-3 w-3" />
-                                                          管理画面で開く
-                                                        </button>
-                                                      )}
+                                                    {q.category_id && q.question_id && (
+                                                      <button
+                                                        className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors flex-shrink-0"
+                                                        title={t?.openInAdmin || "質問管理で開く"}
+                                                        onClick={(e) => {
+                                                          e.preventDefault();
+                                                          e.stopPropagation();
+                                                          navigate(
+                                                            `/admin/category/${q.category_id}?id=${q.question_id}`
+                                                          );
+                                                        }}
+                                                      >
+                                                        <ExternalLink className="h-3 w-3" />
+                                                        管理画面で開く
+                                                      </button>
+                                                    )}
                                                   </div>
-                                                  {formatDateTime(
-                                                    q.answer_time || q.time
-                                                  ) && (
+                                                  {formatDateTime(q.answer_time || q.time) && (
                                                     <div className="flex items-center gap-1 mt-2">
                                                       <Clock className="h-3 w-3 text-zinc-500" />
                                                       <span className="text-xs text-zinc-500">
-                                                        {formatDateTime(
-                                                          q.answer_time ||
-                                                            q.time
-                                                        )}
+                                                        {formatDateTime(q.answer_time || q.time)}
                                                       </span>
                                                     </div>
                                                   )}
@@ -1378,9 +1311,7 @@ export default function Home() {
                                                 <div className="mt-2">
                                                   <span className="text-xs text-zinc-500">
                                                     取得日時:{" "}
-                                                    {new Date(
-                                                      q.retrieved_at
-                                                    ).toLocaleString()}
+                                                    {new Date(q.retrieved_at).toLocaleString()}
                                                   </span>
                                                 </div>
                                               )}
@@ -1460,21 +1391,19 @@ export default function Home() {
                               </Button>
                               {showLangPicker && (
                                 <div className="absolute left-0 bottom-full z-50 mb-1 min-w-32 rounded-md border border-slate-200 bg-white p-1 shadow-lg">
-                                  {Object.keys(languageCodeToLabel).map(
-                                    (code) => (
-                                      <button
-                                        key={code}
-                                        className="block w-full rounded-sm p-1.5 text-left text-xs hover:bg-slate-50 transition-colors text-slate-700"
-                                        onClick={() => {
-                                          applyAction("translate", code);
-                                          setShowLangPicker(false);
-                                        }}
-                                        disabled={actionLoading}
-                                      >
-                                        {languageCodeToLabel[code]}
-                                      </button>
-                                    )
-                                  )}
+                                  {Object.keys(languageCodeToLabel).map((code) => (
+                                    <button
+                                      key={code}
+                                      className="block w-full rounded-sm p-1.5 text-left text-xs hover:bg-slate-50 transition-colors text-slate-700"
+                                      onClick={() => {
+                                        applyAction("translate", code);
+                                        setShowLangPicker(false);
+                                      }}
+                                      disabled={actionLoading}
+                                    >
+                                      {languageCodeToLabel[code]}
+                                    </button>
+                                  ))}
                                 </div>
                               )}
                             </div>
@@ -1531,16 +1460,12 @@ export default function Home() {
                           ) : (
                             <>
                               <Send className="h-3 w-3" />
-                              <span className="hidden sm:inline">
-                                {t.askButton || "送信"}
-                              </span>
+                              <span className="hidden sm:inline">{t.askButton || "送信"}</span>
                             </>
                           )}
                         </Button>
                       </div>
-                      <div className="mt-2 text-xs text-zinc-500">
-                        ⌘/Ctrl + Enter で送信
-                      </div>
+                      <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
                     </CardContent>
                   </Card>
                 </motion.div>
