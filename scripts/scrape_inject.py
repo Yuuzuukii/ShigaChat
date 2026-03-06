@@ -22,9 +22,11 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Tuple
 
+import numpy as np
 import psycopg
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
+from openai import OpenAI
 from pgvector.psycopg import register_vector
 from psycopg.rows import dict_row
 import requests
@@ -36,7 +38,7 @@ DEFAULT_BACKUP_DIR = PROJECT_ROOT / "backup"
 DEFAULT_DUMP_SCRIPT = SCRIPT_DIR / "dump_postgres.sh"
 
 BASE = "https://www.s-i-a.or.jp"
-DEFAULT_FIXED_DT = "2025-09-22 00:00:00+09"
+DEFAULT_FIXED_DT = datetime.now().strftime("%Y-%m-%d %H:%M:%S+09")
 DEFAULT_SLEEP_SEC = 0.7
 USER_AGENT = {"User-Agent": "ShigaChatCrawler/1.0 (+https://example.com)"}
 
@@ -116,16 +118,31 @@ def run_backup(dump_script: Path, backup_dir: Path) -> Path:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     backup_path = backup_dir / f"shigachat_pre_scrape_inject_{ts}.sql"
 
-    script_path = dump_script if dump_script.is_absolute() else (PROJECT_ROOT / dump_script)
-    if not script_path.exists():
-        raise FileNotFoundError(f"dump script not found: {script_path}")
-
     print(f"[backup] creating dump at: {backup_path}")
-    subprocess.run(
-        ["bash", str(script_path), str(backup_path)],
-        cwd=str(PROJECT_ROOT),
-        check=True,
-    )
+
+    env = os.environ.copy()
+    env["PGPASSWORD"] = _required_env("PG_PASSWORD")
+
+    with open(backup_path, "w") as f:
+        subprocess.run(
+            [
+                "pg_dump",
+                "-h", _required_env("PG_HOST"),
+                "-p", os.getenv("PG_PORT", "5432"),
+                "-U", _required_env("PG_USER"),
+                "-d", _required_env("PG_DATABASE"),
+                "--no-owner",
+                "--no-privileges",
+                "--clean",
+                "--if-exists",
+            ],
+            stdout=f,
+            env=env,
+            check=True,
+        )
+
+    size = backup_path.stat().st_size // 1024
+    print(f"[backup] done: {backup_path} ({size} KB)")
     return backup_path
 
 
@@ -190,7 +207,23 @@ def fetch_pairs(url: str) -> List[Tuple[str, str]]:
         a = blk.select_one(".field--name-field-answer .field__item")
         if not (q and a):
             continue
-        pairs.append((q.get_text(" ", strip=True), a.decode_contents()))
+
+        answer_html = a.decode_contents()
+
+        # 関連ページリンク (.field--name-field-qanda-link) を回答末尾に追記
+        link_field = blk.select_one(".field--name-field-qanda-link")
+        if link_field:
+            link_items = []
+            for item in link_field.select(".field__item a"):
+                href = str(item.get("href") or "").strip()
+                label = item.get_text(" ", strip=True)
+                if href:
+                    link_items.append(f'<a href="{href}">{label}</a>')
+            if link_items:
+                links_html = "<p>関連ページ: " + " / ".join(link_items) + "</p>"
+                answer_html = answer_html + links_html
+
+        pairs.append((q.get_text(" ", strip=True), answer_html))
     return pairs
 
 
@@ -288,6 +321,27 @@ def short_title(text: str, limit: int = 120) -> str:
     return clean[:limit]
 
 
+# --- Embedding helper (inline; no dependency on app/api/) ---
+
+_openai_client: "OpenAI | None" = None
+
+def _get_openai_client() -> OpenAI:
+    global _openai_client
+    if _openai_client is None:
+        api_key = _required_env("OPENAI_API_KEY")
+        _openai_client = OpenAI(api_key=api_key)
+    return _openai_client
+
+
+def _embed_payload(question_text: str, answer_text: str) -> np.ndarray:
+    """OpenAI text-embedding-3-small でベクトルを生成する。"""
+    model = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
+    payload = f"Q: {question_text}\nA: {answer_text}"
+    client = _get_openai_client()
+    resp = client.embeddings.create(input=[payload], model=model)
+    return np.array(resp.data[0].embedding, dtype="float32")
+
+
 def upsert_embedding_row(
     cur: psycopg.Cursor,
     *,
@@ -305,13 +359,7 @@ def upsert_embedding_row(
     if not question_text.strip() or not answer_text.strip():
         return False
 
-    app_dir = PROJECT_ROOT / "app"
-    import_root = app_dir if app_dir.exists() else PROJECT_ROOT
-    if str(import_root) not in sys.path:
-        sys.path.insert(0, str(import_root))
-    from api.rag.vector_store import embed_payload  # imported lazily to fail only when vector step runs
-
-    vec = embed_payload(question_text, answer_text)
+    vec = _embed_payload(question_text, answer_text)
     cur.execute(
         """
         INSERT INTO shigachat.qa_embedding

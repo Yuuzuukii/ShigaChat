@@ -12,7 +12,7 @@ from database_utils import get_db_cursor, get_placeholder
 from api.rag.detect import detect_language
 from api.rag.search import retrieve
 from api.rag.prompt_builder import build_prompt
-from api.rag.generator import generate_answer, strip_citations
+from api.rag.generator import generate_answer, strip_citations, summarize_history_for_query
 
 
 # thread_id から直近k件の会話履歴を取得（rag_qa を含む）
@@ -68,6 +68,31 @@ def load_summary(thread_id: int) -> Optional[str]:
     return None
 
 
+def _expand_query(question_text: str, recent_history_qa: List[Dict[str, Any]]) -> str:
+    """
+    直近の会話履歴をLLMで要約し、ベクトル検索クエリを文脈付きに拡張する。
+    要約に失敗した場合は直前QAのテキストをフォールバックとして使用する。
+    履歴がない場合はそのまま返す。
+    """
+    if not recent_history_qa:
+        return question_text
+
+    # LLMで履歴を要約
+    summary = summarize_history_for_query(recent_history_qa)
+
+    if summary:
+        return f"{summary} {question_text}"
+
+    # フォールバック: LLM要約失敗時は全件のQAテキストを結合して使用
+    parts = []
+    for item in recent_history_qa:
+        q = (item.get("question") or "").strip()[:100]
+        a = (item.get("answer") or "").strip()[:100]
+        parts.extend(filter(None, [q, a]))
+    context_prefix = " ".join(parts)
+    return f"{context_prefix} {question_text}" if context_prefix else question_text
+
+
 def answer_with_rag_pg(
     question_text: str,
     thread_id: int | None,
@@ -109,8 +134,11 @@ def answer_with_rag_pg(
         if normalized in lang_map:
             prompt_lang = lang_map[normalized]
 
+    # 直前の会話ターンがある場合、クエリを文脈付きで拡張する
+    search_query = _expand_query(question_text, recent_history_qa)
+
     contexts = retrieve(
-        query=question_text,
+        query=search_query,
         language_id=language_id,
         top_k=top_k,
         similarity_threshold=similarity_threshold,
@@ -160,6 +188,7 @@ def answer_with_rag_pg(
             "model_used": model_used,
             "history_used": len(recent_history_qa),
             "summary_used": summary is not None,
+            "search_query": search_query,
         },
     }
 

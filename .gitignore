@@ -20,3 +20,4 @@ __pycache__/
 *.log
 app/app.log
 !app/ShigaChat.db
+/backup

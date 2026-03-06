@@ -91,7 +91,7 @@ export default function ChatInput({
               <Button
                 onClick={handleSend}
                 disabled={loading}
-                className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 text-sm flex items-center justify-center"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
