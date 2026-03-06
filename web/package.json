@@ -24,7 +24,9 @@
     "build": "env-cmd -f .env.local react-scripts build",
     "build:deploy": "env-cmd -f .env.deploy react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "lint": "eslint src/",
+    "lint:fix": "eslint src/ --fix"
   },
   "eslintConfig": {
     "extends": [
@@ -47,6 +49,7 @@
   "devDependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "autoprefixer": "^10.4.21",
+    "eslint-plugin-unused-imports": "^4.4.1",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17"
   }

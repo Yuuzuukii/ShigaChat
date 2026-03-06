@@ -36,7 +36,6 @@ import {
   Tag,
   Edit3,
   Trash2,
-  FolderOpen,
   Archive,
   History,
   ArrowLeft,

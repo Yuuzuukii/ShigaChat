@@ -6,7 +6,6 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
-import { Card } from "../components/ui/card";
 import ChatMessages from "../components/chat/ChatMessages";
 import ChatInput from "../components/chat/ChatInput";
 import { postGetAnswer, postAction, fetchUserThreads } from "../services/api";

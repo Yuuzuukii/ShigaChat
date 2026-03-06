@@ -207,7 +207,7 @@ const Kategori = () => {
                     const color = getTextColorForBg(bg);
                     const Icon = categoryIcons[category.className] || Tag;
                     return (
-                      <div className="ring-item" style={{ ['--i']: i }} key={category.id} role="listitem">
+                      <div className="ring-item" style={{ '--i': i }} key={category.id} role="listitem">
                         <div className="ring-item-cancel">
                           <div className="ring-item-inner">
                             <Button

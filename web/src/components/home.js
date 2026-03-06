@@ -6,7 +6,6 @@ import { updateUserLanguage } from "../utils/language";
 import {
   API_BASE_URL,
   translations,
-  languageCodeToId,
   languageLabelToCode,
   languageCodeToLabel,
 } from "../config/constants";
@@ -26,7 +25,6 @@ import {
   Clock,
   ExternalLink,
   ChevronDown,
-  ChevronRight,
   FileText,
   AlertTriangle,
   Loader2,
@@ -35,10 +33,7 @@ import {
   FileBarChart,
   Sparkles,
   Plus,
-  Cpu,
-  Gauge,
 } from "lucide-react";
-import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "./ui/select";
 
 // --- Local persistence keys (per-browser, per-user scoped) ---
 const LS_THREADS_KEY = "chat_threads"; // array of {id, title, lastUpdated}
