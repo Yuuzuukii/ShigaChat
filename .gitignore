@@ -26,7 +26,4 @@ nginx/build
 app/app.log
 !app/ShigaChat.db
 
-# その他
-/backup
-/Question
-/documents
+
