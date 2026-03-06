@@ -4,22 +4,29 @@
 
 # 環境変数ファイル
 .env*
+
+# Python
 __pycache__/
 *.pyc
-nginx/log/
-nginx/build
-env/
-.python-version
-__pycache__/
 *.py[cod]
 *$py.class
+.python-version
+env/
+
+# nginx（設定ファイルは追跡する）
+nginx/log/
+nginx/build
+
+# Node
 **/node_modules
+
+# runtime / generated
 *.db
-__pycache__/
-*.pyc
 *.log
 app/app.log
 !app/ShigaChat.db
+
+# その他
 /backup
 /Question
 /documents
