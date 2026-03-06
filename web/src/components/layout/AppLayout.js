@@ -22,7 +22,7 @@ export default function AppLayout() {
     try { return new URLSearchParams(location.search).get("tid"); } catch { return null; }
   }, [location.search]);
 
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(true);
 
   const threadHook = useThreads({ token, userId, t, onUnauthorized });
 
