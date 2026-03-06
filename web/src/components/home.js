@@ -1161,8 +1161,7 @@ export default function Home() {
             </div>
 
             {/* フローティング設定コントロール */}
-            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10 flex flex-col gap-2">
-              {/* 絞り込み強度 */}
+            {/* <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10 flex flex-col gap-2">
               <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200">
                 <span className="text-xs font-medium text-zinc-700 whitespace-nowrap">
                   {t?.similarityLabel || "一致の厳しさ"}
@@ -1189,7 +1188,7 @@ export default function Home() {
                   {similarity.toFixed(2)}
                 </span>
               </Card>
-            </div>
+            </div> */}
 
             <div className="h-full flex flex-col">
               {/* Messages area with full width scrolling */}
