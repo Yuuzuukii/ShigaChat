@@ -86,6 +86,8 @@ def answer_with_rag_pg(
         ctx_list.append(
             {
                 "sid": f"S{i}",
+                "qa_id": c.qa_id,
+                "category_id": c.category_id,
                 "question": c.question_text,
                 "answer": c.answer_text,
             }
