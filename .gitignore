@@ -13,8 +13,6 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
-
-# runtime / generated
 **/node_modules
 *.db
 __pycache__/
