@@ -13,7 +13,9 @@ env/
 __pycache__/
 *.py[cod]
 *$py.class
-/node_modules# runtime / generated
+
+# runtime / generated
+**/node_modules
 *.db
 __pycache__/
 *.pyc

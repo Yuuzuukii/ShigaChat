@@ -4,8 +4,13 @@
 import React from "react";
 import { motion } from "framer-motion";
 import {
-  Lightbulb, FileText, Clock, ChevronDown,
-  AlertTriangle, Sparkles, ExternalLink,
+  Lightbulb,
+  FileText,
+  Clock,
+  ChevronDown,
+  AlertTriangle,
+  Sparkles,
+  ExternalLink,
 } from "lucide-react";
 import RichText from "../common/RichText";
 
@@ -17,10 +22,18 @@ function formatDateTime(val) {
     const d = new Date(isoish);
     if (isNaN(d.getTime())) return s;
     return d.toLocaleString().replace(/\u30fb/g, " ");
-  } catch { return String(val); }
+  } catch {
+    return String(val);
+  }
 }
 
-export default function MessageBubble({ message: m, index, t, navigate, suppressEntranceAnimation = false }) {
+export default function MessageBubble({
+  message: m,
+  index: _index,
+  t,
+  navigate,
+  suppressEntranceAnimation = false,
+}) {
   if (suppressEntranceAnimation) {
     return (
       <div className={`mb-6 ${m.role === "user" ? "flex justify-end" : ""}`}>
@@ -54,15 +67,19 @@ export default function MessageBubble({ message: m, index, t, navigate, suppress
 function UserBubble({ m, t }) {
   const isAction = m.type === "action";
   return (
-    <div className={`max-w-[80%] rounded-2xl border p-4 shadow-sm ${isAction ? "bg-blue-300 bg-gradient-to-br from-blue-100 to-zinc-100/60 text-blue-900 shadow-blue-100" : "border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900 shadow-blue-100"}`}>
-      <div className={`mb-2 flex items-center gap-1.5 ${isAction ? "text-blue-600" : "text-zinc-500"}`}>
+    <div
+      className={`max-w-[80%] rounded-2xl border p-4 shadow-sm ${isAction ? "bg-blue-300 bg-gradient-to-br from-blue-100 to-zinc-100/60 text-blue-900 shadow-blue-100" : "border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900 shadow-blue-100"}`}
+    >
+      <div
+        className={`mb-2 flex items-center gap-1.5 ${isAction ? "text-blue-600" : "text-zinc-500"}`}
+      >
         {isAction && (
           <div className="flex h-4 w-4 items-center justify-center rounded-full bg-blue-600">
             <Sparkles className="h-2.5 w-2.5 text-white" />
           </div>
         )}
         <span className="text-[10px] font-semibold uppercase tracking-wider">
-          {isAction ? (t?.actionLabel || "アクション") : (t?.you || "あなた")}
+          {isAction ? t?.actionLabel || "アクション" : t?.you || "あなた"}
         </span>
       </div>
       <div className="text-sm leading-relaxed">{m.content}</div>
@@ -108,7 +125,9 @@ function RagSection({ ragQa, t, navigate }) {
       <summary className="cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-zinc-500" />
-          <span>{t?.similarQuestions || "参考となる関連質問"} ({ragQa?.length || 0}件)</span>
+          <span>
+            {t?.similarQuestions || "参考となる関連質問"} ({ragQa?.length || 0}件)
+          </span>
           <ChevronDown className="h-3 w-3 text-zinc-400" />
         </div>
       </summary>
@@ -126,7 +145,11 @@ function RagSection({ ragQa, t, navigate }) {
                       {q.category_id && q.question_id && (
                         <button
                           className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors flex-shrink-0"
-                          onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/category/${q.category_id}?id=${q.question_id}`); }}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            navigate(`/category/${q.category_id}?id=${q.question_id}`);
+                          }}
                         >
                           <ExternalLink className="h-3 w-3" />
                         </button>
@@ -135,14 +158,18 @@ function RagSection({ ragQa, t, navigate }) {
                     {formatDateTime(q.answer_time || q.time) && (
                       <div className="flex items-center gap-1 mt-2">
                         <Clock className="h-3 w-3 text-zinc-500" />
-                        <span className="text-xs text-zinc-500">{formatDateTime(q.answer_time || q.time)}</span>
+                        <span className="text-xs text-zinc-500">
+                          {formatDateTime(q.answer_time || q.time)}
+                        </span>
                       </div>
                     )}
                   </div>
                 </div>
               </summary>
               <div className="px-4 pb-4">
-                <div className="text-sm text-zinc-700 leading-relaxed"><RichText content={q.answer} /></div>
+                <div className="text-sm text-zinc-700 leading-relaxed">
+                  <RichText content={q.answer} />
+                </div>
               </div>
             </details>
           ))}
@@ -153,7 +180,9 @@ function RagSection({ ragQa, t, navigate }) {
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-zinc-200">
               <AlertTriangle className="h-5 w-5 text-zinc-500" />
             </div>
-            <p className="text-sm font-medium text-zinc-700">{t?.noSimilarWarning || "類似質問が見つかりませんでした"}</p>
+            <p className="text-sm font-medium text-zinc-700">
+              {t?.noSimilarWarning || "類似質問が見つかりませんでした"}
+            </p>
           </div>
         </div>
       )}

@@ -7,7 +7,7 @@ from __future__ import annotations
 import os
 import re
 from functools import lru_cache
-from typing import Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 from openai import OpenAI
 
@@ -43,4 +43,44 @@ def strip_citations(answer_text: str) -> str:
     return clean_text
 
 
-__all__ = ["generate_answer", "strip_citations"]
+# 直近の会話履歴をベクトル検索クエリ用に要約する
+def summarize_history_for_query(
+    history_qa: List[Dict[str, Any]],
+    model: Optional[str] = None,
+) -> str:
+    """
+    直近の会話履歴（question/answer のリスト）を受け取り、
+    ベクトル検索に使いやすい短いキーワード列に要約して返す。
+    失敗時は空文字を返す。
+    """
+    if not history_qa:
+        return ""
+    model = model or os.getenv("SUMMARY_MODEL", "gpt-4.1-nano")
+    # QAをテキスト化
+    lines = []
+    for item in history_qa:
+        q = (item.get("question") or "").strip()[:200]
+        a = (item.get("answer") or "").strip()[:200]
+        if q:
+            lines.append(f"User: {q}")
+        if a:
+            lines.append(f"Assistant: {a}")
+    if not lines:
+        return ""
+    history_text = "\n".join(lines)
+    prompt = (
+        "以下の会話履歴を読み、次の検索クエリに使うための重要なキーワードや話題を"
+        "50文字以内の日本語で簡潔にまとめてください。箇条書きや説明は不要で、キーワードだけ出力してください。\n\n"
+        f"{history_text}"
+    )
+    try:
+        resp = _get_openai_client().responses.create(
+            model=model,
+            input=prompt,
+        )
+        return (resp.output_text or "").strip()
+    except Exception:
+        return ""
+
+
+__all__ = ["generate_answer", "strip_citations", "summarize_history_for_query"]

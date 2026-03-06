@@ -6,7 +6,6 @@ import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
-import { Card } from "../components/ui/card";
 import ChatMessages from "../components/chat/ChatMessages";
 import ChatInput from "../components/chat/ChatInput";
 import { postGetAnswer, postAction, fetchUserThreads } from "../services/api";
@@ -16,11 +15,7 @@ import { toast } from "../lib/utils";
 const DEFAULT_SIMILARITY = 0.3;
 const LS_MSGS_PREFIX = "chat_msgs_";
 
-const NETWORK_ERROR_PATTERNS = [
-  /failed to fetch/i,
-  /network\s?error/i,
-  /load failed/i,
-];
+const NETWORK_ERROR_PATTERNS = [/failed to fetch/i, /network\s?error/i, /load failed/i];
 
 const DB_ERROR_PATTERNS = [
   /データベース/i,
@@ -54,9 +49,7 @@ const LANGUAGE_TRANSLATION_ERROR_PATTERNS = [
 
 function errorLikeToString(error) {
   return String(
-    (error && typeof error === "object" && "message" in error && error.message) ||
-      error ||
-      ""
+    (error && typeof error === "object" && "message" in error && error.message) || error || ""
   ).trim();
 }
 
@@ -79,7 +72,9 @@ function normalizeErrorDetail(detail) {
   if (detail && typeof detail === "object") {
     if (typeof detail.message === "string") return detail.message.trim();
     if (typeof detail.msg === "string") return detail.msg.trim();
-    try { return JSON.stringify(detail); } catch {}
+    try {
+      return JSON.stringify(detail);
+    } catch {}
   }
   return "";
 }
@@ -107,12 +102,13 @@ function normalizeRequestError(error, t) {
   const dbMessage = t?.databaseConnectionError || "データベースに接続できません";
   const raw = errorLikeToString(error);
   const isNetworkError =
-    error instanceof TypeError ||
-    NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
-  const isAnswerGenerationError =
-    ANSWER_GENERATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
-  const isLanguageOrTranslationError =
-    LANGUAGE_TRANSLATION_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+    error instanceof TypeError || NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+  const isAnswerGenerationError = ANSWER_GENERATION_ERROR_PATTERNS.some((pattern) =>
+    pattern.test(raw)
+  );
+  const isLanguageOrTranslationError = LANGUAGE_TRANSLATION_ERROR_PATTERNS.some((pattern) =>
+    pattern.test(raw)
+  );
 
   if (isNetworkError) return serverMessage;
   if (isLanguageOrTranslationError) return t?.languageOrTranslationError || fallback;
@@ -132,12 +128,9 @@ function normalizeActionError(error, actionType, t) {
   const fallback = getActionErrorFallback(actionType, t);
   const raw = errorLikeToString(error);
   const isNetworkError =
-    error instanceof TypeError ||
-    NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
+    error instanceof TypeError || NETWORK_ERROR_PATTERNS.some((pattern) => pattern.test(raw));
   const isActionInternalError =
-    /^action failed:/i.test(raw) ||
-    /openai/i.test(raw) ||
-    /api[-_\s]?key/i.test(raw);
+    /^action failed:/i.test(raw) || /openai/i.test(raw) || /api[-_\s]?key/i.test(raw);
 
   if (isNetworkError) return fallback;
   if (isActionInternalError) return fallback;
@@ -149,13 +142,25 @@ export default function HomePage() {
   const { language, t, threadHook } = useOutletContext();
   const navigate = useNavigate();
   const {
-    setThreads, currentThreadId, setCurrentThreadId,
-    messages, setMessages, messagesLoading,
-    startNewChat, renameThread,
-    skipNextThreadLoad, toClientThreads,
+    setThreads,
+    currentThreadId,
+    setCurrentThreadId,
+    messages,
+    setMessages,
+    messagesLoading,
+    startNewChat,
+    renameThread,
+    skipNextThreadLoad,
+    toClientThreads,
   } = threadHook;
 
-  const userId = (() => { try { return JSON.parse(localStorage.getItem("user"))?.id; } catch { return null; } })();
+  const userId = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("user"))?.id;
+    } catch {
+      return null;
+    }
+  })();
   const token = localStorage.getItem("token");
 
   const [input, setInput] = useState("");
@@ -231,7 +236,9 @@ export default function HomePage() {
     const n = parseFloat(e.target.value);
     const clamped = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
     setSimilarity(clamped);
-    try { localStorage.setItem("rag_similarity_threshold", String(clamped)); } catch {}
+    try {
+      localStorage.setItem("rag_similarity_threshold", String(clamped));
+    } catch {}
   };
 
   useEffect(() => {
@@ -243,7 +250,12 @@ export default function HomePage() {
 
   // ─── Send message ───
   const sendMessage = async () => {
-    if (!token) { setErrorMessageKey("errorLogin"); setErrorMessage(""); onUnauthorized(); return; }
+    if (!token) {
+      setErrorMessageKey("errorLogin");
+      setErrorMessage("");
+      onUnauthorized();
+      return;
+    }
     const text = input.trim();
     if (!text) {
       setErrorMessageKey("enterquestion");
@@ -252,7 +264,11 @@ export default function HomePage() {
     }
 
     const tidFromUrl = (() => {
-      try { return new URLSearchParams(window.location.search).get("tid"); } catch { return null; }
+      try {
+        return new URLSearchParams(window.location.search).get("tid");
+      } catch {
+        return null;
+      }
     })();
     let threadId = currentThreadId || tidFromUrl;
     if (threadId && String(threadId) !== String(currentThreadId)) {
@@ -266,7 +282,12 @@ export default function HomePage() {
       setMessages([]);
     }
 
-    const userMsg = { id: crypto.randomUUID(), role: "user", content: text, time: new Date().toISOString() };
+    const userMsg = {
+      id: crypto.randomUUID(),
+      role: "user",
+      content: text,
+      time: new Date().toISOString(),
+    };
     const typingMsg = { id: "typing", role: "assistant", content: "…", typing: true };
     const isFirstMessage = messages.length === 0;
 
@@ -279,7 +300,9 @@ export default function HomePage() {
 
     try {
       const isTemp = String(threadId).startsWith("tmp-");
-      const payload = isTemp ? { text, similarity_threshold: similarity } : { thread_id: Number(threadId), text, similarity_threshold: similarity };
+      const payload = isTemp
+        ? { text, similarity_threshold: similarity }
+        : { thread_id: Number(threadId), text, similarity_threshold: similarity };
 
       const res = await postGetAnswer(payload, { onUnauthorized });
       if (!res.ok) {
@@ -296,29 +319,41 @@ export default function HomePage() {
             const oldKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`;
             const newKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${newId}`;
             const oldVal = localStorage.getItem(oldKey);
-            if (oldVal !== null) { localStorage.setItem(newKey, oldVal); localStorage.removeItem(oldKey); }
+            if (oldVal !== null) {
+              localStorage.setItem(newKey, oldVal);
+              localStorage.removeItem(oldKey);
+            }
           } catch {}
           // Keep current optimistic messages; avoid reload flicker on tmp -> real thread migration.
           skipNextThreadLoad.current = true;
           setCurrentThreadId(newId);
           threadId = newId;
           navigate(`/home?tid=${encodeURIComponent(newId)}`, { replace: true });
-          try { window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId })); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
+          } catch {}
         }
       }
 
       const asstMsg = {
-        id: crypto.randomUUID(), role: "assistant", content: data.answer,
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data.answer,
         time: new Date().toISOString(),
-        rag_qa: data.meta?.references || [], type: data.type || "",
+        rag_qa: data.meta?.references || [],
+        type: data.type || "",
       };
       setMessages((prev) => [...prev.filter((m) => m.id !== "typing"), asstMsg]);
 
       if (isFirstMessage) {
         const serverTitle = typeof data?.thread_title === "string" ? data.thread_title.trim() : "";
-        const newTitle = serverTitle || (t?.newChat || "New Chat");
+        const newTitle = serverTitle || t?.newChat || "New Chat";
         renameThread(threadId, newTitle);
-        try { window.dispatchEvent(new CustomEvent("threadTitleChanged", { detail: { threadId, title: newTitle } })); } catch {}
+        try {
+          window.dispatchEvent(
+            new CustomEvent("threadTitleChanged", { detail: { threadId, title: newTitle } })
+          );
+        } catch {}
       }
 
       // Refresh thread list
@@ -327,7 +362,9 @@ export default function HomePage() {
         if (resp.ok) {
           const data2 = await resp.json();
           setThreads(toClientThreads(data2.threads || []));
-          try { window.dispatchEvent(new CustomEvent("threadUpdated")); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent("threadUpdated"));
+          } catch {}
         }
       } catch {}
     } catch (e) {
@@ -343,22 +380,54 @@ export default function HomePage() {
 
   // ─── Action (translate / summarize / simplify) ───
   const applyAction = async (type, targetLangOverride = null) => {
-    if (!token) { setErrorMessageKey("errorLogin"); setErrorMessage(""); onUnauthorized(); return; }
+    if (!token) {
+      setErrorMessageKey("errorLogin");
+      setErrorMessage("");
+      onUnauthorized();
+      return;
+    }
     scrollToBottom();
 
-    const lastAssistantIdx = [...messages].map((m, i) => ({ m, i })).reverse().find((x) => x.m.role === "assistant" && !x.m.typing)?.i;
-    if (lastAssistantIdx == null) { setErrorMessage(t?.noRecentAnswer || "直近の回答がありません"); return; }
+    const lastAssistantIdx = [...messages]
+      .map((m, i) => ({ m, i }))
+      .reverse()
+      .find((x) => x.m.role === "assistant" && !x.m.typing)?.i;
+    if (lastAssistantIdx == null) {
+      setErrorMessage(t?.noRecentAnswer || "直近の回答がありません");
+      return;
+    }
 
     let lastUserIdx = -1;
-    for (let i = lastAssistantIdx - 1; i >= 0; i--) { if (messages[i].role === "user") { lastUserIdx = i; break; } }
+    for (let i = lastAssistantIdx - 1; i >= 0; i--) {
+      if (messages[i].role === "user") {
+        lastUserIdx = i;
+        break;
+      }
+    }
     const questionText = lastUserIdx >= 0 ? messages[lastUserIdx].content || "" : "";
     const answerText = messages[lastAssistantIdx].content || "";
 
-    const actionLabels = { translate: t?.actionTranslate, summarize: t?.actionSummarize, simplify: t?.actionSimplify };
+    const actionLabels = {
+      translate: t?.actionTranslate,
+      summarize: t?.actionSummarize,
+      simplify: t?.actionSimplify,
+    };
     const actionText = `${t?.actionApplyPrefix || ""}${actionLabels[type]}${type === "translate" ? ` (${languageCodeToLabel[targetLangOverride || language] || targetLangOverride || language})` : ""}${t?.actionApplySuffix || ""}`;
 
-    const actionMsg = { id: crypto.randomUUID(), role: "user", type: "action", content: actionText, time: new Date().toISOString() };
-    const typingMsg = { id: "action-typing", role: "assistant", type: "action", content: "…", typing: true };
+    const actionMsg = {
+      id: crypto.randomUUID(),
+      role: "user",
+      type: "action",
+      content: actionText,
+      time: new Date().toISOString(),
+    };
+    const typingMsg = {
+      id: "action-typing",
+      role: "assistant",
+      type: "action",
+      content: "…",
+      typing: true,
+    };
     setMessages((prev) => [...prev, actionMsg, typingMsg]);
     setTimeout(scrollToBottomImmediate, 0);
 
@@ -370,17 +439,29 @@ export default function HomePage() {
         const n = Number(currentThreadId);
         if (Number.isFinite(n)) threadIdNum = n;
       }
-      const res = await postAction({
-        action: type, question: questionText, answer: answerText,
-        target_lang: targetLangOverride || language, thread_id: threadIdNum, action_label: actionText,
-      }, { onUnauthorized });
+      const res = await postAction(
+        {
+          action: type,
+          question: questionText,
+          answer: answerText,
+          target_lang: targetLangOverride || language,
+          thread_id: threadIdNum,
+          action_label: actionText,
+        },
+        { onUnauthorized }
+      );
 
       if (!res.ok) {
         const detail = await readResponseErrorMessage(res);
         throw new Error(detail || getActionErrorFallback(type, t));
       }
       const data = await res.json();
-      const asstMsg = { id: crypto.randomUUID(), role: "assistant", content: data?.result || "", time: new Date().toISOString() };
+      const asstMsg = {
+        id: crypto.randomUUID(),
+        role: "assistant",
+        content: data?.result || "",
+        time: new Date().toISOString(),
+      };
       setMessages((prev) => [...prev.filter((m) => m.id !== "action-typing"), asstMsg]);
 
       // Thread ID migration
@@ -390,11 +471,16 @@ export default function HomePage() {
         if (newId !== oldId) {
           setCurrentThreadId(newId);
           navigate(`/home?tid=${encodeURIComponent(newId)}`, { replace: true });
-          try { window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId })); } catch {}
+          try {
+            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
+          } catch {}
         }
         try {
           const resp = await fetchUserThreads({ onUnauthorized });
-          if (resp.ok) { const d = await resp.json(); setThreads(toClientThreads(d.threads || [])); }
+          if (resp.ok) {
+            const d = await resp.json();
+            setThreads(toClientThreads(d.threads || []));
+          }
         } catch {}
       }
     } catch (e) {
@@ -436,7 +522,7 @@ export default function HomePage() {
             </div>
 
             {/* 絞り込み強度 */}
-            <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
+            {/* <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
               <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200">
                 <span className="text-xs font-medium text-zinc-700 whitespace-nowrap">{t?.similarityLabel || "一致の厳しさ"}</span>
                 <div className="flex items-center gap-2">
@@ -446,7 +532,7 @@ export default function HomePage() {
                 </div>
                 <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs font-mono text-blue-700">{similarity.toFixed(2)}</span>
               </Card>
-            </div>
+            </div> */}
 
             <div className="h-full flex flex-col">
               <ChatMessages
@@ -460,12 +546,17 @@ export default function HomePage() {
                 messagesEndRef={messagesEndRef}
               />
               <ChatInput
-                input={input} setInput={setInput}
-                loading={loading} actionLoading={actionLoading}
-                errorMessage={errorMessageKey ? (t?.[errorMessageKey] || errorMessage) : errorMessage}
+                input={input}
+                setInput={setInput}
+                loading={loading}
+                actionLoading={actionLoading}
+                errorMessage={errorMessageKey ? t?.[errorMessageKey] || errorMessage : errorMessage}
                 actionMessage={actionMessage}
-                t={t} onSend={sendMessage} onApplyAction={applyAction}
-                similarity={similarity} onSimilarityChange={handleSimilarityChange}
+                t={t}
+                onSend={sendMessage}
+                onApplyAction={applyAction}
+                similarity={similarity}
+                onSimilarityChange={handleSimilarityChange}
               />
             </div>
           </motion.div>

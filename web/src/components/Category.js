@@ -1,11 +1,7 @@
 import React, { useState, useContext, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { UserContext } from "../UserContext";
-import {
-  translations,
-  categoryList,
-  languageLabelToCode,
-} from "../config/constants";
+import { translations, categoryList, languageLabelToCode } from "../config/constants";
 import { redirectToLogin } from "../utils/auth";
 import { Button } from "./ui/button";
 import {
@@ -23,7 +19,7 @@ import {
   Siren,
   CloudLightning,
   Tag,
-  Layers
+  Layers,
 } from "lucide-react";
 import "./Category.css"; // 円形レイアウト用のスタイルを読み込み
 
@@ -68,7 +64,9 @@ function getTextColorForBg(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const srgb = [r, g, b].map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  const srgb = [r, g, b].map((v) =>
+    v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  );
   const luminance = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
   return luminance > 0.6 ? "#1f2937" : "#ffffff"; // 明るい背景→濃い文字、暗い背景→白
 }
@@ -107,10 +105,12 @@ const Kategori = () => {
     const el = ringRef.current;
     if (!el) return;
 
-    const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const prefersReduced =
+      window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) return; // モーション低減ではフォールバックもしない
 
-    const hasRegisterProperty = typeof window !== 'undefined' && 'CSS' in window && 'registerProperty' in CSS;
+    const hasRegisterProperty =
+      typeof window !== "undefined" && "CSS" in window && "registerProperty" in CSS;
     if (hasRegisterProperty) return; // 充分なサポートがあるとみなし、CSSのアニメーションに任せる
 
     // 検出: 一定時間後に --spin が変化していなければJSフォールバック起動
@@ -124,8 +124,12 @@ const Kategori = () => {
 
     const SPEED_DEG_PER_SEC = 360 / 30; // CSSと同じ30秒/周
 
-    const onEnter = () => { paused = true; };
-    const onLeave = () => { paused = false; };
+    const onEnter = () => {
+      paused = true;
+    };
+    const onLeave = () => {
+      paused = false;
+    };
 
     function tick(ts) {
       if (!running) return;
@@ -138,7 +142,7 @@ const Kategori = () => {
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
       angle = (angle + dt * SPEED_DEG_PER_SEC) % 360;
-      el.style.setProperty('--spin', angle + 'deg');
+      el.style.setProperty("--spin", angle + "deg");
       rafId = requestAnimationFrame(tick);
     }
 
@@ -147,19 +151,19 @@ const Kategori = () => {
       started = true;
       running = true;
       lastTs = 0;
-      el.addEventListener('mouseenter', onEnter);
-      el.addEventListener('mouseleave', onLeave);
-      el.addEventListener('focusin', onEnter);
-      el.addEventListener('focusout', onLeave);
+      el.addEventListener("mouseenter", onEnter);
+      el.addEventListener("mouseleave", onLeave);
+      el.addEventListener("focusin", onEnter);
+      el.addEventListener("focusout", onLeave);
       rafId = requestAnimationFrame(tick);
     }
 
     // 初期値リセット
-    el.style.setProperty('--spin', '0deg');
+    el.style.setProperty("--spin", "0deg");
     // 800ms後に--spinが変化していなければ非対応とみなす
     checkTimer = window.setTimeout(() => {
-      const val = getComputedStyle(el).getPropertyValue('--spin').trim();
-      if (!val || val === '0deg') {
+      const val = getComputedStyle(el).getPropertyValue("--spin").trim();
+      if (!val || val === "0deg") {
         startJsFallback();
       }
     }, 800);
@@ -167,10 +171,10 @@ const Kategori = () => {
     return () => {
       window.clearTimeout(checkTimer);
       if (rafId) cancelAnimationFrame(rafId);
-      el.removeEventListener('mouseenter', onEnter);
-      el.removeEventListener('mouseleave', onLeave);
-      el.removeEventListener('focusin', onEnter);
-      el.removeEventListener('focusout', onLeave);
+      el.removeEventListener("mouseenter", onEnter);
+      el.removeEventListener("mouseleave", onLeave);
+      el.removeEventListener("focusin", onEnter);
+      el.removeEventListener("focusout", onLeave);
     };
   }, []);
 
@@ -184,7 +188,11 @@ const Kategori = () => {
             <div className="mx-auto mt-8 flex items-center justify-center">
               <div
                 className="category-ring"
-                style={{ '--count': categoryList.length, '--radius': 'clamp(8rem, 27vw, 24rem)', '--ellipseY': '0.8' }}
+                style={{
+                  "--count": categoryList.length,
+                  "--radius": "clamp(8rem, 27vw, 24rem)",
+                  "--ellipseY": "0.8",
+                }}
                 role="list"
                 ref={ringRef}
               >
@@ -192,22 +200,36 @@ const Kategori = () => {
                   <div className="center-halo" aria-hidden="true"></div>
                   <div className="center-content" role="presentation">
                     <div className="center-title-row" aria-hidden="true">
-                      <div className="center-icon" aria-hidden="true"><Layers /></div>
+                      <div className="center-icon" aria-hidden="true">
+                        <Layers />
+                      </div>
                       <div className="center-title">{t.categorySearch}</div>
                     </div>
                     <div className="w-44 h-1 bg-blue-600 mx-auto rounded-full"></div>
-                    <div className="center-subtitle ">{language === 'ja' ? 'カテゴリを選択してください' : (t.selectcategory || t.select)}</div>
+                    <div className="center-subtitle ">
+                      {language === "ja"
+                        ? "カテゴリを選択してください"
+                        : t.selectcategory || t.select}
+                    </div>
                   </div>
                 </div>
                 <div className="ring-track">
                   {categoryList.map((category, i) => {
-                    const palette = categoryColors[category.className] || { base: "#f4f4f4", hover: "#e5e5e5" };
+                    const palette = categoryColors[category.className] || {
+                      base: "#f4f4f4",
+                      hover: "#e5e5e5",
+                    };
                     const isHover = hoveredCategoryId === category.id;
                     const bg = isHover ? palette.hover : palette.base;
                     const color = getTextColorForBg(bg);
                     const Icon = categoryIcons[category.className] || Tag;
                     return (
-                      <div className="ring-item" style={{ ['--i']: i }} key={category.id} role="listitem">
+                      <div
+                        className="ring-item"
+                        style={{ "--i": i }}
+                        key={category.id}
+                        role="listitem"
+                      >
                         <div className="ring-item-cancel">
                           <div className="ring-item-inner">
                             <Button

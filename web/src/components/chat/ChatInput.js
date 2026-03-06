@@ -9,22 +9,33 @@ import { Card, CardContent } from "../ui/card";
 import ActionBar from "./ActionBar";
 
 export default function ChatInput({
-  input, setInput, loading, actionLoading,
-  errorMessage, actionMessage,
-  t, onSend, onApplyAction, similarity, onSimilarityChange,
+  input,
+  setInput,
+  loading,
+  actionLoading,
+  errorMessage,
+  actionMessage,
+  t,
+  onSend,
+  onApplyAction,
+  similarity: _similarity,
+  onSimilarityChange: _onSimilarityChange,
 }) {
   const textareaRef = useRef(null);
 
-  const handleInputChange = useCallback((e) => {
-    setInput(e.target.value);
-    if (!e.target.value.trim()) {
-      e.target.style.height = "40px";
-      return;
-    }
-    e.target.style.height = "auto";
-    const newHeight = Math.min(Math.max(e.target.scrollHeight, 40), 128);
-    e.target.style.height = newHeight + "px";
-  }, [setInput]);
+  const handleInputChange = useCallback(
+    (e) => {
+      setInput(e.target.value);
+      if (!e.target.value.trim()) {
+        e.target.style.height = "40px";
+        return;
+      }
+      e.target.style.height = "auto";
+      const newHeight = Math.min(Math.max(e.target.scrollHeight, 40), 128);
+      e.target.style.height = newHeight + "px";
+    },
+    [setInput]
+  );
 
   const handleKeyDown = (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
@@ -56,10 +67,14 @@ export default function ChatInput({
 
             {/* Error messages */}
             {errorMessage && (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">{errorMessage}</div>
+              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 p-2 text-sm text-red-700">
+                {errorMessage}
+              </div>
             )}
             {actionMessage && (
-              <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">{actionMessage}</div>
+              <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700">
+                {actionMessage}
+              </div>
             )}
 
             {/* Input area */}
@@ -76,7 +91,7 @@ export default function ChatInput({
               <Button
                 onClick={handleSend}
                 disabled={loading}
-                className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 text-sm flex items-center justify-center gap-1"
+                className="w-20 rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50 text-sm flex items-center justify-center"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -88,7 +103,12 @@ export default function ChatInput({
                 )}
               </Button>
             </div>
-            <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
+            <div className="flex justify-between">
+              <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
+              <div className="mt-2 text-xs text-zinc-500">
+                ※ 本サービスへの質問による個人情報の漏洩に関しては、一切の責任を負いかねます
+              </div>
+            </div>
           </CardContent>
         </Card>
       </motion.div>

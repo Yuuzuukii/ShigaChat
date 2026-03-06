@@ -6,22 +6,22 @@ MySQLで管理しているthread履歴を取り出し、pgvector検索→プロ�
 from __future__ import annotations
 
 import json
-from typing import List, Tuple, Dict, Any, Optional
+from typing import List, Dict, Any, Optional
 
 from database_utils import get_db_cursor, get_placeholder
 from api.rag.detect import detect_language
 from api.rag.search import retrieve
 from api.rag.prompt_builder import build_prompt
-from api.rag.generator import generate_answer, strip_citations
+from api.rag.generator import generate_answer, strip_citations, summarize_history_for_query
 
 
-# thread_id から直近k件の会話履歴を取得
-def load_history(thread_id: int, k: int = 6) -> List[Tuple[str, str]]:
+# thread_id から直近k件の会話履歴を取得（rag_qa を含む）
+def load_history(thread_id: int, k: int = 6) -> List[Dict[str, Any]]:
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
         cursor.execute(
             f"""
-            SELECT question, answer
+            SELECT question, answer, rag_qa
             FROM thread_qa
             WHERE thread_id = {ph}
             ORDER BY created_at DESC
@@ -30,7 +30,24 @@ def load_history(thread_id: int, k: int = 6) -> List[Tuple[str, str]]:
             (thread_id,),
         )
         rows = cursor.fetchall() or []
-    history = [(r["question"], r["answer"]) for r in reversed(rows)]
+    history: List[Dict[str, Any]] = []
+    for r in reversed(rows):
+        rag_qa = []
+        raw_rag_qa = r.get("rag_qa")
+        if raw_rag_qa:
+            try:
+                parsed = json.loads(raw_rag_qa)
+                if isinstance(parsed, list):
+                    rag_qa = parsed
+            except (json.JSONDecodeError, TypeError):
+                rag_qa = []
+        history.append(
+            {
+                "question": r.get("question"),
+                "answer": r.get("answer"),
+                "rag_qa": rag_qa,
+            }
+        )
     return history
 
 
@@ -51,6 +68,31 @@ def load_summary(thread_id: int) -> Optional[str]:
     return None
 
 
+def _expand_query(question_text: str, recent_history_qa: List[Dict[str, Any]]) -> str:
+    """
+    直近の会話履歴をLLMで要約し、ベクトル検索クエリを文脈付きに拡張する。
+    要約に失敗した場合は直前QAのテキストをフォールバックとして使用する。
+    履歴がない場合はそのまま返す。
+    """
+    if not recent_history_qa:
+        return question_text
+
+    # LLMで履歴を要約
+    summary = summarize_history_for_query(recent_history_qa)
+
+    if summary:
+        return f"{summary} {question_text}"
+
+    # フォールバック: LLM要約失敗時は全件のQAテキストを結合して使用
+    parts = []
+    for item in recent_history_qa:
+        q = (item.get("question") or "").strip()[:100]
+        a = (item.get("answer") or "").strip()[:100]
+        parts.extend(filter(None, [q, a]))
+    context_prefix = " ".join(parts)
+    return f"{context_prefix} {question_text}" if context_prefix else question_text
+
+
 def answer_with_rag_pg(
     question_text: str,
     thread_id: int | None,
@@ -67,7 +109,9 @@ def answer_with_rag_pg(
     """
     iso, language_id = detect_language(question_text)
     history_qa = load_history(thread_id, k=6) if thread_id else []
-    summary = load_summary(thread_id) if thread_id else None
+    recent_history_qa = history_qa[-3:] if history_qa else []
+    # summary = load_summary(thread_id) if thread_id else None  # 会話要約は一旦無効化
+    summary = None
 
     # プロンプト言語の決定: user設定を優先
     prompt_lang = iso  # デフォルトは質問文の言語
@@ -90,8 +134,11 @@ def answer_with_rag_pg(
         if normalized in lang_map:
             prompt_lang = lang_map[normalized]
 
+    # 直前の会話ターンがある場合、クエリを文脈付きで拡張する
+    search_query = _expand_query(question_text, recent_history_qa)
+
     contexts = retrieve(
-        query=question_text,
+        query=search_query,
         language_id=language_id,
         top_k=top_k,
         similarity_threshold=similarity_threshold,
@@ -108,7 +155,13 @@ def answer_with_rag_pg(
             }
         )
 
-    prompt = build_prompt(question_text, ctx_list, lang=prompt_lang, summary=summary)
+    prompt = build_prompt(
+        question_text,
+        ctx_list,
+        lang=prompt_lang,
+        summary=summary,
+        history_qa=recent_history_qa,
+    )
     answer_text, model_used = generate_answer(prompt)
     clean_text = strip_citations(answer_text)
 
@@ -133,8 +186,9 @@ def answer_with_rag_pg(
             "used_source_ids": used_source_ids,
             "similarity_threshold": similarity_threshold,
             "model_used": model_used,
-            "history_used": len(history_qa),
+            "history_used": len(recent_history_qa),
             "summary_used": summary is not None,
+            "search_query": search_query,
         },
     }
 
