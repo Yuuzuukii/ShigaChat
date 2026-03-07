@@ -49,6 +49,17 @@ jobs:
           REACT_APP_BASE_PATH=""
           EOF
 
+      # ① フロントエンドを先にビルド（nginx/build/ が必要なため）
+      - name: Build (dev)
+        working-directory: web
+        run: npm run build
+
+      # ② ビルド成果物を nginx/build/ にコピー
+      - name: Copy build to nginx/build
+        run: |
+          mkdir -p nginx/build
+          cp -r web/build/. nginx/build/
+
       # バックエンド用 .env を作成（Docker Compose 用）
       - name: Create .env (backend)
         run: |
@@ -62,12 +73,9 @@ jobs:
           SECRET_KEY=dummy
           EOF
 
+      # ③ nginx/build/ が揃った状態で Docker ビルド
       - name: Docker Compose up
         run: docker compose up -d --build
 
-      - name: Build (dev)
-        working-directory: web
-        run: npm run build
-
       - name: ✅ Build succeeded
-        run: echo "フロントエンドのビルドが正常に完了しました"
+        run: echo "フロントエンドのビルド・Docker起動が正常に完了しました"

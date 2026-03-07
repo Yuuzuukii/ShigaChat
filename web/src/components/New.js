@@ -29,7 +29,7 @@ function New() {
       // ログイン成功時のリダイレクト処理
       const redirectPath = localStorage.getItem("redirectAfterLogin");
       localStorage.removeItem("redirectAfterLogin");
-      
+
       if (redirectPath && redirectPath !== "/new" && redirectPath !== "/") {
         console.log("🔄 ログイン後のリダイレクト:", redirectPath);
         navigate(redirectPath, { replace: true });
@@ -71,12 +71,14 @@ function New() {
         isAdmin: userData.isAdmin === 1,
       };
       setUser(mappedUser);
-      try { localStorage.setItem("user", JSON.stringify(mappedUser)); } catch {}
+      try {
+        localStorage.setItem("user", JSON.stringify(mappedUser));
+      } catch {}
 
       // ログイン成功時のリダイレクト処理
       const redirectPath = localStorage.getItem("redirectAfterLogin");
       localStorage.removeItem("redirectAfterLogin");
-      
+
       if (redirectPath && redirectPath !== "/new" && redirectPath !== "/") {
         console.log("🔄 ログイン後のリダイレクト:", redirectPath);
         navigate(redirectPath, { replace: true });
@@ -99,7 +101,9 @@ function New() {
   const handleLanguageChange = (event) => {
     const newLanguageCode = event.target.value;
     setLanguage(newLanguageCode);
-    try { localStorage.setItem("shigachat_lang", newLanguageCode); } catch {}
+    try {
+      localStorage.setItem("shigachat_lang", newLanguageCode);
+    } catch {}
   };
 
   return (
@@ -125,7 +129,10 @@ function New() {
               {/* Language selector pinned to top-right */}
               <div className="absolute right-4 top-4 flex items-center gap-2">
                 <Globe className="h-4 w-4 text-blue-600" />
-                <Select value={language} onValueChange={(val)=>handleLanguageChange({target:{value:val}})}>
+                <Select
+                  value={language}
+                  onValueChange={(val) => handleLanguageChange({ target: { value: val } })}
+                >
                   <SelectTrigger className="h-8 w-[140px] rounded-lg border-blue-200/80 bg-white/80 px-2 text-xs text-blue-700 shadow-sm backdrop-blur">
                     <SelectValue />
                   </SelectTrigger>
@@ -145,7 +152,11 @@ function New() {
 
               {/* Centered title */}
               <CardTitle className="flex flex-col items-center gap-2 text-blue-800">
-                <img src="./icon_192.png" alt="ShigaChat" className="h-10 w-10 rounded-xl shadow-sm" />
+                <img
+                  src={`${process.env.PUBLIC_URL}/icon_192.png`}
+                  alt="ShigaChat"
+                  className="h-10 w-10 rounded-xl shadow-sm"
+                />
                 <span className="text-2xl tracking-wide">ShigaChat</span>
               </CardTitle>
             </CardHeader>
@@ -153,7 +164,9 @@ function New() {
             <CardContent className="pb-6 pt-2">
               <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
                 <div className="space-y-2">
-                  <Label htmlFor="nickname" className="text-blue-900">{t.nickname}</Label>
+                  <Label htmlFor="nickname" className="text-blue-900">
+                    {t.nickname}
+                  </Label>
                   <Input
                     id="nickname"
                     placeholder={t.nickname}
@@ -165,7 +178,9 @@ function New() {
                 </div>
 
                 <div className="space-y-2">
-                  <Label htmlFor="password" className="text-blue-900">{t.password}</Label>
+                  <Label htmlFor="password" className="text-blue-900">
+                    {t.password}
+                  </Label>
                   <div className="relative">
                     <Input
                       id="password"
@@ -190,7 +205,10 @@ function New() {
                 </div>
 
                 {errorMessage && (
-                  <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                  <div
+                    className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                    role="alert"
+                  >
                     {errorMessage}
                   </div>
                 )}
@@ -227,7 +245,9 @@ function New() {
                 </Button>
               </form>
 
-              <div className="mt-6 text-center text-xs text-zinc-500">© {new Date().getFullYear()} ShigaChat</div>
+              <div className="mt-6 text-center text-xs text-zinc-500">
+                © {new Date().getFullYear()} ShigaChat
+              </div>
             </CardContent>
           </Card>
         </motion.div>

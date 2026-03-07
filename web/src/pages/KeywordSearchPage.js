@@ -5,9 +5,9 @@
  * - services/api.js の searchKeyword/addHistory を使用
  * - Admin 関連リンクを除外
  */
-import React, { useState, useEffect, useRef } from "react";
-import { useOutletContext } from "react-router-dom";
-import { searchKeyword, addHistory as addHistoryApi } from "../services/api";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { useOutletContext, useSearchParams } from "react-router-dom";
+import { searchKeyword } from "../services/api";
 import { categoryList } from "../config/categories";
 import RichText from "../components/common/RichText";
 import { Search as SearchIcon } from "lucide-react";
@@ -15,7 +15,11 @@ import { toast } from "../lib/utils";
 
 function normalizeErrorDetail(detail) {
   if (typeof detail === "string") return detail.trim();
-  if (Array.isArray(detail)) return detail.map((item) => String(item ?? "")).join(" ").trim();
+  if (Array.isArray(detail))
+    return detail
+      .map((item) => String(item ?? ""))
+      .join(" ")
+      .trim();
   if (detail && typeof detail === "object") {
     if (typeof detail.message === "string") return detail.message.trim();
     if (typeof detail.msg === "string") return detail.msg.trim();
@@ -53,8 +57,9 @@ function isNoResultError(status, message) {
 
 export default function KeywordSearchPage() {
   const { language, t } = useOutletContext();
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(() => searchParams.get("q") || "");
   const [keywordError, setKeywordError] = useState("");
   const [results, setResults] = useState([]);
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
@@ -66,7 +71,9 @@ export default function KeywordSearchPage() {
   const inputRef = useRef(null);
 
   // 初期フォーカス
-  useEffect(() => { inputRef.current?.focus(); }, []);
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
 
   // マウントアニメーション
   useEffect(() => {
@@ -83,52 +90,62 @@ export default function KeywordSearchPage() {
     setShowResults(false);
   }, [hasSearched]);
 
-  const handleSearch = async () => {
+  const executeSearch = useCallback(
+    async (trimmedKeyword) => {
+      setKeywordError("");
+      setShowNoResults(false);
+      setHasSearched(true);
+      setLastSearchedTerm(trimmedKeyword);
+
+      try {
+        const normalizedKeyword = language === "en" ? trimmedKeyword.toLowerCase() : trimmedKeyword;
+        const response = await searchKeyword(normalizedKeyword);
+        if (!response.ok) {
+          const detail = await readResponseErrorMessage(response);
+          if (isNoResultError(response.status, detail)) {
+            setResults([]);
+            setShowNoResults(true);
+            return;
+          }
+          throw new Error(detail || t.keyworderror || "検索に失敗しました");
+        }
+        const data = await response.json();
+        const normalized = Array.isArray(data) ? data : [];
+        setResults(normalized);
+        setShowNoResults(normalized.length === 0);
+      } catch (error) {
+        console.error("検索エラー:", error?.message || error);
+        setResults([]);
+        setShowNoResults(false);
+        toast.error(t.keyworderror || "検索に失敗しました", { duration: 4000 });
+      }
+    },
+    [language, t]
+  );
+
+  // URLの ?q= パラメータが存在すれば初回マウント時に自動検索
+  useEffect(() => {
+    const q = searchParams.get("q");
+    if (q && q.trim()) {
+      executeSearch(q.trim());
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleSearch = () => {
     const trimmedKeyword = keyword.trim();
     if (!trimmedKeyword) {
       setKeywordError(t.keywordRequired || "キーワードを入力してください");
       return;
     }
-    setKeywordError("");
-    setShowNoResults(false);
-
-    setHasSearched(true);
-    setLastSearchedTerm(trimmedKeyword);
-
-    try {
-      const normalizedKeyword =
-        language === "en" ? trimmedKeyword.toLowerCase() : trimmedKeyword;
-      const response = await searchKeyword(normalizedKeyword);
-      if (!response.ok) {
-        const detail = await readResponseErrorMessage(response);
-        if (isNoResultError(response.status, detail)) {
-          setResults([]);
-          setShowNoResults(true);
-          return;
-        }
-        throw new Error(detail || t.keyworderror || "検索に失敗しました");
-      }
-      const data = await response.json();
-      const normalized = Array.isArray(data) ? data : [];
-      setResults(normalized);
-      setShowNoResults(normalized.length === 0);
-    } catch (error) {
-      console.error("検索エラー:", error?.message || error);
-      setResults([]);
-      setShowNoResults(false);
-      toast.error(t.keyworderror || "検索に失敗しました", { duration: 4000 });
-    }
-  };
-
-  const handleAddHistory = async (questionId) => {
-    if (!questionId) return;
-    try { await addHistoryApi(questionId); } catch {}
+    // URLクエリパラメータを更新（履歴に追加）
+    setSearchParams({ q: trimmedKeyword });
+    executeSearch(trimmedKeyword);
   };
 
   const toggleAnswer = (questionId) => {
     if (!questionId) return;
     setVisibleAnswerId((prev) => (prev === questionId ? null : questionId));
-    handleAddHistory(questionId);
   };
 
   const onKeyDown = (e) => {
@@ -148,7 +165,9 @@ export default function KeywordSearchPage() {
         >
           <div
             className={`transition-all duration-500 ease-out ${
-              hasSearched ? "min-h-0 pt-6" : "min-h-[80vh] flex flex-col items-center justify-center"
+              hasSearched
+                ? "min-h-0 pt-6"
+                : "min-h-[80vh] flex flex-col items-center justify-center"
             }`}
           >
             {/* 初期ヘッダー */}
@@ -225,8 +244,18 @@ export default function KeywordSearchPage() {
                       >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
-                            <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            <svg
+                              className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0"
+                              fill="none"
+                              stroke="currentColor"
+                              viewBox="0 0 24 24"
+                            >
+                              <path
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                strokeWidth={2}
+                                d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                              />
                             </svg>
                             <div className="flex-1 min-w-0 leading-relaxed">
                               <RichText content={question.question_text || t.loading} />
@@ -241,24 +270,41 @@ export default function KeywordSearchPage() {
 
                         <div className="mt-2 text-sm text-zinc-500">
                           {t.category}:{" "}
-                          {categoryList?.find((cat) => cat.id === question.category_id)?.name?.[language] ||
-                            categoryList?.find((cat) => cat.id === question.category_id)?.name?.ja ||
+                          {categoryList?.find((cat) => cat.id === question.category_id)?.name?.[
+                            language
+                          ] ||
+                            categoryList?.find((cat) => cat.id === question.category_id)?.name
+                              ?.ja ||
                             t.unknownCategory}
                         </div>
 
                         <div className="mt-3 flex items-center justify-end gap-1 text-sm text-zinc-500">
-                          <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          <svg
+                            className="h-4 w-4 text-zinc-500"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                            />
                           </svg>
                           <span>
                             {t.questionDate}
-                            {new Date((question.update_time || "").replace(" ", "T")).toLocaleString()}
+                            {new Date(
+                              (question.update_time || "").replace(" ", "T")
+                            ).toLocaleString()}
                           </span>
                         </div>
 
                         {visibleAnswerId === question.question_id && (
                           <div className="mt-4 rounded-md bg-blue-50/50 p-4 text-zinc-800">
-                            <div className="text-sm font-semibold text-zinc-700 mb-2">{t.answer}</div>
+                            <div className="text-sm font-semibold text-zinc-700 mb-2">
+                              {t.answer}
+                            </div>
                             <div className="text-base leading-8 whitespace-pre-wrap break-words">
                               <RichText content={question.answer_text || t.loading} />
                             </div>

@@ -34,8 +34,7 @@ export async function apiFetch(path, options = {}, { onUnauthorized } = {}) {
 
 // ──────── ユーザー系 ────────
 
-export const fetchCurrentUser = (opts) =>
-  apiFetch("/user/current_user", {}, opts);
+export const fetchCurrentUser = (opts) => apiFetch("/user/current_user", {}, opts);
 
 export const postLogin = (username, password) =>
   apiFetch("/user/token", {
@@ -51,32 +50,47 @@ export const postRegister = (name, password, spokenLanguage) =>
   });
 
 export const postChangeLanguage = (languageName, opts) =>
-  apiFetch(`/user/change_language?language=${encodeURIComponent(languageName)}`, { method: "POST" }, opts);
+  apiFetch(
+    `/user/change_language?language=${encodeURIComponent(languageName)}`,
+    { method: "POST" },
+    opts
+  );
 
 // ──────── スレッド / 質問系 ────────
 
-export const fetchUserThreads = (opts) =>
-  apiFetch("/question/get_user_threads", {}, opts);
+export const fetchUserThreads = (opts) => apiFetch("/question/get_user_threads", {}, opts);
 
 export const fetchThreadMessages = (threadId, opts) =>
   apiFetch(`/question/get_thread_messages/${encodeURIComponent(String(threadId))}`, {}, opts);
 
 export const deleteThread = (threadId, opts) =>
-  apiFetch(`/question/delete_thread/${encodeURIComponent(String(threadId))}`, { method: "DELETE" }, opts);
+  apiFetch(
+    `/question/delete_thread/${encodeURIComponent(String(threadId))}`,
+    { method: "DELETE" },
+    opts
+  );
 
 export const postGetAnswer = (payload, opts) =>
-  apiFetch("/question/get_answer", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }, opts);
+  apiFetch(
+    "/question/get_answer",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    opts
+  );
 
 // ──────── アクション系 ────────
 
 export const postAction = (payload, opts) =>
-  apiFetch("/action/apply", {
-    method: "POST",
-    body: JSON.stringify(payload),
-  }, opts);
+  apiFetch(
+    "/action/apply",
+    {
+      method: "POST",
+      body: JSON.stringify(payload),
+    },
+    opts
+  );
 
 // ──────── キーワード検索系 ────────
 
@@ -103,19 +117,27 @@ export const fetchGlobalNotifications = (lang, opts) =>
   apiFetch(`/notification/notifications/global?lang=${lang}`, {}, opts);
 
 export const markNotificationRead = (notificationId, opts) =>
-  apiFetch("/notification/notifications/read", {
-    method: "PUT",
-    body: JSON.stringify({ id: notificationId }),
-  }, opts);
+  apiFetch(
+    "/notification/notifications/read",
+    {
+      method: "PUT",
+      body: JSON.stringify({ id: notificationId }),
+    },
+    opts
+  );
 
 export const markAllPersonalRead = (opts) =>
   apiFetch("/notification/notifications/read_all", { method: "PUT" }, opts);
 
 export const markGlobalNotificationRead = (notificationId, opts) =>
-  apiFetch("/notification/notifications/global/read", {
-    method: "POST",
-    body: JSON.stringify({ id: notificationId }),
-  }, opts);
+  apiFetch(
+    "/notification/notifications/global/read",
+    {
+      method: "POST",
+      body: JSON.stringify({ id: notificationId }),
+    },
+    opts
+  );
 
 export const markAllGlobalRead = (opts) =>
   apiFetch("/notification/notifications/global/read_all", { method: "POST" }, opts);
@@ -123,7 +145,11 @@ export const markAllGlobalRead = (opts) =>
 // ──────── 履歴系 ────────
 
 export const addHistory = (questionId, opts) =>
-  apiFetch("/history/add_history", {
-    method: "POST",
-    body: JSON.stringify({ question_id: questionId }),
-  }, opts);
+  apiFetch(
+    "/history/add_history",
+    {
+      method: "POST",
+      body: JSON.stringify({ question_id: questionId }),
+    },
+    opts
+  );
