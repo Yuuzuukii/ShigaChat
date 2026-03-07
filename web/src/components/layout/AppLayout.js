@@ -19,7 +19,11 @@ export default function AppLayout() {
 
   const location = useLocation();
   const activeThreadId = useMemo(() => {
-    try { return new URLSearchParams(location.search).get("tid"); } catch { return null; }
+    try {
+      return new URLSearchParams(location.search).get("tid");
+    } catch {
+      return null;
+    }
   }, [location.search]);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
