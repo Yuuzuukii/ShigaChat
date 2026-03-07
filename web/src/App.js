@@ -1,11 +1,5 @@
-import React, { useContext, useEffect } from "react";
-import {
-  BrowserRouter as Router,
-  Route,
-  Routes,
-  Navigate,
-  useNavigate,
-} from "react-router-dom";
+import React, { useContext } from "react";
+import { BrowserRouter as Router, Route, Routes, Navigate } from "react-router-dom";
 import { UserContext } from "./contexts/UserContext";
 import { BASE_PATH, MAINTENANCE_MODE } from "./config/constants";
 
@@ -21,26 +15,6 @@ import CategoryListPage from "./pages/CategoryListPage";
 import CategoryDetailPage from "./pages/CategoryDetailPage";
 import NotFoundPage from "./pages/NotFoundPage";
 import MaintenancePage from "./pages/MaintenancePage";
-
-/**
- * TokenExpiredHandler - トークン切れイベントハンドラー
- */
-function TokenExpiredHandler() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const handleTokenExpired = () => {
-      console.warn("🔒 トークンが切れました。ログインページにリダイレクトします。");
-      try { localStorage.removeItem("redirectAfterLogin"); } catch {}
-      navigate("/login");
-    };
-
-    window.addEventListener("tokenExpired", handleTokenExpired);
-    return () => window.removeEventListener("tokenExpired", handleTokenExpired);
-  }, [navigate]);
-
-  return null;
-}
 
 function App() {
   const { isLoading } = useContext(UserContext);
@@ -66,7 +40,6 @@ function App() {
 
   return (
     <Router basename={BASE_PATH}>
-      <TokenExpiredHandler />
       <Routes>
         {/* ルート → ログイン画面にリダイレクト */}
         <Route path="" element={<Navigate to="/login" />} />
