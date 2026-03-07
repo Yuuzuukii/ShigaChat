@@ -172,7 +172,6 @@ jobs:
           ls -la ~/.ssh
           ssh -vvv target "echo ok"
 
-
       # ─── ファイル転送 (rsync over ProxyJump) ───
       - name: Sync files to remote server
         run: |
