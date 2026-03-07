@@ -81,6 +81,7 @@ jobs:
           cat > .env.deploy << 'EOF'
           REACT_APP_API_URL=https://si-lab.org/shigachat/api
           REACT_APP_BASE_PATH="/shigachat"
+          PUBLIC_URL=/shigachat
           EOF
 
       - name: Build
