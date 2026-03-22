@@ -2,6 +2,13 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
+    <script>
+      const basePath = ("%REACT_APP_BASE_PATH%" || "/").replace(/\/+$/, "");
+      if (basePath && basePath !== "/" && window.location.pathname === "/") {
+        const suffix = `${window.location.search}${window.location.hash}`;
+        window.location.replace(`${basePath}/${suffix}`);
+      }
+    </script>
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />

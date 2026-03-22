@@ -11,7 +11,7 @@ from typing import List, Dict, Any, Optional
 from database_utils import get_db_cursor, get_placeholder
 from api.rag.detect import detect_language
 from api.rag.search import retrieve
-from api.rag.prompt_builder import build_prompt
+from api.rag.prompt_builder import build_prompt, normalize_fallback_prefix
 from api.rag.generator import generate_answer, strip_citations, summarize_history_for_query
 
 
@@ -174,6 +174,12 @@ def answer_with_rag_pg(
             clean_text = parsed["answer"]
     except (json.JSONDecodeError, TypeError):
         pass
+
+    clean_text = normalize_fallback_prefix(
+        clean_text,
+        lang=prompt_lang,
+        used_source_ids=used_source_ids,
+    )
 
     return {
         "type": "rag",
