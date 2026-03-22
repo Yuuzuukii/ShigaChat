@@ -3,7 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <script>
-      const basePath = ("%REACT_APP_BASE_PATH%" || "/").replace(/\/+$/, "");
+      const publicUrl = "%PUBLIC_URL%";
+      const basePath = (() => {
+        try {
+          return new URL(publicUrl || "/", window.location.origin).pathname.replace(/\/+$/, "");
+        } catch {
+          return (publicUrl || "/").replace(/\/+$/, "");
+        }
+      })();
       if (basePath && basePath !== "/" && window.location.pathname === "/") {
         const suffix = `${window.location.search}${window.location.hash}`;
         window.location.replace(`${basePath}/${suffix}`);
