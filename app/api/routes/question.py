@@ -402,10 +402,11 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
         action_type = "rag"
 
         # used_source_ids でフィルタ（LLMが実際に参照した出典のみ）
-        if used_source_ids:
-            rag_qa = [r for r in references if r.get("sid") in used_source_ids]
-        else:
-            rag_qa = references if isinstance(references, list) else []
+        # used_source_ids が空なら、取得候補があっても UI には返さない。
+        rag_qa = []
+        if isinstance(references, list) and used_source_ids:
+            used_source_id_set = set(used_source_ids)
+            rag_qa = [r for r in references if r.get("sid") in used_source_id_set]
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
         _ensure_threads_has_summary_column()
