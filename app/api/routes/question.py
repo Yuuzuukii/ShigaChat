@@ -1,17 +1,24 @@
+import asyncio
 from datetime import datetime
+import os
 import re
+import httpx
 from fastapi import APIRouter, HTTPException, Depends, Query, BackgroundTasks
+from fastapi.responses import StreamingResponse
+from typing import Optional, Tuple
 from config import language_mapping
 from database_utils import get_db_cursor, get_placeholder
+from api.agent_client import generate_answer_via_agent
 from api.routes.user import current_user_info
 from models.schemas import Question
-from api.rag.orchestrator import answer_with_rag_pg
+from api.rag.orchestrator import answer_with_rag_pg, load_history
 from api.rag.detect import detect_language
 from api.rag.summarizer import save_thread_summary
 from api.utils.reactive import title_text
 import json
 
 router = APIRouter()
+AGENT_API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "http://agent:8001")
 
 # --- Helpers ---------------------------------------------------------------
 _OPENAI_KEY_MISSING_MESSAGES = {
@@ -167,6 +174,43 @@ def _fit_thread_title(text: str) -> str:
 
 def _fallback_thread_title(spoken_language: str) -> str:
     return _UNTITLED_BY_LANGUAGE.get(spoken_language, _UNTITLED_BY_LANGUAGE["English"])
+
+
+def _sse_event(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+
+
+def _parse_sse_chunk(raw_event: str) -> Tuple[Optional[str], Optional[dict]]:
+    event_name = None
+    data_lines: list[str] = []
+    for line in raw_event.splitlines():
+        if line.startswith("event:"):
+            event_name = line.split(":", 1)[1].strip()
+        elif line.startswith("data:"):
+            data_lines.append(line.split(":", 1)[1].strip())
+
+    if not event_name:
+        return None, None
+
+    payload = {}
+    if data_lines:
+        try:
+            payload = json.loads("\n".join(data_lines))
+        except json.JSONDecodeError:
+            payload = {"raw": "\n".join(data_lines)}
+    return event_name, payload
+
+
+def _to_agent_chat_history(history_qa: list[dict]) -> list[list[str]]:
+    chat_history: list[list[str]] = []
+    for item in history_qa:
+        question = (item.get("question") or "").strip()
+        answer = (item.get("answer") or "").strip()
+        if question:
+            chat_history.append(["human", question])
+        if answer:
+            chat_history.append(["ai", answer])
+    return chat_history
 
 
 def _generate_thread_title(question_text: str, spoken_language: str) -> str:
@@ -362,15 +406,8 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
                 conn.commit()
 
         # ---- 履歴の取得（逐次フローの reactive で参照するので先に取る） ----------
-        with get_db_cursor() as (cursor, conn):
-            cursor.execute(f"""
-                SELECT question, answer FROM thread_qa
-                WHERE thread_id = {ph}
-                ORDER BY created_at DESC
-                LIMIT 6
-            """, (assigned_thread_id,))
-            past_qa_rows = cursor.fetchall()
-        history_qa = list(reversed(past_qa_rows))  # [(user, bot), ...] の昇順に
+        history_qa = load_history(assigned_thread_id, k=6)
+        agent_chat_history = _to_agent_chat_history(history_qa)
         is_first_turn = len(history_qa) == 0
         generated_thread_title = None
         if is_first_turn:
@@ -386,27 +423,46 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
         except Exception:
             sim_th = 0.3
 
-        resp = answer_with_rag_pg(
-            question_text=question_text,
-            thread_id=assigned_thread_id,
-            similarity_threshold=sim_th,
-            top_k=5,
-            user_spoken_language=current_user.get("spoken_language"),
-        )
+        try:
+            agent_resp = await generate_answer_via_agent(
+                question_text,
+                assigned_thread_id,
+                agent_chat_history,
+            )
+            answer_text = (agent_resp.get("answer") or "").strip()
+            agent_refs = agent_resp.get("ref_qa") or []
+            rag_qa = [
+                {"question": item.get("question", ""), "answer": item.get("answer", "")}
+                for item in agent_refs
+                if isinstance(item, dict)
+            ]
+            meta = {
+                "references": rag_qa,
+                "source": "agent",
+            }
+            action_type = "rag"
+        except Exception:
+            resp = answer_with_rag_pg(
+                question_text=question_text,
+                thread_id=assigned_thread_id,
+                similarity_threshold=sim_th,
+                top_k=5,
+                user_spoken_language=current_user.get("spoken_language"),
+            )
 
-        # RAG専用応答を展開
-        answer_text = resp.get("text", "").strip()
-        meta = resp.get("meta", {}) or {}
-        references = meta.get("references", []) if isinstance(meta, dict) else []
-        used_source_ids = meta.get("used_source_ids", []) if isinstance(meta, dict) else []
-        action_type = "rag"
+            # RAG専用応答を展開
+            answer_text = resp.get("text", "").strip()
+            meta = resp.get("meta", {}) or {}
+            references = meta.get("references", []) if isinstance(meta, dict) else []
+            used_source_ids = meta.get("used_source_ids", []) if isinstance(meta, dict) else []
+            action_type = "rag"
 
-        # used_source_ids でフィルタ（LLMが実際に参照した出典のみ）
-        # used_source_ids が空なら、取得候補があっても UI には返さない。
-        rag_qa = []
-        if isinstance(references, list) and used_source_ids:
-            used_source_id_set = set(used_source_ids)
-            rag_qa = [r for r in references if r.get("sid") in used_source_id_set]
+            # used_source_ids でフィルタ（LLMが実際に参照した出典のみ）
+            # used_source_ids が空なら、取得候補があっても UI には返さない。
+            rag_qa = []
+            if isinstance(references, list) and used_source_ids:
+                used_source_id_set = set(used_source_ids)
+                rag_qa = [r for r in references if r.get("sid") in used_source_id_set]
 
         # ---- DB 保存（thread_qa に rag_qa も入れる） ----------------------------
         _ensure_threads_has_summary_column()
@@ -477,6 +533,155 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
         error_detail = f"内部エラー: {str(e)}"
         print(f"❌ {error_detail}")
         raise HTTPException(status_code=500, detail=error_detail)
+
+
+@router.post("/get_answer_stream")
+async def get_answer_stream(
+    request: Question,
+    current_user: dict = Depends(current_user_info),
+):
+    question_text = request.text
+    req_thread_id = request.thread_id
+    user_id = current_user["id"]
+
+    ph = get_placeholder()
+    with get_db_cursor() as (cursor, conn):
+        assigned_thread_id = None
+
+        if req_thread_id is not None:
+            cursor.execute(f"SELECT id, user_id FROM threads WHERE id = {ph}", (req_thread_id,))
+            row = cursor.fetchone()
+            if row:
+                if row["user_id"] != user_id:
+                    raise HTTPException(status_code=403, detail="このスレッドにアクセスする権限がありません")
+                assigned_thread_id = req_thread_id
+
+        if assigned_thread_id is None:
+            cursor.execute(
+                f"INSERT INTO threads (user_id, last_updated) VALUES ({ph}, {ph}) RETURNING id",
+                (user_id, datetime.now()),
+            )
+            assigned_thread_id = cursor.fetchone()["id"]
+            conn.commit()
+
+    history_qa = load_history(assigned_thread_id, k=6)
+    agent_chat_history = _to_agent_chat_history(history_qa)
+    is_first_turn = len(history_qa) == 0
+    generated_thread_title = None
+    if is_first_turn:
+        generated_thread_title = _generate_thread_title(
+            question_text,
+            current_user.get("spoken_language", "English"),
+        )
+
+    async def event_generator():
+        answer_parts: list[str] = []
+        rag_qa: list[dict] = []
+        yield _sse_event(
+            "thread_ready",
+            {
+                "thread_id": assigned_thread_id,
+                "thread_title": generated_thread_title,
+            },
+        )
+
+        try:
+            async with httpx.AsyncClient(timeout=None) as client:
+                async with client.stream(
+                    "POST",
+                    f"{AGENT_API_BASE_URL}/chat/stream",
+                    json={
+                        "question": question_text,
+                        "thread_id": assigned_thread_id,
+                        "chat_history": agent_chat_history,
+                    },
+                ) as response:
+                    response.raise_for_status()
+                    buffer = ""
+                    async for chunk in response.aiter_text():
+                        buffer += chunk
+                        while "\n\n" in buffer:
+                            raw_event, buffer = buffer.split("\n\n", 1)
+                            event_name, payload = _parse_sse_chunk(raw_event)
+                            if not event_name:
+                                continue
+
+                            if event_name == "token":
+                                token = payload.get("content", "")
+                                if token:
+                                    answer_parts.append(token)
+                            elif event_name == "end":
+                                rag_qa = payload.get("ref_qa", []) or []
+
+                            if event_name != "end":
+                                yield _sse_event(event_name, payload)
+
+            answer_text = "".join(answer_parts).strip()
+
+            _ensure_threads_has_summary_column()
+            _ensure_threads_has_thread_title_column()
+            with get_db_cursor() as (cursor, conn):
+                _ensure_thread_qa_has_rag_column()
+                _ensure_thread_qa_has_type_column()
+                try:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO thread_qa (thread_id, question, answer, rag_qa, type)
+                        VALUES ({ph}, {ph}, {ph}, {ph}, {ph})
+                        """,
+                        (
+                            assigned_thread_id,
+                            question_text,
+                            answer_text,
+                            json.dumps(rag_qa, ensure_ascii=False),
+                            "rag",
+                        ),
+                    )
+                except Exception:
+                    cursor.execute(
+                        f"""
+                        INSERT INTO thread_qa (thread_id, question, answer, rag_qa)
+                        VALUES ({ph}, {ph}, {ph}, {ph})
+                        """,
+                        (
+                            assigned_thread_id,
+                            question_text,
+                            answer_text,
+                            json.dumps(rag_qa, ensure_ascii=False),
+                        ),
+                    )
+
+                if generated_thread_title:
+                    cursor.execute(
+                        f"UPDATE threads SET last_updated = {ph}, thread_title = {ph} WHERE id = {ph}",
+                        (datetime.now(), generated_thread_title, assigned_thread_id),
+                    )
+                else:
+                    cursor.execute(
+                        f"UPDATE threads SET last_updated = {ph} WHERE id = {ph}",
+                        (datetime.now(), assigned_thread_id),
+                    )
+                conn.commit()
+
+            await asyncio.to_thread(save_thread_summary, assigned_thread_id, question_text, answer_text)
+
+            yield _sse_event(
+                "end",
+                {
+                    "thread_id": assigned_thread_id,
+                    "thread_title": generated_thread_title,
+                    "answer": answer_text,
+                    "ref_qa": rag_qa,
+                    "meta": {
+                        "references": rag_qa,
+                        "source": "agent",
+                    },
+                },
+            )
+        except Exception as e:
+            yield _sse_event("error", {"message": str(e)})
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 @router.get("/get_translated_answer")
 async def get_translated_answer(

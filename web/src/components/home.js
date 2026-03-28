@@ -113,6 +113,7 @@ export default function Home() {
   const [actionMessage, setActionMessage] = useState("");
   const [threadsLoading, setThreadsLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
+  const progressTimerIdsRef = useRef([]);
   // Guard to avoid wiping optimistic messages when creating first thread
   const skipNextThreadLoad = useRef(false);
   // Normalize + merge helpers for thread objects
@@ -678,8 +679,10 @@ export default function Home() {
     const typingMsg = {
       id: "typing",
       role: "assistant",
-      content: "…",
+      content: "",
       typing: true,
+      progress: 8,
+      progressText: t?.preparingAnswer || "回答の準備をしています…",
     };
 
     // Check if this is the first message BEFORE updating messages
@@ -695,18 +698,45 @@ export default function Home() {
     setLoading(true);
     setErrorMessage("");
 
+    const clearProgressTimers = () => {
+      progressTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      progressTimerIdsRef.current = [];
+    };
+
+    const updateTypingMessage = (updater) => {
+      setMessages((prev) =>
+        prev.map((message) =>
+          message.id === "typing" ? { ...message, ...updater(message) } : message
+        )
+      );
+    };
+
+    const progressLabels = {
+      thread_ready: { text: t?.preparingAnswer || "回答の準備をしています…", progress: 10 },
+      history_loaded: { text: t?.progressHistory || "会話履歴を読み込んでいます…", progress: 25 },
+      language_detected: {
+        text: t?.progressUnderstanding || "質問内容を整理しています…",
+        progress: 40,
+      },
+      vector_search_done: {
+        text: t?.progressSearching || "関連情報を確認しています…",
+        progress: 60,
+      },
+      reference_selected: { text: t?.progressSelecting || "参考情報を選んでいます…", progress: 75 },
+      answer_start: { text: t?.progressComposing || "回答をまとめています…", progress: 90 },
+    };
+
     try {
-      // when threadId is temporary, omit thread_id so server creates autoincrement thread
       const isTemp = String(threadId).startsWith("tmp-");
-      const base = {
-        text,
-        similarity_threshold: similarity,
-      };
-      const payload = isTemp ? base : { thread_id: Number(threadId), ...base };
-      const res = await fetch(`${API_BASE_URL}/question/get_answer`, {
+      const payload = isTemp
+        ? { text, similarity_threshold: similarity }
+        : { thread_id: Number(threadId), text, similarity_threshold: similarity };
+
+      const res = await fetch(`${API_BASE_URL}/question/get_answer_stream`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          Accept: "text/event-stream",
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify(payload),
@@ -743,66 +773,114 @@ export default function Home() {
         console.log("Final error message:", errorMessage); // デバッグ用ログ
         throw new Error(errorMessage);
       }
-      const data = await res.json();
-
-      // If we started from a temporary thread, map it to server-assigned ID
-      if (isTemp && data && data.thread_id != null) {
-        const newId = String(data.thread_id);
-        const oldId = String(threadId);
-        if (newId !== oldId) {
-          // migrate localStorage messages
-          try {
-            const oldKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${oldId}`;
-            const newKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${newId}`;
-            const oldVal = localStorage.getItem(oldKey);
-            if (oldVal !== null) {
-              localStorage.setItem(newKey, oldVal);
-              localStorage.removeItem(oldKey);
-            }
-          } catch {}
-          setCurrentThreadId(newId);
-          setCurrentThreadIdLS(newId);
-          threadId = newId;
-
-          // Update URL to reflect the new thread ID
-          const url = new URL(window.location);
-          url.searchParams.set("tid", newId);
-          window.history.replaceState({}, "", url.toString());
-
-          // Notify NavBar about the new active thread
-          try {
-            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
-          } catch {}
-        }
+      if (!res.body) {
+        throw new Error("Streaming response is empty");
       }
 
-      // Add assistant message
-      const asstMsg = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.answer,
-        time: new Date().toISOString(),
-        rag_qa: data.meta && Array.isArray(data.meta.references) ? data.meta.references : [],
-        type: data.type || "",
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalPayload = null;
+
+      const handleThreadReady = (data) => {
+        if (!(isTemp && data && data.thread_id != null)) return;
+        const newId = String(data.thread_id);
+        const oldId = String(threadId);
+        if (newId === oldId) return;
+        try {
+          const oldKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${oldId}`;
+          const newKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${newId}`;
+          const oldVal = localStorage.getItem(oldKey);
+          if (oldVal !== null) {
+            localStorage.setItem(newKey, oldVal);
+            localStorage.removeItem(oldKey);
+          }
+        } catch {}
+        setCurrentThreadId(newId);
+        setCurrentThreadIdLS(newId);
+        threadId = newId;
+
+        const url = new URL(window.location);
+        url.searchParams.set("tid", newId);
+        window.history.replaceState({}, "", url.toString());
+        try {
+          window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
+        } catch {}
       };
 
-      setMessages((prev) => {
-        const next = prev.filter((m) => m.id !== "typing");
-        next.push(asstMsg);
-        return next;
-      });
+      const processEvent = (rawEvent) => {
+        const lines = rawEvent.split("\n");
+        let eventName = "";
+        const dataLines = [];
+        for (const line of lines) {
+          if (line.startsWith("event:")) eventName = line.slice(6).trim();
+          if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+        }
+        if (!eventName) return;
+        const data = dataLines.length ? JSON.parse(dataLines.join("\n")) : {};
+
+        if (eventName === "thread_ready") {
+          handleThreadReady(data);
+        } else if (eventName === "token") {
+          updateTypingMessage((message) => ({
+            typing: false,
+            progress: 92,
+            progressText: t?.progressComposing || "回答を生成しています…",
+            content: `${message.content || ""}${data.content || ""}`,
+          }));
+        } else if (eventName === "end") {
+          finalPayload = data;
+        } else if (eventName === "error") {
+          throw new Error(data.message || "Streaming failed");
+        } else if (progressLabels[eventName]) {
+          updateTypingMessage(() => ({
+            progressText: progressLabels[eventName].text,
+            progress: progressLabels[eventName].progress,
+          }));
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+        while (buffer.includes("\n\n")) {
+          const boundaryIndex = buffer.indexOf("\n\n");
+          const rawEvent = buffer.slice(0, boundaryIndex);
+          buffer = buffer.slice(boundaryIndex + 2);
+          if (rawEvent.trim()) processEvent(rawEvent);
+        }
+
+        if (done) break;
+      }
+
+      if (!finalPayload) {
+        throw new Error("Streaming ended without completion event");
+      }
+
+      updateTypingMessage(() => ({
+        typing: false,
+        progress: null,
+        progressText: null,
+        content: finalPayload.answer || "",
+        rag_qa:
+          finalPayload.meta && Array.isArray(finalPayload.meta.references)
+            ? finalPayload.meta.references
+            : [],
+        type: "rag",
+        time: new Date().toISOString(),
+      }));
 
       // Update local title immediately for better UX if it's the first message
       if (isFirstMessage) {
         const newTitle = text.slice(0, 50) + (text.length > 50 ? "..." : "");
-        console.log("Updating thread title:", threadId, "with:", newTitle);
-        renameThread(threadId, newTitle);
+        renameThread(threadId, finalPayload.thread_title || newTitle);
 
         // Immediately notify NavBar about the title change
         try {
           window.dispatchEvent(
             new CustomEvent("threadTitleChanged", {
-              detail: { threadId, title: newTitle },
+              detail: { threadId, title: finalPayload.thread_title || newTitle },
             })
           );
         } catch {}
@@ -830,6 +908,8 @@ export default function Home() {
       setMessages((prev) => prev.filter((m) => m.id !== "typing"));
       setErrorMessage(e.message);
     } finally {
+      progressTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId));
+      progressTimerIdsRef.current = [];
       setLoading(false);
     }
   };
@@ -1234,20 +1314,38 @@ export default function Home() {
                               </div>
                               <div className="prose prose-sm max-w-none text-zinc-800 leading-relaxed">
                                 {m.typing ? (
-                                  <div className="flex items-center gap-2">
-                                    <div className="flex gap-1">
-                                      <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]"></div>
-                                      <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]"></div>
-                                      <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600"></div>
+                                  <div className="w-full max-w-md">
+                                    <div className="flex items-center gap-2">
+                                      <div className="flex gap-1">
+                                        <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]"></div>
+                                        <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]"></div>
+                                        <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600"></div>
+                                      </div>
+                                      <span className="text-sm text-zinc-600">
+                                        {m.progressText || t?.generatingAnswer || "回答を生成中…"}
+                                      </span>
                                     </div>
-                                    <span className="text-sm text-zinc-600">
-                                      {t?.generatingAnswer || "回答を生成中…"}
-                                    </span>
                                   </div>
                                 ) : (
                                   <RichText content={m.content} />
                                 )}
                               </div>
+                              {m.progress != null && (
+                                <div className="mt-3 w-full max-w-md rounded-lg border border-blue-200 bg-blue-50/70 p-3">
+                                  <div className="mb-2 flex items-center justify-between text-xs font-medium text-blue-700">
+                                    <span>
+                                      {m.progressText || t?.generatingAnswer || "回答を生成中…"}
+                                    </span>
+                                    <span>{m.progress}%</span>
+                                  </div>
+                                  <div className="h-3 w-full overflow-hidden rounded-full bg-blue-100">
+                                    <div
+                                      className="h-full rounded-full bg-blue-600 transition-all duration-500"
+                                      style={{ width: `${m.progress || 8}%` }}
+                                    ></div>
+                                  </div>
+                                </div>
+                              )}
 
                               {/* Enhanced RAG section with simple text design */}
                               {!m.typing &&

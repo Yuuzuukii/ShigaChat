@@ -98,13 +98,17 @@ function AssistantBubble({ m, t, navigate }) {
       </div>
       <div className="prose prose-sm max-w-none text-zinc-800 leading-relaxed">
         {m.typing ? (
-          <div className="flex items-center gap-2">
-            <div className="flex gap-1">
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]" />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]" />
-              <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600" />
+          <div className="w-full max-w-md">
+            <div className="flex items-center gap-2">
+              <div className="flex gap-1">
+                <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]" />
+                <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]" />
+                <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600" />
+              </div>
+              <span className="text-sm text-zinc-600">
+                {m.progressText || t?.generatingAnswer || "回答を生成中…"}
+              </span>
             </div>
-            <span className="text-sm text-zinc-600">{t?.generatingAnswer || "回答を生成中…"}</span>
           </div>
         ) : (
           <RichText content={m.content} />

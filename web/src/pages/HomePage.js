@@ -8,7 +8,7 @@ import { motion } from "framer-motion";
 import { Plus } from "lucide-react";
 import ChatMessages from "../components/chat/ChatMessages";
 import ChatInput from "../components/chat/ChatInput";
-import { postGetAnswer, postAction, fetchUserThreads } from "../services/api";
+import { postGetAnswerStream, postAction, fetchUserThreads } from "../services/api";
 import { languageCodeToLabel } from "../config/i18n";
 import { toast } from "../lib/utils";
 
@@ -136,6 +136,28 @@ function normalizeActionError(error, actionType, t) {
   if (isActionInternalError) return fallback;
   if (DB_ERROR_PATTERNS.some((pattern) => pattern.test(raw))) return fallback;
   return raw || fallback;
+}
+
+function parseSseEvent(rawEvent) {
+  const lines = rawEvent.split("\n");
+  let eventName = "";
+  const dataLines = [];
+
+  for (const line of lines) {
+    if (line.startsWith("event:")) eventName = line.slice(6).trim();
+    if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
+  }
+
+  if (!eventName) return null;
+
+  try {
+    return {
+      eventName,
+      data: dataLines.length ? JSON.parse(dataLines.join("\n")) : {},
+    };
+  } catch {
+    return { eventName, data: {} };
+  }
 }
 
 export default function HomePage() {
@@ -288,7 +310,14 @@ export default function HomePage() {
       content: text,
       time: new Date().toISOString(),
     };
-    const typingMsg = { id: "typing", role: "assistant", content: "…", typing: true };
+    const typingMsg = {
+      id: "typing",
+      role: "assistant",
+      content: "",
+      typing: true,
+      progress: 8,
+      progressText: t?.preparingAnswer || "回答の準備をしています…",
+    };
     const isFirstMessage = messages.length === 0;
 
     setMessages((prev) => [...prev, userMsg, typingMsg]);
@@ -304,49 +333,156 @@ export default function HomePage() {
         ? { text, similarity_threshold: similarity }
         : { thread_id: Number(threadId), text, similarity_threshold: similarity };
 
-      const res = await postGetAnswer(payload, { onUnauthorized });
+      const res = await postGetAnswerStream(payload, { onUnauthorized });
       if (!res.ok) {
         const detail = await readResponseErrorMessage(res);
         throw new Error(detail || t?.failtogetanswer || "回答の取得に失敗しました");
       }
-      const data = await res.json();
-
-      // Temp thread → server-assigned ID migration
-      if (isTemp && data?.thread_id != null) {
-        const newId = String(data.thread_id);
-        if (newId !== String(threadId)) {
-          try {
-            const oldKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`;
-            const newKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${newId}`;
-            const oldVal = localStorage.getItem(oldKey);
-            if (oldVal !== null) {
-              localStorage.setItem(newKey, oldVal);
-              localStorage.removeItem(oldKey);
-            }
-          } catch {}
-          // Keep current optimistic messages; avoid reload flicker on tmp -> real thread migration.
-          skipNextThreadLoad.current = true;
-          setCurrentThreadId(newId);
-          threadId = newId;
-          navigate(`/home?tid=${encodeURIComponent(newId)}`, { replace: true });
-          try {
-            window.dispatchEvent(new CustomEvent("threadSelected", { detail: newId }));
-          } catch {}
-        }
+      if (!res.body) {
+        throw new Error("Streaming response is empty");
       }
 
-      const asstMsg = {
-        id: crypto.randomUUID(),
-        role: "assistant",
-        content: data.answer,
-        time: new Date().toISOString(),
-        rag_qa: data.meta?.references || [],
-        type: data.type || "",
+      const progressLabels = {
+        thread_ready: {
+          text: t?.preparingAnswer || "回答の準備をしています…",
+          progress: 10,
+        },
+        history_loaded: {
+          text: t?.progressHistory || "会話履歴を読み込んでいます…",
+          progress: 25,
+        },
+        language_detected: {
+          text: t?.progressUnderstanding || "質問内容を整理しています…",
+          progress: 40,
+        },
+        vector_search_done: {
+          text: t?.progressSearching || "関連情報を確認しています…",
+          progress: 60,
+        },
+        reference_selected: {
+          text: t?.progressSelecting || "参考情報を選んでいます…",
+          progress: 75,
+        },
+        answer_start: {
+          text: t?.progressComposing || "回答をまとめています…",
+          progress: 90,
+        },
       };
-      setMessages((prev) => [...prev.filter((m) => m.id !== "typing"), asstMsg]);
+
+      const updateTypingMessage = (updater) => {
+        setMessages((prev) =>
+          prev.map((message) =>
+            message.id === "typing" ? { ...message, ...updater(message) } : message
+          )
+        );
+      };
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let finalPayload = null;
+      let resolvedThreadId = null;
+
+      // Temp thread → server-assigned ID migration
+      const handleThreadReady = (data) => {
+        if (!(isTemp && data?.thread_id != null)) return;
+        const newId = String(data.thread_id);
+        if (newId === String(threadId)) return;
+        resolvedThreadId = newId;
+      };
+
+      const processEvent = (rawEvent) => {
+        const parsed = parseSseEvent(rawEvent);
+        if (!parsed) return;
+        const { eventName, data } = parsed;
+
+        if (eventName === "thread_ready") {
+          handleThreadReady(data);
+          return;
+        }
+
+        if (eventName === "token") {
+          updateTypingMessage((message) => ({
+            typing: false,
+            progress: 92,
+            progressText: t?.progressComposing || "回答を生成しています…",
+            content: `${message.content || ""}${data.content || ""}`,
+          }));
+          return;
+        }
+
+        if (eventName === "end") {
+          finalPayload = data;
+          return;
+        }
+
+        if (eventName === "error") {
+          throw new Error(data.message || "Streaming failed");
+        }
+
+        if (progressLabels[eventName]) {
+          updateTypingMessage(() => ({
+            progress: progressLabels[eventName].progress,
+            progressText: progressLabels[eventName].text,
+          }));
+        }
+      };
+
+      while (true) {
+        const { value, done } = await reader.read();
+        buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+
+        while (buffer.includes("\n\n")) {
+          const boundaryIndex = buffer.indexOf("\n\n");
+          const rawEvent = buffer.slice(0, boundaryIndex);
+          buffer = buffer.slice(boundaryIndex + 2);
+          if (rawEvent.trim()) processEvent(rawEvent);
+        }
+
+        if (done) break;
+      }
+
+      if (!finalPayload) {
+        throw new Error("Streaming ended without completion event");
+      }
+
+      if (!resolvedThreadId && isTemp && finalPayload?.thread_id != null) {
+        resolvedThreadId = String(finalPayload.thread_id);
+      }
+
+      if (resolvedThreadId && resolvedThreadId !== String(threadId)) {
+        try {
+          const oldKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`;
+          const newKey = `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${resolvedThreadId}`;
+          const oldVal = localStorage.getItem(oldKey);
+          if (oldVal !== null) {
+            localStorage.setItem(newKey, oldVal);
+            localStorage.removeItem(oldKey);
+          }
+        } catch {}
+
+        skipNextThreadLoad.current = true;
+        setCurrentThreadId(resolvedThreadId);
+        threadId = resolvedThreadId;
+        navigate(`/home?tid=${encodeURIComponent(resolvedThreadId)}`, { replace: true });
+        try {
+          window.dispatchEvent(new CustomEvent("threadSelected", { detail: resolvedThreadId }));
+        } catch {}
+      }
+
+      updateTypingMessage(() => ({
+        typing: false,
+        progress: null,
+        progressText: null,
+        content: finalPayload.answer || "",
+        time: new Date().toISOString(),
+        rag_qa: finalPayload.meta?.references || [],
+        type: "rag",
+      }));
 
       if (isFirstMessage) {
-        const serverTitle = typeof data?.thread_title === "string" ? data.thread_title.trim() : "";
+        const serverTitle =
+          typeof finalPayload?.thread_title === "string" ? finalPayload.thread_title.trim() : "";
         const newTitle = serverTitle || t?.newChat || "New Chat";
         renameThread(threadId, newTitle);
         try {

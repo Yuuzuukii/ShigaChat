@@ -93,6 +93,17 @@ export const postGetAnswer = (payload, opts) =>
     opts
   );
 
+export const postGetAnswerStream = (payload, opts) =>
+  apiFetch(
+    "/question/get_answer_stream",
+    {
+      method: "POST",
+      headers: { Accept: "text/event-stream" },
+      body: JSON.stringify(payload),
+    },
+    opts
+  );
+
 // ──────── アクション系 ────────
 
 export const postAction = (payload, opts) =>
