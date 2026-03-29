@@ -201,16 +201,27 @@ def _parse_sse_chunk(raw_event: str) -> Tuple[Optional[str], Optional[dict]]:
     return event_name, payload
 
 
-def _to_agent_chat_history(history_qa: list[dict]) -> list[list[str]]:
-    chat_history: list[list[str]] = []
+def _to_agent_chat_history_text(history_qa: list[dict]) -> str:
+    lines: list[str] = []
     for item in history_qa:
         question = (item.get("question") or "").strip()
         answer = (item.get("answer") or "").strip()
+        rag_qa = item.get("rag_qa") or []
         if question:
-            chat_history.append(["human", question])
+            lines.append(f"human: {question}")
         if answer:
-            chat_history.append(["ai", answer])
-    return chat_history
+            lines.append(f"ai: {answer}")
+        if isinstance(rag_qa, list):
+            for idx, ref in enumerate(rag_qa, 1):
+                if not isinstance(ref, dict):
+                    continue
+                ref_question = (ref.get("question") or "").strip()
+                ref_answer = (ref.get("answer") or "").strip()
+                if not ref_question and not ref_answer:
+                    continue
+                lines.append(f"ref_qa[{idx}].question: {ref_question}")
+                lines.append(f"ref_qa[{idx}].answer: {ref_answer}")
+    return "\n".join(lines)
 
 
 def _generate_thread_title(question_text: str, spoken_language: str) -> str:
@@ -407,7 +418,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
 
         # ---- 履歴の取得（逐次フローの reactive で参照するので先に取る） ----------
         history_qa = load_history(assigned_thread_id, k=6)
-        agent_chat_history = _to_agent_chat_history(history_qa)
+        agent_chat_history_text = _to_agent_chat_history_text(history_qa)
         is_first_turn = len(history_qa) == 0
         generated_thread_title = None
         if is_first_turn:
@@ -427,7 +438,7 @@ async def get_answer(request: Question, background_tasks: BackgroundTasks, curre
             agent_resp = await generate_answer_via_agent(
                 question_text,
                 assigned_thread_id,
-                agent_chat_history,
+                agent_chat_history_text,
             )
             answer_text = (agent_resp.get("answer") or "").strip()
             agent_refs = agent_resp.get("ref_qa") or []
@@ -565,7 +576,7 @@ async def get_answer_stream(
             conn.commit()
 
     history_qa = load_history(assigned_thread_id, k=6)
-    agent_chat_history = _to_agent_chat_history(history_qa)
+    agent_chat_history_text = _to_agent_chat_history_text(history_qa)
     is_first_turn = len(history_qa) == 0
     generated_thread_title = None
     if is_first_turn:
@@ -593,7 +604,7 @@ async def get_answer_stream(
                     json={
                         "question": question_text,
                         "thread_id": assigned_thread_id,
-                        "chat_history": agent_chat_history,
+                        "chat_history_text": agent_chat_history_text,
                     },
                 ) as response:
                     response.raise_for_status()

@@ -676,8 +676,9 @@ export default function Home() {
       content: text,
       time: new Date().toISOString(),
     };
+    const typingMessageId = crypto.randomUUID();
     const typingMsg = {
-      id: "typing",
+      id: typingMessageId,
       role: "assistant",
       content: "",
       typing: true,
@@ -706,7 +707,7 @@ export default function Home() {
     const updateTypingMessage = (updater) => {
       setMessages((prev) =>
         prev.map((message) =>
-          message.id === "typing" ? { ...message, ...updater(message) } : message
+          message.id === typingMessageId ? { ...message, ...updater(message) } : message
         )
       );
     };
@@ -743,7 +744,7 @@ export default function Home() {
       });
       if (res.status === 401) {
         // Remove typing placeholder before redirect
-        setMessages((prev) => prev.filter((m) => m.id !== "typing"));
+        setMessages((prev) => prev.filter((m) => m.id !== typingMessageId));
         redirectToLogin(navigate);
         return;
       }
@@ -905,7 +906,7 @@ export default function Home() {
         }
       } catch {}
     } catch (e) {
-      setMessages((prev) => prev.filter((m) => m.id !== "typing"));
+      setMessages((prev) => prev.filter((m) => m.id !== typingMessageId));
       setErrorMessage(e.message);
     } finally {
       progressTimerIdsRef.current.forEach((timerId) => window.clearTimeout(timerId));

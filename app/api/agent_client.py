@@ -1,12 +1,13 @@
 import os
 import json
+from typing import Optional, Tuple
 
 import httpx
 
 AGENT_API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "http://agent:8001")
 
 
-def _parse_sse_chunk(raw_event: str) -> tuple[str | None, dict]:
+def _parse_sse_chunk(raw_event: str) -> Tuple[Optional[str], dict]:
     event_name = None
     data_lines: list[str] = []
     for line in raw_event.splitlines():
