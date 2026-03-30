@@ -26,7 +26,7 @@ export function useAuth({ requireAuth = true } = {}) {
   // window.location によるリダイレクトが走っているが、
   // フォールバックとして token も user も無い場合に navigate でも飛ばす
   useEffect(() => {
-    if (requireAuth && ctx.user === null && !ctx.isLoading && !ctx.token) {
+    if (requireAuth && ctx.user === null && !ctx.isLoading) {
       redirectToLogin();
     }
   }, [requireAuth, ctx.user, ctx.isLoading, ctx.token, redirectToLogin]);

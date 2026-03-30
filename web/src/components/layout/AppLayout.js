@@ -30,7 +30,13 @@ export default function AppLayout() {
 
   const threadHook = useThreads({ token, userId, t, onUnauthorized });
 
-  if (!user) return null; // 認証ガードがリダイレクト中
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+        <div className="text-sm text-gray-500">Redirecting to login...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
