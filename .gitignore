@@ -27,3 +27,13 @@ app/app.log
 !app/ShigaChat.db
 
 
+
+# Python virtualenv / tooling in nested projects
+.venv/
+venv/
+ENV/
+**/.venv/
+**/.pytest_cache/
+**/.mypy_cache/
+**/.ruff_cache/
+*.egg-info/
