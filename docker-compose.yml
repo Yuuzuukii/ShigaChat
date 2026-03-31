@@ -1,4 +1,5 @@
 ## compose version key is obsolete in v2; removed to avoid warnings
+name: shigachat
 
 services:
   uvicorn:
@@ -33,9 +34,9 @@ services:
 
   agent:
     build:
-      context: ../ShigaChat-Agent
+      context: ${AGENT_CONTEXT:-../ShigaChat-Agent}
     volumes:
-      - ../ShigaChat-Agent:/app
+      - ${AGENT_CONTEXT:-../ShigaChat-Agent}:/app
     ports:
       - "8001:8001"
     environment:
@@ -46,7 +47,7 @@ services:
       PG_USER: ${PG_USER}
       PG_PASSWORD: ${PG_PASSWORD}
     env_file:
-      - ../ShigaChat-Agent/.env
+      - ${AGENT_ENV_FILE:-../ShigaChat-Agent/.env}
     depends_on:
       postgres:
         condition: service_healthy
