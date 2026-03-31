@@ -1,6 +1,5 @@
 /**
  * S04: キーワード検索画面
- * keyword.js (277行) のリファクタ版
  * - AppLayout の OutletContext から language/t を取得
  * - services/api.js の searchKeyword/addHistory を使用
  * - Admin 関連リンクを除外

@@ -1,20 +1,35 @@
 /**
  * S06: カテゴリ詳細画面
- * CategoryDetail.js (330行) のリファクタ版
  * - AppLayout の OutletContext から language/t を取得
  * - services/api.js を使用
  * - Admin 関連を除外
  */
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
-import { fetchCategoryTranslation, fetchCategoryQuestions, addHistory as addHistoryApi } from "../services/api";
+import {
+  fetchCategoryTranslation,
+  fetchCategoryQuestions,
+  addHistory as addHistoryApi,
+} from "../services/api";
 import { categoryList } from "../config/categories";
 import RichText from "../components/common/RichText";
 import { toast } from "../lib/utils";
 import {
-  IdCard, HeartHandshake, Stethoscope, PiggyBank, Briefcase,
-  GraduationCap, Heart, Baby, Home, Receipt, HelpingHand,
-  Siren, CloudLightning, Tag, ArrowLeft,
+  IdCard,
+  HeartHandshake,
+  Stethoscope,
+  PiggyBank,
+  Briefcase,
+  GraduationCap,
+  Heart,
+  Baby,
+  Home,
+  Receipt,
+  HelpingHand,
+  Siren,
+  CloudLightning,
+  Tag,
+  ArrowLeft,
 } from "lucide-react";
 
 const categoryIcons = {
@@ -97,20 +112,24 @@ export default function CategoryDetailPage() {
           const code = String(error?.message || "").trim();
           const message =
             code === ERROR_CATEGORY_NOT_FOUND
-              ? (t?.categorynotfound || "カテゴリが見つかりません。")
-              : (t?.qaFetchError || "Q&Aの取得に失敗しました");
+              ? t?.categorynotfound || "カテゴリが見つかりません。"
+              : t?.qaFetchError || "Q&Aの取得に失敗しました";
           toast.error(message, { duration: 4000 });
         }
       }
     }
 
     load();
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [categoryId, language, t]);
 
   const handleAddHistory = async (qId) => {
     if (!qId) return;
-    try { await addHistoryApi(qId); } catch {}
+    try {
+      await addHistoryApi(qId);
+    } catch {}
   };
 
   const toggleAnswer = (qId) => {
@@ -162,8 +181,18 @@ export default function CategoryDetailPage() {
                     >
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-start gap-3 text-lg font-semibold text-zinc-900 min-w-0 flex-1">
-                          <svg className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                          <svg
+                            className="h-5 w-5 text-zinc-500 mt-1 flex-shrink-0"
+                            fill="none"
+                            stroke="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                            />
                           </svg>
                           <div className="flex-1 min-w-0 leading-relaxed">
                             <RichText content={question.質問} />
@@ -177,8 +206,18 @@ export default function CategoryDetailPage() {
                       </div>
 
                       <div className="mt-3 flex items-center justify-end gap-1 text-sm text-zinc-500">
-                        <svg className="h-4 w-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        <svg
+                          className="h-4 w-4 text-zinc-500"
+                          fill="none"
+                          stroke="currentColor"
+                          viewBox="0 0 24 24"
+                        >
+                          <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                          />
                         </svg>
                         <span>
                           {t.questionDate}

@@ -5,8 +5,6 @@ from dotenv import load_dotenv
 load_dotenv()
 
 SECRET_KEY = os.getenv("SECRET_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-OpenAI.api_key = OPENAI_API_KEY
 
 language_mapping = {
     "日本語": 1,

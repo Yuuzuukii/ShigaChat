@@ -1,6 +1,6 @@
 /**
  * AppLayout - S00 共通レイアウト（Header + Sidebar + Outlet）
- * NavBar.js を分割・リファクタした結果のルートレイアウト
+ * 認証後ページ共通のルートレイアウト
  */
 import React, { useState, useMemo } from "react";
 import { Outlet, useLocation } from "react-router-dom";

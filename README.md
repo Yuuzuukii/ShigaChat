@@ -51,7 +51,7 @@ docker compose up -d
 docker compose ps
 ```
 
-`uvicorn`（アプリ）、`nginx`（フロント）、`postgres`（データベース）が起動します。
+`uvicorn`（API 兼アプリ）、`agent`（RAG検索・回答生成）、`nginx`（フロント）、`postgres`（データベース）が起動します。
 
 3. 🗄️ データベースセットアップ（初回必須）
 

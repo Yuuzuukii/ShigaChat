@@ -1,6 +1,5 @@
 /**
  * UserContext - 認証状態のグローバル管理
- * contexts/UserContext.js（移動先）
  */
 import React, { createContext, useState, useEffect } from "react";
 import { API_BASE_URL, BASE_PATH } from "../config/constants";

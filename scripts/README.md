@@ -44,19 +44,6 @@
 
 ## マイグレーション
 
-### summary カラム追加
-
-RAG会話履歴要約機能のために、`threads` テーブルに `summary TEXT` カラムを追加します。
-
-```bash
-./scripts/migrate_add_summary.sh
-```
-
-**特徴:**
-- 冪等性あり（既にカラムがあれば何もしない）
-- スキーマ自動検出 (`shigachat` or `public`)
-- 実行後にテーブル定義を表示
-
 ### スキーマ統一
 
 すべてのテーブルを `shigachat` スキーマに統一します（`public` スキーマからの移動）。
@@ -70,21 +57,27 @@ RAG会話履歴要約機能のために、`threads` テーブルに `summary TEX
 - `public` スキーマにあるすべてのアプリケーションテーブルを自動検出して移動
 - 実行後にスキーマ分布とテーブル一覧を表示
 
-## MySQL → PostgreSQL 移行
+## データ再投入
 
-### pgloader を使った移行
+### スクレイプ + DB投入
 
-MySQLからPostgreSQLへのデータ移行（初回セットアップ時）。
+滋賀県国際協会のQ&Aページをスクレイプし、PostgreSQL と `qa_embedding` をまとめて再生成します。
 
 ```bash
-./scripts/migrate_mysql_to_postgres.sh
+docker compose run --rm --profile tools scraper
 ```
 
-設定ファイル: `scripts/pgloader.load`
+オプション例:
 
-**注意:**
-- 既にPostgreSQLにデータがある場合は実行しないでください（既存データが削除されます）
-- 現在の環境は既にPostgreSQL移行済みです
+```bash
+docker compose run --rm --profile tools scraper python3 scrape_inject.py --skip-backup
+docker compose run --rm --profile tools scraper python3 scrape_inject.py --skip-vector
+```
+
+**特徴:**
+- 実行前に DB バックアップを作成（`--skip-backup` 指定時を除く）
+- `question` / `answer` / 翻訳テーブル / `qa_embedding` を再投入
+- 埋め込み再生成をスキップ可能 (`--skip-vector`)
 
 ## ファイル一覧
 
@@ -92,11 +85,10 @@ MySQLからPostgreSQLへのデータ移行（初回セットアップ時）。
 |---------|------|
 | `dump_postgres.sh` | PostgreSQLデータベース全体をSQLファイルにダンプ |
 | `restore_postgres.sh` | ダンプファイルからPostgreSQLを復元 |
-| `migrate_add_summary.sh` | `threads.summary` カラム追加マイグレーション |
 | `migrate_unify_schema.sh` | すべてのテーブルを `shigachat` スキーマに統一 |
-| `migrate_mysql_to_postgres.sh` | MySQL→PostgreSQL初回移行 (非推奨: 既に移行済み) |
-| `pgloader.load` | pgloader設定ファイル |
-| `migrate_mysql_to_postgres.load` | pgloader詳細設定 (環境変数テンプレート) |
+| `scrape_inject.py` | 参照Q&Aを再スクレイプして PostgreSQL と `qa_embedding` に投入 |
+| `Dockerfile.scraper` | `scraper` サービス用イメージ定義 |
+| `shigachat_dump.sql` | 初期リストア用のSQLダンプ |
 
 ## 運用例
 
@@ -124,7 +116,7 @@ ssh prod-server 'cd /app && ./scripts/dump_postgres.sh' > prod_backup.sql
 ./scripts/dump_postgres.sh backup_before_deploy.sql
 
 # マイグレーション実行
-./scripts/migrate_add_summary.sh
+./scripts/migrate_unify_schema.sh
 
 # 問題があればロールバック
 # ./scripts/restore_postgres.sh --confirm backup_before_deploy.sql
@@ -135,7 +127,7 @@ ssh prod-server 'cd /app && ./scripts/dump_postgres.sh' > prod_backup.sql
 ### リストアが途中で失敗する
 
 - ダンプファイルが破損していないか確認
-- PostgreSQLコンテナが正常に動作しているか確認: `docker-compose ps`
+- PostgreSQLコンテナが正常に動作しているか確認: `docker compose ps`
 - ディスク容量が十分にあるか確認: `df -h`
 
 ### マイグレーションが適用されない
@@ -149,5 +141,5 @@ ssh prod-server 'cd /app && ./scripts/dump_postgres.sh' > prod_backup.sql
 
 確認方法:
 ```bash
-docker-compose exec postgres psql -U postgres -d shigachat -c "SHOW search_path;"
+docker compose exec postgres psql -U postgres -d shigachat -c "SHOW search_path;"
 ```

@@ -1,6 +1,5 @@
 /**
  * S05: カテゴリ一覧画面
- * Category.js (247行) のリファクタ版
  * - AppLayout の OutletContext から language/t を取得
  * - categories.js から categoryList/categoryColors を使用
  * - 円形レイアウト CSS (Category.css) を維持
@@ -13,9 +12,21 @@ import { fetchCategoryTranslation } from "../services/api";
 import { toast } from "../lib/utils";
 import { Button } from "../components/ui/button";
 import {
-  IdCard, HeartHandshake, Stethoscope, PiggyBank, Briefcase,
-  GraduationCap, Heart, Baby, Home, Receipt, HelpingHand,
-  Siren, CloudLightning, Tag, Layers,
+  IdCard,
+  HeartHandshake,
+  Stethoscope,
+  PiggyBank,
+  Briefcase,
+  GraduationCap,
+  Heart,
+  Baby,
+  Home,
+  Receipt,
+  HelpingHand,
+  Siren,
+  CloudLightning,
+  Tag,
+  Layers,
 } from "lucide-react";
 import "../components/Category.css";
 
@@ -41,7 +52,9 @@ function getTextColorForBg(hex) {
   const r = parseInt(hex.slice(1, 3), 16) / 255;
   const g = parseInt(hex.slice(3, 5), 16) / 255;
   const b = parseInt(hex.slice(5, 7), 16) / 255;
-  const srgb = [r, g, b].map((v) => (v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)));
+  const srgb = [r, g, b].map((v) =>
+    v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4)
+  );
   const luminance = 0.2126 * srgb[0] + 0.7152 * srgb[1] + 0.0722 * srgb[2];
   return luminance > 0.6 ? "#1f2937" : "#ffffff";
 }
@@ -61,7 +74,8 @@ export default function CategoryListPage() {
     const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) return;
 
-    const hasRegisterProperty = typeof window !== "undefined" && "CSS" in window && "registerProperty" in CSS;
+    const hasRegisterProperty =
+      typeof window !== "undefined" && "CSS" in window && "registerProperty" in CSS;
     if (hasRegisterProperty) return;
 
     let rafId = 0;
@@ -73,12 +87,20 @@ export default function CategoryListPage() {
     let checkTimer = 0;
     const SPEED_DEG_PER_SEC = 360 / 30;
 
-    const onEnter = () => { paused = true; };
-    const onLeave = () => { paused = false; };
+    const onEnter = () => {
+      paused = true;
+    };
+    const onLeave = () => {
+      paused = false;
+    };
 
     function tick(ts) {
       if (!running) return;
-      if (paused) { lastTs = ts; rafId = requestAnimationFrame(tick); return; }
+      if (paused) {
+        lastTs = ts;
+        rafId = requestAnimationFrame(tick);
+        return;
+      }
       if (!lastTs) lastTs = ts;
       const dt = (ts - lastTs) / 1000;
       lastTs = ts;
@@ -152,7 +174,11 @@ export default function CategoryListPage() {
             <div className="mx-auto mt-8 flex items-center justify-center">
               <div
                 className="category-ring"
-                style={{ "--count": categoryList.length, "--radius": "clamp(8rem, 27vw, 24rem)", "--ellipseY": "0.8" }}
+                style={{
+                  "--count": categoryList.length,
+                  "--radius": "clamp(8rem, 27vw, 24rem)",
+                  "--ellipseY": "0.8",
+                }}
                 role="list"
                 ref={ringRef}
               >
@@ -160,18 +186,25 @@ export default function CategoryListPage() {
                   <div className="center-halo" aria-hidden="true" />
                   <div className="center-content" role="presentation">
                     <div className="center-title-row" aria-hidden="true">
-                      <div className="center-icon" aria-hidden="true"><Layers /></div>
+                      <div className="center-icon" aria-hidden="true">
+                        <Layers />
+                      </div>
                       <div className="center-title">{t.categorySearch}</div>
                     </div>
                     <div className="w-44 h-1 bg-blue-600 mx-auto rounded-full" />
                     <div className="center-subtitle">
-                      {language === "ja" ? "カテゴリを選択してください" : (t.selectcategory || t.select)}
+                      {language === "ja"
+                        ? "カテゴリを選択してください"
+                        : t.selectcategory || t.select}
                     </div>
                   </div>
                 </div>
                 <div className="ring-track">
                   {categoryList.map((cat, i) => {
-                    const palette = categoryColors[cat.className] || { base: "#f4f4f4", hover: "#e5e5e5" };
+                    const palette = categoryColors[cat.className] || {
+                      base: "#f4f4f4",
+                      hover: "#e5e5e5",
+                    };
                     const isHover = hoveredCategoryId === cat.id;
                     const bg = isHover ? palette.hover : palette.base;
                     const color = getTextColorForBg(bg);

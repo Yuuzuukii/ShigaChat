@@ -1,6 +1,6 @@
 /**
  * HomePage - S03 ホーム/チャット画面
- * home.js(1563行)から分割リファクタ。ロジックはuseThreadsフック + services/api.jsに移行済み
+ * ロジックは useThreads フック + services/api.js に集約済み
  */
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useNavigate, useOutletContext } from "react-router-dom";
