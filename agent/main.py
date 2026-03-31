@@ -115,6 +115,7 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
                 },
             )
         except Exception as exc:
+            print(f"[ERROR] /chat/stream failed: {exc}")
             yield _sse_event("error", {"message": str(exc)})
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
