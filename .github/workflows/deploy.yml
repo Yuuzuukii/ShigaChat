@@ -32,7 +32,8 @@
 #
 #   ── 共通 ──
 #   DEPLOY_SSH_KEY     : SSH 秘密鍵
-#   ENV_FILE           : 本番用 .env ファイルの中身
+#   ENV_FILE           : app用 本番 .env ファイルの中身
+#   AGENT_ENV_FILE     : agent用 本番 .env ファイルの中身
 #
 # ■ フロントエンド環境変数（ワークフローに直書き）
 #   REACT_APP_API_URL   = https://si-lab.org/shigachat/api
@@ -119,6 +120,13 @@ jobs:
           ${{ secrets.ENV_FILE }}
           EOF
           echo "NGINX_PORT=${NGINX_PORT}" >> .env
+
+      - name: Create agent/.env file
+        run: |
+          mkdir -p agent
+          cat <<'EOF' > agent/.env
+          ${{ secrets.AGENT_ENV_FILE }}
+          EOF
 
       # ─── SSH & ProxyJump の設定 ───
       - name: Setup SSH with ProxyJump

@@ -73,6 +73,21 @@ jobs:
           SECRET_KEY=dummy
           EOF
 
+      - name: Create agent/.env
+        run: |
+          mkdir -p agent
+          cat > agent/.env << 'EOF'
+          OPENAI_API_KEY=dummy
+          ANSWER_MODEL=gpt-5.4-nano
+          QUERY_REWRITE_MODEL=gpt-5.4-nano
+          REF_SELECTION_MODEL=gpt-5.4-nano
+          PG_HOST=postgres
+          PG_PORT=5432
+          PG_DATABASE=shigachat
+          PG_USER=postgres
+          PG_PASSWORD=postgres
+          EOF
+
       # ③ nginx/build/ が揃った状態で Docker ビルド
       - name: Docker Compose up
         run: docker compose up -d --build
