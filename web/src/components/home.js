@@ -844,6 +844,7 @@ export default function Home() {
       while (true) {
         const { value, done } = await reader.read();
         buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+        buffer = buffer.replace(/\r\n/g, "\n");
 
         while (buffer.includes("\n\n")) {
           const boundaryIndex = buffer.indexOf("\n\n");
