@@ -46,7 +46,7 @@ services:
       PG_USER: ${PG_USER}
       PG_PASSWORD: ${PG_PASSWORD}
     env_file:
-      - ./agent/.env
+      - .env
     depends_on:
       postgres:
         condition: service_healthy
