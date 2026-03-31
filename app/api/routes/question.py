@@ -692,7 +692,15 @@ async def get_answer_stream(
         except Exception as e:
             yield _sse_event("error", {"message": str(e)})
 
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 @router.get("/get_translated_answer")
 async def get_translated_answer(
