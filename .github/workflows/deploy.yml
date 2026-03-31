@@ -49,7 +49,6 @@ on:
 
 env:
   DEPLOY_PATH: ${{ secrets.DEPLOY_PATH || '/var/services/masuo/ShigaChat_latest' }}
-  AGENT_REMOTE_PATH: ${{ secrets.AGENT_REMOTE_PATH || '/var/services/masuo/ShigaChat-Agent' }}
 
 jobs:
   # ---------------------------------------------------------------
@@ -196,17 +195,9 @@ jobs:
       - name: Deploy on remote server
         run: |
           ssh target "cd ${{ env.DEPLOY_PATH }} && \
-            AGENT_CONTEXT=${{ env.AGENT_REMOTE_PATH }} \
-            AGENT_ENV_FILE=${{ env.AGENT_REMOTE_PATH }}/.env \
             docker compose pull && \
-            AGENT_CONTEXT=${{ env.AGENT_REMOTE_PATH }} \
-            AGENT_ENV_FILE=${{ env.AGENT_REMOTE_PATH }}/.env \
             docker compose build --no-cache && \
-            AGENT_CONTEXT=${{ env.AGENT_REMOTE_PATH }} \
-            AGENT_ENV_FILE=${{ env.AGENT_REMOTE_PATH }}/.env \
             docker compose up -d && \
-            AGENT_CONTEXT=${{ env.AGENT_REMOTE_PATH }} \
-            AGENT_ENV_FILE=${{ env.AGENT_REMOTE_PATH }}/.env \
             docker compose ps"
 
       # ─── クリーンアップ ───

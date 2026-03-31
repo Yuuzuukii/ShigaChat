@@ -34,9 +34,9 @@ services:
 
   agent:
     build:
-      context: ${AGENT_CONTEXT:-../ShigaChat-Agent}
+      context: ./agent
     volumes:
-      - ${AGENT_CONTEXT:-../ShigaChat-Agent}:/app
+      - ./agent:/app
     ports:
       - "8001:8001"
     environment:
@@ -46,8 +46,6 @@ services:
       PG_DATABASE: ${PG_DATABASE}
       PG_USER: ${PG_USER}
       PG_PASSWORD: ${PG_PASSWORD}
-    env_file:
-      - ${AGENT_ENV_FILE:-../ShigaChat-Agent/.env}
     depends_on:
       postgres:
         condition: service_healthy
