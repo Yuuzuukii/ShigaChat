@@ -10,16 +10,3 @@ DB_CONFIG = {
     "host": os.getenv("PG_HOST", "localhost"),
     "port": os.getenv("PG_PORT", 5432)
 }
-
-
-LANGUAGE_MAP = {
-    "ja": 1,
-    "en": 2,
-    "vi": 3,
-    "zh": 4,
-    "ko": 5,
-    "pt": 6,
-    "es": 7,
-    "tl": 8,
-    "id": 9,
-}

@@ -1,24 +1,23 @@
 from langgraph.graph import END, START, StateGraph
 
 from agent.graph import (
+    _format_ref_qa,
     build_answer_without_ref_prompt_node,
     lang_detect_node,
     query_rewrite_node,
     vector_search_node,
 )
 from agent.routing import route_after_vector_search_simple
+from lib.language import resolve_language
 from lib.prompts import SIMPLE_ANSWER
 from schema.dto import Context, State
 
 
 async def build_simple_answer_prompt_node(state: State, runtime) -> dict:
     question = state.retrieval_query or runtime.context["question"]
-    language = state.language
+    language = resolve_language(state.language)
     chat_history_text = runtime.context["chat_history_text"]
-    ref_qa_text = "\n\n".join(
-        f"question: {item.question}\nanswer: {item.answer}"
-        for item in state.ref_qa.ref_qa
-    )
+    ref_qa_text = _format_ref_qa(state.ref_qa.ref_qa, include_ids=False)
 
     prompt = SIMPLE_ANSWER[language].format(
         chat_history=chat_history_text,
