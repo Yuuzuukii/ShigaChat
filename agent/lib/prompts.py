@@ -1345,3 +1345,7 @@ ANSWER_WITH_REF_OR_GENERAL = {
 }
 SIMPLE_ANSWER = {lang: prompts["simple_answer"] for lang, prompts in PROMPTS.items()}
 ANSWER_WITHOUT_REF = {lang: prompts["answer_without_ref"] for lang, prompts in PROMPTS.items()}
+
+
+def get_prompt_template(prompt_map: dict[str, str], language: str) -> str:
+    return prompt_map.get(language) or prompt_map["en"]

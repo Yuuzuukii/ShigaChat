@@ -9,7 +9,7 @@ from agent.graph import (
 )
 from agent.routing import route_after_vector_search_simple
 from lib.language import resolve_language
-from lib.prompts import SIMPLE_ANSWER
+from lib.prompts import SIMPLE_ANSWER, get_prompt_template
 from schema.dto import Context, State
 
 
@@ -19,7 +19,7 @@ async def build_simple_answer_prompt_node(state: State, runtime) -> dict:
     chat_history_text = runtime.context["chat_history_text"]
     ref_qa_text = _format_ref_qa(state.ref_qa.ref_qa, include_ids=False)
 
-    prompt = SIMPLE_ANSWER[language].format(
+    prompt = get_prompt_template(SIMPLE_ANSWER, language).format(
         chat_history=chat_history_text,
         question=question,
         ref_qa=ref_qa_text,

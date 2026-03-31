@@ -9,7 +9,13 @@ from schema.outputs import RefQA, RefSelection
 from lib.llm import call_llm, call_llm_structured
 from lib.language import detect_language, resolve_language
 from lib.rag import vector_search
-from lib.prompts import QUERY_REWRITE, SELECT_REF, ANSWER_WITH_REF, ANSWER_WITHOUT_REF
+from lib.prompts import (
+    ANSWER_WITHOUT_REF,
+    ANSWER_WITH_REF,
+    QUERY_REWRITE,
+    SELECT_REF,
+    get_prompt_template,
+)
 from agent.routing import route_after_vector_search, route_after_select_ref
 
 load_dotenv()
@@ -45,7 +51,7 @@ async def query_rewrite_node(state: State, runtime: Runtime[Context]) -> dict:
     if not chat_history_text.strip():
         return {"retrieval_query": question}
 
-    prompt = QUERY_REWRITE[language].format(
+    prompt = get_prompt_template(QUERY_REWRITE, language).format(
         chat_history=chat_history_text,
         question=question,
     )
@@ -75,7 +81,7 @@ async def select_ref_node(state: State, runtime: Runtime[Context]) -> dict:
 
     ref_qa_text = _format_ref_qa(ref_items, include_ids=True)
 
-    prompt = SELECT_REF[language].format(
+    prompt = get_prompt_template(SELECT_REF, language).format(
         chat_history=chat_history_text,
         question=retrieval_query,
         ref_qa=ref_qa_text,
@@ -108,7 +114,7 @@ async def build_answer_with_ref_prompt_node(state: State, runtime: Runtime[Conte
     chat_history_text = runtime.context["chat_history_text"]
     ref_qa_text = _format_ref_qa(state.ref_qa.ref_qa, include_ids=False)
 
-    prompt = ANSWER_WITH_REF[language].format(
+    prompt = get_prompt_template(ANSWER_WITH_REF, language).format(
         chat_history=chat_history_text,
         question=question,
         ref_qa=ref_qa_text,
@@ -122,7 +128,7 @@ async def build_answer_without_ref_prompt_node(state: State, runtime: Runtime[Co
     language = resolve_language(state.language)
     chat_history_text = runtime.context["chat_history_text"]
 
-    prompt = ANSWER_WITHOUT_REF[language].format(
+    prompt = get_prompt_template(ANSWER_WITHOUT_REF, language).format(
         chat_history=chat_history_text,
         question=question,
     )

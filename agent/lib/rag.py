@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 from lib.config import DB_CONFIG
-from lib.language import LANGUAGE_MAP
+from lib.language import LANGUAGE_MAP, resolve_language
 from schema.outputs import RefQA, RefQAItem
 
 load_dotenv()
@@ -20,7 +20,7 @@ def embed_text(text):
 def vector_search(question: str, language: str, top_k: int) -> RefQA:
     import psycopg
 
-    lang_id = LANGUAGE_MAP[language]
+    lang_id = LANGUAGE_MAP[resolve_language(language)]
     q_vector = embed_text(question)
     conn = psycopg.connect(**DB_CONFIG)
     cur = conn.cursor()
