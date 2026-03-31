@@ -1,5 +1,4 @@
 ## compose version key is obsolete in v2; removed to avoid warnings
-name: shigachat
 
 services:
   uvicorn:
