@@ -8,6 +8,7 @@ import {
   FileText,
   Clock,
   ChevronDown,
+  ChevronRight,
   AlertTriangle,
   Sparkles,
   ExternalLink,
@@ -124,15 +125,25 @@ function AssistantBubble({ m, t, navigate }) {
 }
 
 function RagSection({ ragQa, t, navigate }) {
+  const [isReferenceOpen, setIsReferenceOpen] = React.useState(false);
+
   return (
-    <details className="mt-4" open={false}>
+    <details
+      className="mt-4"
+      open={isReferenceOpen}
+      onToggle={(e) => setIsReferenceOpen(e.currentTarget.open)}
+    >
       <summary className="cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none">
         <div className="flex items-center gap-2">
           <FileText className="h-4 w-4 text-zinc-500" />
           <span>
             {t?.similarQuestions || "参考となる関連質問"} ({ragQa?.length || 0}件)
           </span>
-          <ChevronDown className="h-3 w-3 text-zinc-400" />
+          {isReferenceOpen ? (
+            <ChevronRight className="h-3 w-3 text-zinc-400" />
+          ) : (
+            <ChevronDown className="h-3 w-3 text-zinc-400" />
+          )}
         </div>
       </summary>
       {ragQa && ragQa.length > 0 ? (
@@ -148,14 +159,16 @@ function RagSection({ ragQa, t, navigate }) {
                       </div>
                       {q.category_id && q.question_id && (
                         <button
-                          className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-800 hover:bg-zinc-100 px-2 py-1 rounded-md transition-colors flex-shrink-0"
+                          type="button"
+                          aria-label="該当カテゴリを開く"
+                          className="inline-flex flex-shrink-0 items-center justify-center p-1 text-zinc-500 transition-colors hover:text-blue-700"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
                             navigate(`/category/${q.category_id}?id=${q.question_id}`);
                           }}
                         >
-                          <ExternalLink className="h-3 w-3" />
+                          <ExternalLink className="h-4 w-4" />
                         </button>
                       )}
                     </div>

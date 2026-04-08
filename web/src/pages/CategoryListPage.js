@@ -2,7 +2,7 @@
  * S05: カテゴリ一覧画面
  * - AppLayout の OutletContext から language/t を取得
  * - categories.js から categoryList/categoryColors を使用
- * - 円形レイアウト CSS (Category.css) を維持
+ * - 質問管理画面の旧カテゴリグリッドを踏襲
  * - Admin 関連を除外
  */
 import React, { useState, useEffect, useRef } from "react";
@@ -10,7 +10,6 @@ import { useOutletContext, useNavigate } from "react-router-dom";
 import { categoryList, categoryColors } from "../config/categories";
 import { fetchCategoryTranslation } from "../services/api";
 import { toast } from "../lib/utils";
-import { Button } from "../components/ui/button";
 import {
   IdCard,
   HeartHandshake,
@@ -28,7 +27,6 @@ import {
   Tag,
   Layers,
 } from "lucide-react";
-import "../components/Category.css";
 
 const categoryIcons = {
   "category-zairyu": IdCard,
@@ -63,79 +61,7 @@ export default function CategoryListPage() {
   const { language, t } = useOutletContext();
   const navigate = useNavigate();
   const [hoveredCategoryId, setHoveredCategoryId] = useState(null);
-  const ringRef = useRef(null);
   const hasCheckedCategoryApiRef = useRef(false);
-
-  // CSS @property(--spin) 非対応時のフォールバック
-  useEffect(() => {
-    const el = ringRef.current;
-    if (!el) return;
-
-    const prefersReduced = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReduced) return;
-
-    const hasRegisterProperty =
-      typeof window !== "undefined" && "CSS" in window && "registerProperty" in CSS;
-    if (hasRegisterProperty) return;
-
-    let rafId = 0;
-    let running = false;
-    let paused = false;
-    let lastTs = 0;
-    let angle = 0;
-    let started = false;
-    let checkTimer = 0;
-    const SPEED_DEG_PER_SEC = 360 / 30;
-
-    const onEnter = () => {
-      paused = true;
-    };
-    const onLeave = () => {
-      paused = false;
-    };
-
-    function tick(ts) {
-      if (!running) return;
-      if (paused) {
-        lastTs = ts;
-        rafId = requestAnimationFrame(tick);
-        return;
-      }
-      if (!lastTs) lastTs = ts;
-      const dt = (ts - lastTs) / 1000;
-      lastTs = ts;
-      angle = (angle + dt * SPEED_DEG_PER_SEC) % 360;
-      el.style.setProperty("--spin", angle + "deg");
-      rafId = requestAnimationFrame(tick);
-    }
-
-    function startJsFallback() {
-      if (started) return;
-      started = true;
-      running = true;
-      lastTs = 0;
-      el.addEventListener("mouseenter", onEnter);
-      el.addEventListener("mouseleave", onLeave);
-      el.addEventListener("focusin", onEnter);
-      el.addEventListener("focusout", onLeave);
-      rafId = requestAnimationFrame(tick);
-    }
-
-    el.style.setProperty("--spin", "0deg");
-    checkTimer = window.setTimeout(() => {
-      const val = getComputedStyle(el).getPropertyValue("--spin").trim();
-      if (!val || val === "0deg") startJsFallback();
-    }, 800);
-
-    return () => {
-      window.clearTimeout(checkTimer);
-      if (rafId) cancelAnimationFrame(rafId);
-      el.removeEventListener("mouseenter", onEnter);
-      el.removeEventListener("mouseleave", onLeave);
-      el.removeEventListener("focusin", onEnter);
-      el.removeEventListener("focusout", onLeave);
-    };
-  }, []);
 
   // バックエンド停止時にカテゴリ取得失敗トーストを表示するための疎通チェック
   useEffect(() => {
@@ -167,77 +93,55 @@ export default function CategoryListPage() {
   }, [t]);
 
   return (
-    <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
-      <div className="h-full flex justify-center">
-        <div className="relative z-10 mx-auto max-w-5xl px-4 py-6 md:py-8 text-slate-800 w-full">
-          <div className="mt-2">
-            <div className="mx-auto mt-8 flex items-center justify-center">
-              <div
-                className="category-ring"
-                style={{
-                  "--count": categoryList.length,
-                  "--radius": "clamp(8rem, 27vw, 24rem)",
-                  "--ellipseY": "0.8",
-                }}
-                role="list"
-                ref={ringRef}
-              >
-                <div className="ring-center" aria-hidden="true">
-                  <div className="center-halo" aria-hidden="true" />
-                  <div className="center-content" role="presentation">
-                    <div className="center-title-row" aria-hidden="true">
-                      <div className="center-icon" aria-hidden="true">
-                        <Layers />
-                      </div>
-                      <div className="center-title">{t.categorySearch}</div>
-                    </div>
-                    <div className="w-44 h-1 bg-blue-600 mx-auto rounded-full" />
-                    <div className="center-subtitle">
-                      {language === "ja"
-                        ? "カテゴリを選択してください"
-                        : t.selectcategory || t.select}
-                    </div>
-                  </div>
-                </div>
-                <div className="ring-track">
-                  {categoryList.map((cat, i) => {
-                    const palette = categoryColors[cat.className] || {
-                      base: "#f4f4f4",
-                      hover: "#e5e5e5",
-                    };
-                    const isHover = hoveredCategoryId === cat.id;
-                    const bg = isHover ? palette.hover : palette.base;
-                    const color = getTextColorForBg(bg);
-                    const Icon = categoryIcons[cat.className] || Tag;
-                    return (
-                      <div className="ring-item" style={{ "--i": i }} key={cat.id} role="listitem">
-                        <div className="ring-item-cancel">
-                          <div className="ring-item-inner">
-                            <Button
-                              variant="ghost"
-                              aria-label={cat.name[language] || cat.name.ja}
-                              onClick={() => navigate(`/category/${cat.id}`)}
-                              onMouseEnter={() => setHoveredCategoryId(cat.id)}
-                              onMouseLeave={() => setHoveredCategoryId(null)}
-                              onFocus={() => setHoveredCategoryId(cat.id)}
-                              onBlur={() => setHoveredCategoryId(null)}
-                              className="ring-button group border border-slate-200 shadow-sm focus-visible:ring-blue-400"
-                              style={{ backgroundColor: bg, color }}
-                            >
-                              <div className="flex h-full w-full flex-col items-center justify-center gap-1">
-                                <Icon className="h-6 w-6 opacity-90" />
-                                <span className="text-center text-xs font-bold leading-tight">
-                                  {cat.name[language] || cat.name.ja}
-                                </span>
-                              </div>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+    <div className="min-h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+      <div className="flex justify-center">
+        <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 text-slate-800 md:py-8">
+          <div className="w-full">
+            <div className="mb-10 text-center">
+              <div className="mb-4 flex items-center justify-center gap-3">
+                <Layers className="h-8 w-8 text-blue-800" />
+                <h1 className="text-3xl font-bold text-blue-800">{t.categorySearch}</h1>
               </div>
+              <div className="mx-auto mb-4 h-1 w-20 rounded-full bg-blue-600" />
+              <p className="text-sm text-slate-600 sm:text-base">
+                {language === "ja" ? "カテゴリを選択してください" : t.selectcategory || t.select}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4" role="list">
+              {categoryList.map((cat) => {
+                const palette = categoryColors[cat.className] || {
+                  base: "#f4f4f4",
+                  hover: "#e5e5e5",
+                };
+                const isHover = hoveredCategoryId === cat.id;
+                const bg = isHover ? palette.hover : palette.base;
+                const color = getTextColorForBg(bg);
+                const Icon = categoryIcons[cat.className] || Tag;
+
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    role="listitem"
+                    aria-label={cat.name[language] || cat.name.ja}
+                    onClick={() => navigate(`/category/${cat.id}`)}
+                    onMouseEnter={() => setHoveredCategoryId(cat.id)}
+                    onMouseLeave={() => setHoveredCategoryId(null)}
+                    onFocus={() => setHoveredCategoryId(cat.id)}
+                    onBlur={() => setHoveredCategoryId(null)}
+                    className="group relative min-h-[136px] overflow-hidden rounded-lg border-0 p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                    style={{ backgroundColor: bg, color }}
+                  >
+                    <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">
+                      <Icon className="h-7 w-7 opacity-90" />
+                      <span className="text-sm font-bold leading-snug sm:text-base">
+                        {cat.name[language] || cat.name.ja}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         </div>

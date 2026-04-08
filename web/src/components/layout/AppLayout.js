@@ -2,7 +2,7 @@
  * AppLayout - S00 共通レイアウト（Header + Sidebar + Outlet）
  * 認証後ページ共通のルートレイアウト
  */
-import React, { useState, useMemo } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import { Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../../hooks/useAuth";
 import { useLanguage } from "../../hooks/useLanguage";
@@ -27,6 +27,7 @@ export default function AppLayout() {
   }, [location.search]);
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(true);
+  const scrollContainerRef = useRef(null);
 
   const threadHook = useThreads({ token, userId, t, onUnauthorized });
 
@@ -69,6 +70,7 @@ export default function AppLayout() {
 
       {/* Page content */}
       <main
+        ref={scrollContainerRef}
         className="h-screen overflow-auto"
         style={{
           marginLeft: isDrawerOpen ? "18rem" : "3.5rem",
@@ -77,7 +79,9 @@ export default function AppLayout() {
           scrollBehavior: "smooth",
         }}
       >
-        <Outlet context={{ language, t, changeLanguage, threadHook }} />
+        <Outlet
+          context={{ language, t, changeLanguage, threadHook, isDrawerOpen, scrollContainerRef }}
+        />
       </main>
 
       <Toaster isDrawerOpen={isDrawerOpen} />

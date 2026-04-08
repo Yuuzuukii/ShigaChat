@@ -3,7 +3,11 @@
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { fetchUserThreads, fetchThreadMessages, deleteThread as deleteThreadApi } from "../services/api";
+import {
+  fetchUserThreads,
+  fetchThreadMessages,
+  deleteThread as deleteThreadApi,
+} from "../services/api";
 import { toast } from "../lib/utils";
 
 const LS_MSGS_PREFIX = "chat_msgs_";
@@ -24,35 +28,63 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     try {
       const raw = localStorage.getItem(`thread_title_overrides_${userId ?? "nouser"}`);
       return raw ? JSON.parse(raw) : {};
-    } catch { return {}; }
+    } catch {
+      return {};
+    }
   });
 
-  const saveOverrides = useCallback((obj) => {
-    try { localStorage.setItem(`thread_title_overrides_${userId ?? "nouser"}`, JSON.stringify(obj)); } catch {}
-  }, [userId]);
+  const saveOverrides = useCallback(
+    (obj) => {
+      try {
+        localStorage.setItem(`thread_title_overrides_${userId ?? "nouser"}`, JSON.stringify(obj));
+      } catch {}
+    },
+    [userId]
+  );
 
   // ─── helpers ───
 
-  const toClientThreads = useCallback((arr = []) =>
-    (arr || []).map((th) => {
-      const id = String(th.thread_id ?? th.id);
-      const serverTitle = String(th.title || "").trim();
-      const overrideTitle = String(threadTitleOverrides[id] || "").trim();
-      const looksOldAutoTruncated = /\.\.\.$|…$/.test(overrideTitle);
-      const title = overrideTitle && !looksOldAutoTruncated ? overrideTitle : serverTitle;
-      return {
-        id,
-        title,
-        lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
-      };
-    }), [threadTitleOverrides]);
+  const toClientThreads = useCallback(
+    (arr = []) =>
+      (arr || []).map((th) => {
+        const id = String(th.thread_id ?? th.id);
+        const serverTitle = String(th.title || "").trim();
+        const overrideTitle = String(threadTitleOverrides[id] || "").trim();
+        const looksOldAutoTruncated = /\.\.\.$|…$/.test(overrideTitle);
+        const title = overrideTitle && !looksOldAutoTruncated ? overrideTitle : serverTitle;
+        return {
+          id,
+          title,
+          lastUpdated: th.last_updated ?? th.lastUpdated ?? new Date().toISOString(),
+        };
+      }),
+    [threadTitleOverrides]
+  );
 
-  const saveMsgsLS = useCallback((threadId, msgsArr) => {
-    try { localStorage.setItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`, JSON.stringify(msgsArr)); } catch {}
-  }, [userId]);
-  const loadMsgsLS = useCallback((threadId) => {
-    try { return JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`)) || []; } catch { return []; }
-  }, [userId]);
+  const saveMsgsLS = useCallback(
+    (threadId, msgsArr) => {
+      try {
+        localStorage.setItem(
+          `${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`,
+          JSON.stringify(msgsArr)
+        );
+      } catch {}
+    },
+    [userId]
+  );
+  const loadMsgsLS = useCallback(
+    (threadId) => {
+      try {
+        return (
+          JSON.parse(localStorage.getItem(`${LS_MSGS_PREFIX}${userId ?? "nouser"}_${threadId}`)) ||
+          []
+        );
+      } catch {
+        return [];
+      }
+    },
+    [userId]
+  );
   const notifyThreadFetchError = useCallback(() => {
     if (hasShownThreadFetchErrorToastRef.current) return;
     hasShownThreadFetchErrorToastRef.current = true;
@@ -83,7 +115,14 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     } finally {
       setThreadsLoading(false);
     }
-  }, [token, userId, onUnauthorized, toClientThreads, notifyThreadFetchError, clearThreadFetchErrorNotice]);
+  }, [
+    token,
+    userId,
+    onUnauthorized,
+    toClientThreads,
+    notifyThreadFetchError,
+    clearThreadFetchErrorNotice,
+  ]);
 
   // Initial load
   useEffect(() => {
@@ -101,49 +140,80 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const tid = params.get("tid");
-    if (tid && String(tid) !== String(currentThreadId)) {
-      setCurrentThreadId(String(tid));
-    }
-  }, [location.search, currentThreadId]);
+    if (!tid) return;
+    setCurrentThreadId((prev) => (String(tid) === String(prev) ? prev : String(tid)));
+  }, [location.search]);
 
   // ─── load messages ───
 
-  const loadThreadMessages = useCallback(async (threadId) => {
-    if (!token || !threadId) { setMessages([]); return; }
-    if (String(threadId).startsWith("tmp-")) { setMessages(loadMsgsLS(threadId)); return; }
-
-    setMessages([]);
-    setMessagesLoading(true);
-    try {
-      const resp = await fetchThreadMessages(threadId, { onUnauthorized });
-      if (resp.ok) {
-        const data = await resp.json();
-        const clientMessages = [];
-        (data.messages || []).forEach((msg) => {
-          clientMessages.push({ id: crypto.randomUUID(), role: "user", content: msg.question, time: msg.created_at, type: msg.type });
-          clientMessages.push({ id: crypto.randomUUID(), role: "assistant", content: msg.answer, time: msg.created_at, rag_qa: msg.rag_qa || [], type: msg.type || (msg.rag_qa?.length > 0 ? "rag" : "") });
-        });
-        setMessages(clientMessages);
-        saveMsgsLS(threadId, clientMessages);
-        clearThreadFetchErrorNotice();
-      } else {
+  const loadThreadMessages = useCallback(
+    async (threadId) => {
+      if (!token || !threadId) {
+        setMessages([]);
+        return;
+      }
+      if (String(threadId).startsWith("tmp-")) {
         setMessages(loadMsgsLS(threadId));
-        notifyThreadFetchError();
+        return;
       }
-    } catch (error) {
-      setMessages(loadMsgsLS(threadId));
-      if (!String(error?.message || "").includes("認証エラー")) {
-        notifyThreadFetchError();
+
+      setMessages([]);
+      setMessagesLoading(true);
+      try {
+        const resp = await fetchThreadMessages(threadId, { onUnauthorized });
+        if (resp.ok) {
+          const data = await resp.json();
+          const clientMessages = [];
+          (data.messages || []).forEach((msg) => {
+            clientMessages.push({
+              id: crypto.randomUUID(),
+              role: "user",
+              content: msg.question,
+              time: msg.created_at,
+              type: msg.type,
+            });
+            clientMessages.push({
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: msg.answer,
+              time: msg.created_at,
+              rag_qa: msg.rag_qa || [],
+              type: msg.type || (msg.rag_qa?.length > 0 ? "rag" : ""),
+            });
+          });
+          setMessages(clientMessages);
+          saveMsgsLS(threadId, clientMessages);
+          clearThreadFetchErrorNotice();
+        } else {
+          setMessages(loadMsgsLS(threadId));
+          notifyThreadFetchError();
+        }
+      } catch (error) {
+        setMessages(loadMsgsLS(threadId));
+        if (!String(error?.message || "").includes("認証エラー")) {
+          notifyThreadFetchError();
+        }
+      } finally {
+        setMessagesLoading(false);
       }
-    } finally {
-      setMessagesLoading(false);
-    }
-  }, [token, loadMsgsLS, onUnauthorized, saveMsgsLS, notifyThreadFetchError, clearThreadFetchErrorNotice]);
+    },
+    [
+      token,
+      loadMsgsLS,
+      onUnauthorized,
+      saveMsgsLS,
+      notifyThreadFetchError,
+      clearThreadFetchErrorNotice,
+    ]
+  );
 
   // Auto-load messages on thread switch
   useEffect(() => {
     if (currentThreadId) {
-      if (skipNextThreadLoad.current) { skipNextThreadLoad.current = false; return; }
+      if (skipNextThreadLoad.current) {
+        skipNextThreadLoad.current = false;
+        return;
+      }
       loadThreadMessages(currentThreadId);
     } else {
       setMessages([]);
@@ -157,12 +227,17 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
 
   // ─── thread CRUD ───
 
-  const selectThread = useCallback((id) => {
-    const tid = String(id);
-    setCurrentThreadId(tid);
-    navigate(`/home?tid=${encodeURIComponent(tid)}`);
-    try { window.dispatchEvent(new CustomEvent("threadSelected", { detail: tid })); } catch {}
-  }, [navigate]);
+  const selectThread = useCallback(
+    (id) => {
+      const tid = String(id);
+      setCurrentThreadId(tid);
+      navigate(`/home?tid=${encodeURIComponent(tid)}`);
+      try {
+        window.dispatchEvent(new CustomEvent("threadSelected", { detail: tid }));
+      } catch {}
+    },
+    [navigate]
+  );
 
   const startNewChat = useCallback(() => {
     // Already on an empty draft thread: keep current state, don't create another.
@@ -176,46 +251,52 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     const defaultTitle = t?.newChat || "新しいチャット";
 
     // Insert a visible draft thread immediately in the sidebar.
-    setThreads((prev) => [
-      { id: tempId, title: defaultTitle, lastUpdated: nowIso },
-      ...prev,
-    ]);
+    setThreads((prev) => [{ id: tempId, title: defaultTitle, lastUpdated: nowIso }, ...prev]);
 
     setCurrentThreadId(tempId);
     setMessages([]);
     navigate(`/home?tid=${encodeURIComponent(tempId)}`);
   }, [navigate, t, currentThreadId, messages.length]);
 
-  const renameThread = useCallback((id, title) => {
-    const newTitle = title || t?.newChat || "新しいチャット";
-    setThreads((prev) => prev.map((th) => String(th.id) === String(id) ? { ...th, title: newTitle } : th));
-    setThreadTitleOverrides((prev) => {
-      const updated = { ...prev, [String(id)]: newTitle };
-      saveOverrides(updated);
-      return updated;
-    });
-  }, [t, saveOverrides]);
+  const renameThread = useCallback(
+    (id, title) => {
+      const newTitle = title || t?.newChat || "新しいチャット";
+      setThreads((prev) =>
+        prev.map((th) => (String(th.id) === String(id) ? { ...th, title: newTitle } : th))
+      );
+      setThreadTitleOverrides((prev) => {
+        const updated = { ...prev, [String(id)]: newTitle };
+        saveOverrides(updated);
+        return updated;
+      });
+    },
+    [t, saveOverrides]
+  );
 
-  const removeThread = useCallback(async (id, options = {}) => {
-    const { skipConfirm = false } = options || {};
-    const threadId = String(id);
-    if (!skipConfirm && !window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？")) return false;
-    if (!token) return false;
-    try {
-      const resp = await deleteThreadApi(threadId, { onUnauthorized });
-      if (resp.ok) {
-        await loadThreads();
-        if (String(threadId) === String(currentThreadId)) {
-          startNewChat();
+  const removeThread = useCallback(
+    async (id, options = {}) => {
+      const { skipConfirm = false } = options || {};
+      const threadId = String(id);
+      if (!skipConfirm && !window.confirm(t?.confirmDeleteThread || "スレッドを削除しますか？"))
+        return false;
+      if (!token) return false;
+      try {
+        const resp = await deleteThreadApi(threadId, { onUnauthorized });
+        if (resp.ok) {
+          await loadThreads();
+          if (String(threadId) === String(currentThreadId)) {
+            startNewChat();
+          }
+          return true;
         }
-        return true;
+        return false;
+      } catch (e) {
+        console.error("Error deleting thread:", e);
+        return false;
       }
-      return false;
-    } catch (e) {
-      console.error("Error deleting thread:", e);
-      return false;
-    }
-  }, [token, currentThreadId, t, loadThreads, startNewChat, onUnauthorized]);
+    },
+    [token, currentThreadId, t, loadThreads, startNewChat, onUnauthorized]
+  );
 
   // ─── event listeners ───
 
@@ -224,7 +305,9 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
     const onThreadUpdated = () => loadThreads();
     const onThreadTitleChanged = (e) => {
       const { threadId, title } = e.detail;
-      setThreads((prev) => prev.map((th) => String(th.id) === String(threadId) ? { ...th, title } : th));
+      setThreads((prev) =>
+        prev.map((th) => (String(th.id) === String(threadId) ? { ...th, title } : th))
+      );
     };
     const onThreadSelected = (e) => {
       const tid = String(e.detail);
@@ -255,12 +338,22 @@ export function useThreads({ token, userId, t, onUnauthorized }) {
   }, [loadThreads, currentThreadId, startNewChat]);
 
   return {
-    threads, setThreads, currentThreadId, setCurrentThreadId,
-    messages, setMessages,
-    threadsLoading, messagesLoading,
-    loadThreads, loadThreadMessages,
-    selectThread, startNewChat, renameThread, removeThread,
+    threads,
+    setThreads,
+    currentThreadId,
+    setCurrentThreadId,
+    messages,
+    setMessages,
+    threadsLoading,
+    messagesLoading,
+    loadThreads,
+    loadThreadMessages,
+    selectThread,
+    startNewChat,
+    renameThread,
+    removeThread,
     skipNextThreadLoad,
-    toClientThreads, saveMsgsLS,
+    toClientThreads,
+    saveMsgsLS,
   };
 }

@@ -1,11 +1,13 @@
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 from dataclasses import dataclass
 
 @dataclass
 class RefQAItem:
     question: str
     answer: str
+    question_id: Optional[int] = None
+    category_id: Optional[int] = None
 
 class RefQA(BaseModel):
     ref_qa: List[RefQAItem]

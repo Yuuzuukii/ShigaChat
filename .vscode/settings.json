@@ -5,6 +5,28 @@
     "source.fixAll.eslint": "explicit"
   },
   "eslint.workingDirectories": ["web"],
+  "files.watcherExclude": {
+    "**/.git/objects/**": true,
+    "**/.git/subtree-cache/**": true,
+    "**/web/node_modules/**": true,
+    "**/backup/**": true,
+    "**/nginx/build/**": true
+  },
+  "search.exclude": {
+    "**/web/node_modules": true,
+    "**/backup": true,
+    "**/nginx/build": true
+  },
+  "files.exclude": {
+    "**/web/node_modules": true,
+    "**/backup": true,
+    "**/nginx/build": true
+  },
+  "cSpell.ignorePaths": [
+    "**/web/node_modules/**",
+    "**/backup/**",
+    "**/nginx/build/**"
+  ],
   "[javascript]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
   },

@@ -109,7 +109,12 @@ async def chat_stream(request: ChatRequest) -> StreamingResponse:
                 "end",
                 {
                     "ref_qa": [
-                        {"question": item.question, "answer": item.answer}
+                        {
+                            "question": item.question,
+                            "answer": item.answer,
+                            "question_id": item.question_id,
+                            "category_id": item.category_id,
+                        }
                         for item in selected_ref_qa
                     ]
                 },
@@ -167,7 +172,12 @@ async def chat_simple(request: SimpleChatRequest) -> dict:
         ref_items = []
 
     ref_qa = [
-        {"question": item.question, "answer": item.answer}
+        {
+            "question": item.question,
+            "answer": item.answer,
+            "question_id": item.question_id,
+            "category_id": item.category_id,
+        }
         for item in ref_items
     ]
     used_source_ids = [f"S{i}" for i in range(1, len(ref_qa) + 1)]

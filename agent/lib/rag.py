@@ -26,8 +26,9 @@ def vector_search(question: str, language: str, top_k: int) -> RefQA:
     cur = conn.cursor()
     # qa_embedding, それぞれのテーブルから
     cur.execute(f"""
-        SELECT q.texts, a.texts
+        SELECT qq.question_id, qq.category_id, q.texts, a.texts
         FROM qa_embedding e 
+                JOIN question qq ON qq.question_id = e.question_id
                 JOIN question_translation q ON q.question_id = e.question_id AND q.language_id = e.language_id
                 JOIN answer_translation a ON a.answer_id = e.answer_id AND a.language_id = e.language_id
         WHERE e.language_id = %s
@@ -38,7 +39,14 @@ def vector_search(question: str, language: str, top_k: int) -> RefQA:
     refs = []
 
     for r in cur.fetchall():
-        refs.append(RefQAItem(r[0], r[1]))
+        refs.append(
+            RefQAItem(
+                question_id=r[0],
+                category_id=r[1],
+                question=r[2],
+                answer=r[3],
+            )
+        )
 
     cur.close()
     conn.close()

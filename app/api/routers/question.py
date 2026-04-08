@@ -352,7 +352,12 @@ async def get_answer(request: Question, current_user: dict = Depends(current_use
         answer_text = (agent_resp.get("answer") or "").strip()
         agent_refs = agent_resp.get("ref_qa") or []
         rag_qa = [
-            {"question": item.get("question", ""), "answer": item.get("answer", "")}
+            {
+                "question": item.get("question", ""),
+                "answer": item.get("answer", ""),
+                "question_id": item.get("question_id"),
+                "category_id": item.get("category_id"),
+            }
             for item in agent_refs
             if isinstance(item, dict)
         ]
@@ -847,6 +852,8 @@ async def get_thread_messages(thread_id: str, current_user: dict = Depends(curre
             
             return {"messages": messages}
             
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")
 
@@ -880,5 +887,7 @@ async def delete_thread(thread_id: str, current_user: dict = Depends(current_use
             
             return {"message": "スレッドが正常に削除されました", "thread_id": thread_id}
             
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"内部エラー: {str(e)}")

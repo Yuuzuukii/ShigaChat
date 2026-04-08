@@ -4,7 +4,7 @@
  * - services/api.js を使用
  * - Admin 関連を除外
  */
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate, useSearchParams, useOutletContext } from "react-router-dom";
 import {
   fetchCategoryTranslation,
@@ -52,12 +52,37 @@ const categoryIcons = {
 const ERROR_CATEGORY_NOT_FOUND = "category_not_found";
 const ERROR_QA_FETCH_FAILED = "qa_fetch_failed";
 
+function scrollQuestionIntoMain(questionId, scrollContainerRef) {
+  const questionEl = document.getElementById(`question-${questionId}`);
+  if (!questionEl) return false;
+
+  const scrollContainer = scrollContainerRef?.current;
+  if (!scrollContainer) {
+    questionEl.scrollIntoView({ block: "center" });
+    return true;
+  }
+
+  const containerRect = scrollContainer.getBoundingClientRect();
+  const questionRect = questionEl.getBoundingClientRect();
+  const currentScrollTop = scrollContainer.scrollTop;
+  const targetTop = questionRect.top - containerRect.top + currentScrollTop;
+  const centeredScrollTop = Math.max(
+    0,
+    targetTop - (containerRect.height - questionRect.height) / 2
+  );
+
+  scrollContainer.scrollTop = centeredScrollTop;
+  return true;
+}
+
 export default function CategoryDetailPage() {
   const { categoryId } = useParams();
-  const { language, t } = useOutletContext();
+  const { language, t, isDrawerOpen, scrollContainerRef } = useOutletContext();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const questionId = searchParams.get("id");
+  const autoScrolledQuestionIdRef = useRef(null);
+  const backButtonLeft = isDrawerOpen ? "calc(50% + 9rem)" : "calc(50% + 1.75rem)";
 
   const [questions, setQuestions] = useState(null);
   const [categoryName, setCategoryName] = useState("");
@@ -72,13 +97,22 @@ export default function CategoryDetailPage() {
 
   // スクロール to question
   useEffect(() => {
-    if (!questionId) return;
-    const timeout = setTimeout(() => {
-      const el = document.getElementById(`question-${questionId}`);
-      if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
-    }, 300);
-    return () => clearTimeout(timeout);
-  }, [questionId]);
+    if (!questionId || questions === null) return;
+    if (autoScrolledQuestionIdRef.current === questionId) return;
+
+    const frameId = requestAnimationFrame(() => {
+      const didScroll = scrollQuestionIntoMain(questionId, scrollContainerRef);
+      if (!didScroll) return;
+
+      autoScrolledQuestionIdRef.current = questionId;
+
+      const nextSearchParams = new URLSearchParams(searchParams);
+      nextSearchParams.delete("id");
+      setSearchParams(nextSearchParams, { replace: true });
+    });
+
+    return () => cancelAnimationFrame(frameId);
+  }, [questionId, questions, scrollContainerRef, searchParams, setSearchParams]);
 
   // データ取得
   useEffect(() => {
@@ -242,7 +276,10 @@ export default function CategoryDetailPage() {
             </div>
 
             {/* 戻るボタン */}
-            <div className="fixed bottom-6 left-1/2 transform -translate-x-1/2 z-50">
+            <div
+              className="fixed bottom-6 z-50 -translate-x-1/2"
+              style={{ left: backButtonLeft, transition: "left 300ms ease" }}
+            >
               <button
                 onClick={() => navigate("/category")}
                 className="px-8 py-4 bg-blue-600 text-white rounded-full shadow-lg transition-all duration-200 hover:scale-105 hover:bg-blue-700 hover:shadow-xl font-medium flex items-center gap-2"
