@@ -7,23 +7,13 @@
  */
 import React from "react";
 import { useLanguage } from "../hooks/useLanguage";
-import LanguageSelector from "../components/layout/LanguageSelector";
 import { Wrench } from "lucide-react";
 
 export default function MaintenancePage() {
-  const { language, t, changeLanguageLocal } = useLanguage();
+  const { t } = useLanguage();
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50 px-4">
-      {/* 言語切替（右上） */}
-      <div className="absolute top-4 right-4">
-        <LanguageSelector
-          value={language}
-          onChange={changeLanguageLocal}
-          size="small"
-        />
-      </div>
-
       <div className="text-center max-w-md">
         {/* D01: メンテナンスアイコン */}
         <div className="flex justify-center mb-6">
@@ -33,14 +23,10 @@ export default function MaintenancePage() {
         </div>
 
         {/* D02: メンテナンスメッセージ */}
-        <h1 className="text-2xl font-bold text-zinc-800 mb-3">
-          {t.maintenanceTitle}
-        </h1>
+        <h1 className="text-2xl font-bold text-zinc-800 mb-3">{t.maintenanceTitle}</h1>
 
         {/* D03: 補足メッセージ */}
-        <p className="text-zinc-500 leading-relaxed">
-          {t.maintenanceMessage}
-        </p>
+        <p className="text-zinc-500 leading-relaxed">{t.maintenanceMessage}</p>
       </div>
     </div>
   );

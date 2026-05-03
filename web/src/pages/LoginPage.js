@@ -7,10 +7,9 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { Eye, EyeOff, LogIn, Loader2 } from "lucide-react";
 import { UserContext } from "../contexts/UserContext";
-import { useLanguage } from "../hooks/useLanguage";
+import { translations } from "../config/i18n";
 import { postLogin, fetchCurrentUser } from "../services/api";
 import AuthLayout from "../components/layout/AuthLayout";
-import LanguageSelector from "../components/layout/LanguageSelector";
 import ConfirmDialog from "../components/common/ConfirmDialog";
 import { Button } from "../components/ui/button";
 import { Input } from "../components/ui/input";
@@ -26,7 +25,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const { user, setToken, setUser } = useContext(UserContext);
-  const { t, changeLanguageLocal, language } = useLanguage();
+  const t = translations.en;
   const navigate = useNavigate();
 
   // W01: 遷移警告ダイアログ
@@ -34,14 +33,6 @@ export default function LoginPage() {
   const [pendingNavPath, setPendingNavPath] = useState(null);
 
   const hasInput = nickname.trim() !== "" || password.trim() !== "";
-
-  // Spec requirement: unauthenticated login page defaults to English.
-  useEffect(() => {
-    const hasToken = !!localStorage.getItem("token");
-    if (!hasToken) {
-      changeLanguageLocal("en");
-    }
-  }, [changeLanguageLocal]);
 
   const handleNavigate = (path) => {
     // Login -> Register should not prompt; move immediately.
@@ -142,9 +133,6 @@ export default function LoginPage() {
           <div className="pointer-events-none absolute -left-24 top-0 h-64 w-40 -skew-x-12 bg-gradient-to-b from-white/60 to-transparent opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
 
           <CardHeader className="pb-4 relative">
-            <div className="absolute right-4 top-4">
-              <LanguageSelector value={language} onChange={changeLanguageLocal} size="small" />
-            </div>
             <CardTitle className="flex flex-col items-center gap-2 text-blue-800">
               <img
                 src={`${process.env.PUBLIC_URL}/icon_192.png`}

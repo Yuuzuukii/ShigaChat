@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, Query
 import openai  as oepnai
 import numpy as np
-from typing import Tuple
+from typing import Optional, Tuple
 from sklearn.metrics.pairwise import cosine_similarity
 from config import language_mapping
 from database_utils import get_db_cursor, get_placeholder
@@ -9,13 +9,45 @@ from api.routers.user import current_user_info
 
 router = APIRouter()
 
+LANGUAGE_CODE_MAPPING = {
+    "ja": 1,
+    "en": 2,
+    "vi": 3,
+    "zh": 4,
+    "ko": 5,
+    "pt": 6,
+    "es": 7,
+    "tl": 8,
+    "id": 9,
+}
+
+
+def resolve_language_id(spoken_language: str, lang: Optional[str] = None) -> int:
+    if lang is not None:
+        normalized = lang.strip().lower()
+        language_id = LANGUAGE_CODE_MAPPING.get(normalized)
+        if language_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported lang: {lang}",
+            )
+        return language_id
+
+    language_id = language_mapping.get(spoken_language)
+    if language_id is None:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported spoken language: {spoken_language}",
+        )
+    return language_id
+
 @router.get("/category_translation/{category_id}")
 async def get_translated_category(
     category_id: int,
     current_user: dict = Depends(current_user_info)
 ):
     spoken_language = current_user["spoken_language"]
-    language_id = language_mapping.get(spoken_language)
+    language_id = resolve_language_id(spoken_language)
 
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
@@ -38,6 +70,7 @@ async def get_translated_category(
 @router.get("/category/{category_id}")
 async def get_category_questions(
     category_id: int,
+    lang: Optional[str] = Query(default=None, description="Override QA language code"),
     current_user: dict = Depends(current_user_info)
 ):
     """
@@ -45,7 +78,7 @@ async def get_category_questions(
     ユーザーのspoken_languageを基に言語を動的に切り替えます。
     """
     spoken_language = current_user["spoken_language"]
-    language_id = language_mapping.get(spoken_language)
+    language_id = resolve_language_id(spoken_language, lang)
     
     ph = get_placeholder()
     with get_db_cursor() as (cursor, conn):
