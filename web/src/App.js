@@ -10,7 +10,6 @@ import AppLayout from "./components/layout/AppLayout";
 import LoginPage from "./pages/LoginPage";
 import RegisterPage from "./pages/RegisterPage";
 import HomePage from "./pages/HomePage";
-import KeywordSearchPage from "./pages/KeywordSearchPage";
 import CategoryListPage from "./pages/CategoryListPage";
 import CategoryDetailPage from "./pages/CategoryDetailPage";
 import NotFoundPage from "./pages/NotFoundPage";
@@ -55,7 +54,6 @@ function App() {
         {/* 認証後ページ（AppLayout内） */}
         <Route element={<AppLayout />}>
           <Route path="/home" element={<HomePage />} />
-          <Route path="/keyword" element={<KeywordSearchPage />} />
           <Route path="/category" element={<CategoryListPage />} />
           <Route path="/category/:categoryId" element={<CategoryDetailPage />} />
         </Route>

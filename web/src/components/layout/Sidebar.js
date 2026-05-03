@@ -5,14 +5,31 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Home, Search, Layers, Plus, MoreHorizontal, Pencil, Trash2, Check, X as XIcon, LogOut } from "lucide-react";
+import {
+  Home,
+  Layers,
+  Plus,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  Check,
+  X as XIcon,
+  LogOut,
+} from "lucide-react";
 import { Sidebar as SidebarUI, SidebarHeader, SidebarContent } from "../ui/sidebar";
 import Tooltip from "../common/Tooltip";
 import ConfirmDialog from "../common/ConfirmDialog";
 
 export default function AppSidebar({
-  isOpen, user, threads, activeThreadId, t,
-  onSelectThread, onStartNewChat, onRenameThread, onDeleteThread,
+  isOpen,
+  user,
+  threads,
+  activeThreadId,
+  t,
+  onSelectThread,
+  onStartNewChat,
+  onRenameThread,
+  onDeleteThread,
   onLogout,
 }) {
   const navigate = useNavigate();
@@ -31,7 +48,10 @@ export default function AppSidebar({
 
   useEffect(() => {
     if (editingThreadId && editInputRef.current) {
-      try { editInputRef.current.focus(); editInputRef.current.select(); } catch {}
+      try {
+        editInputRef.current.focus();
+        editInputRef.current.select();
+      } catch {}
     }
   }, [editingThreadId]);
 
@@ -61,7 +81,10 @@ export default function AppSidebar({
     if (title) onRenameThread(editingThreadId, title);
     setEditingThreadId(null);
   };
-  const cancelInlineRename = () => { setEditingThreadId(null); setEditingTitle(""); };
+  const cancelInlineRename = () => {
+    setEditingThreadId(null);
+    setEditingTitle("");
+  };
 
   const handleDeleteThread = async (thread) => {
     const deleted = await onDeleteThread(thread.id, { skipConfirm: true });
@@ -69,7 +92,8 @@ export default function AppSidebar({
       toast.success(t?.threadDeletedSuccess || "スレッドを削除しました", { duration: 3000 });
     } else {
       toast.error(t?.threadDeletedError || "スレッドの削除に失敗しました", {
-        description: t?.threadDeletedErrorDescription || "エラーが発生しました。もう一度お試しください。",
+        description:
+          t?.threadDeletedErrorDescription || "エラーが発生しました。もう一度お試しください。",
         duration: 4000,
       });
     }
@@ -78,17 +102,27 @@ export default function AppSidebar({
 
   const navItems = [
     { to: "/home", icon: Home, label: t?.home || "ホーム", tooltip: t?.tooltipHome },
-    { to: "/keyword", icon: Search, label: t?.keyword || "キーワード検索", tooltip: t?.tooltipKeywordSearch },
-    { to: "/category", icon: Layers, label: t?.category || "カテゴリ検索", tooltip: t?.tooltipCategorySearch },
+    {
+      to: "/category",
+      icon: Layers,
+      label: t?.category || "カテゴリ検索",
+      tooltip: t?.tooltipCategorySearch,
+    },
   ];
 
   return (
     <>
-      <SidebarUI open={true} className="fixed top-0 left-0 z-50 h-screen [&_*]:border-0" style={{ width: isOpen ? "18rem" : "3.5rem", transition: "width 300ms ease" }}>
+      <SidebarUI
+        open={true}
+        className="fixed top-0 left-0 z-50 h-screen [&_*]:border-0"
+        style={{ width: isOpen ? "18rem" : "3.5rem", transition: "width 300ms ease" }}
+      >
         <div className="flex h-full flex-col">
           <SidebarHeader className="py-8 border-0">
             <div className={`flex items-center ${isOpen ? "gap-2 px-2" : "justify-center"}`}>
-              {isOpen && <div className="text-sm font-semibold text-blue-800">{t?.menu || "Menu"}</div>}
+              {isOpen && (
+                <div className="text-sm font-semibold text-blue-800">{t?.menu || "Menu"}</div>
+              )}
             </div>
           </SidebarHeader>
 
@@ -114,7 +148,9 @@ export default function AppSidebar({
             {isOpen && (
               <>
                 <div className="flex items-center justify-between px-2">
-                  <div className="text-xs font-semibold text-zinc-500">{t?.threads || "スレッド"}</div>
+                  <div className="text-xs font-semibold text-zinc-500">
+                    {t?.threads || "スレッド"}
+                  </div>
                   <button
                     onClick={onStartNewChat}
                     className="flex items-center gap-1 px-2 py-1 rounded text-xs text-blue-600 hover:text-blue-700 hover:bg-blue-50 transition-all duration-150 group hover:-translate-y-px hover:shadow-sm active:translate-y-px active:shadow-none"
@@ -131,9 +167,15 @@ export default function AppSidebar({
                     const isActive = activeThreadId && String(activeThreadId) === String(th.id);
                     return (
                       <li key={th.id} className="group relative">
-                        <div className={`flex items-center justify-between rounded px-2 py-1.5 text-sm transition-all duration-200 ${(isActive || isMenuOpen || isEditing) ? "bg-blue-50 text-blue-700 shadow-sm" : "text-zinc-900"} hover:bg-blue-50 hover:text-blue-700`}>
+                        <div
+                          className={`flex items-center justify-between rounded px-2 py-1.5 text-sm transition-all duration-200 ${isActive || isMenuOpen || isEditing ? "bg-blue-50 text-blue-700 shadow-sm" : "text-zinc-900"} hover:bg-blue-50 hover:text-blue-700`}
+                        >
                           {!isEditing ? (
-                            <button className="flex-1 whitespace-normal break-words text-left leading-snug" onClick={() => onSelectThread(th.id)} title={th.title}>
+                            <button
+                              className="flex-1 whitespace-normal break-words text-left leading-snug"
+                              onClick={() => onSelectThread(th.id)}
+                              title={th.title}
+                            >
                               {th.title}
                             </button>
                           ) : (
@@ -144,17 +186,51 @@ export default function AppSidebar({
                                 value={editingTitle}
                                 onChange={(e) => setEditingTitle(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
-                                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); commitInlineRename(); } if (e.key === "Escape") { e.preventDefault(); cancelInlineRename(); } }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    commitInlineRename();
+                                  }
+                                  if (e.key === "Escape") {
+                                    e.preventDefault();
+                                    cancelInlineRename();
+                                  }
+                                }}
                                 onBlur={commitInlineRename}
                               />
-                              <button className="text-green-600" onClick={(e) => { e.stopPropagation(); commitInlineRename(); }}><Check className="h-4 w-4" /></button>
-                              <button className="text-zinc-500" onClick={(e) => { e.stopPropagation(); cancelInlineRename(); }}><XIcon className="h-4 w-4" /></button>
+                              <button
+                                className="text-green-600"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  commitInlineRename();
+                                }}
+                              >
+                                <Check className="h-4 w-4" />
+                              </button>
+                              <button
+                                className="text-zinc-500"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  cancelInlineRename();
+                                }}
+                              >
+                                <XIcon className="h-4 w-4" />
+                              </button>
                             </div>
                           )}
                           {!isEditing && (
                             <button
                               className={`ml-2 transition-opacity duration-150 ${isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
-                              onClick={(e) => { e.preventDefault(); e.stopPropagation(); const rect = e.currentTarget.getBoundingClientRect(); setThreadMenuPos({ left: Math.round(rect.right + 8), top: Math.round(rect.top + rect.height / 2) }); setOpenThreadMenuId(String(th.id)); }}
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const rect = e.currentTarget.getBoundingClientRect();
+                                setThreadMenuPos({
+                                  left: Math.round(rect.right + 8),
+                                  top: Math.round(rect.top + rect.height / 2),
+                                });
+                                setOpenThreadMenuId(String(th.id));
+                              }}
                             >
                               <MoreHorizontal className="h-5 w-5 text-zinc-500 hover:text-blue-700" />
                             </button>
@@ -163,7 +239,11 @@ export default function AppSidebar({
                       </li>
                     );
                   })}
-                  {threads.length === 0 && <li className="px-3 py-2 text-sm text-zinc-500">{t?.noThreads || "まだスレッドがありません"}</li>}
+                  {threads.length === 0 && (
+                    <li className="px-3 py-2 text-sm text-zinc-500">
+                      {t?.noThreads || "まだスレッドがありません"}
+                    </li>
+                  )}
                 </ul>
               </>
             )}
@@ -176,20 +256,36 @@ export default function AppSidebar({
               onClick={() => setShowUserMenu((v) => !v)}
               className={`relative flex w-full items-center rounded px-1 py-1 transition-all hover:bg-blue-50 ${!isOpen ? "justify-center" : ""}`}
             >
-              <div className={isOpen ? "relative inline-flex items-center gap-2" : "relative inline-flex items-center"}>
+              <div
+                className={
+                  isOpen
+                    ? "relative inline-flex items-center gap-2"
+                    : "relative inline-flex items-center"
+                }
+              >
                 <span className="relative inline-block">
-                  <div className={`flex items-center justify-center rounded-full bg-blue-600 font-semibold text-white ${isOpen ? "h-8 w-8 text-sm" : "h-8 w-8 text-base"}`}>
+                  <div
+                    className={`flex items-center justify-center rounded-full bg-blue-600 font-semibold text-white ${isOpen ? "h-8 w-8 text-sm" : "h-8 w-8 text-base"}`}
+                  >
                     {(user?.nickname || "?").trim().charAt(0).toUpperCase()}
                   </div>
                 </span>
-                <div className={isOpen ? "text-sm text-zinc-900 ml-2" : "hidden"}>{user?.nickname || t?.guest}</div>
+                <div className={isOpen ? "text-sm text-zinc-900 ml-2" : "hidden"}>
+                  {user?.nickname || t?.guest}
+                </div>
               </div>
             </button>
             {showUserMenu && (
-              <div className={`absolute ${isOpen ? "left-full ml-2" : "left-full ml-2"} bottom-3 z-[60] w-40 rounded-md border border-zinc-200 bg-white p-2 shadow-lg`}>
+              <div
+                className={`absolute ${isOpen ? "left-full ml-2" : "left-full ml-2"} bottom-3 z-[60] w-40 rounded-md border border-zinc-200 bg-white p-2 shadow-lg`}
+              >
                 <button
                   className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-zinc-800 hover:bg-zinc-100"
-                  onClick={() => { setShowUserMenu(false); onLogout(); navigate("/login"); }}
+                  onClick={() => {
+                    setShowUserMenu(false);
+                    onLogout();
+                    navigate("/login");
+                  }}
                 >
                   <LogOut className="h-4 w-4 text-zinc-600" />
                   <span>{t?.logout || "Logout"}</span>
@@ -207,20 +303,26 @@ export default function AppSidebar({
           style={{ left: threadMenuPos.left, top: threadMenuPos.top }}
           onClick={(e) => e.stopPropagation()}
         >
-          <button className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-800 hover:bg-zinc-100" onClick={() => {
-            const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
-            if (th) startInlineRename(th);
-          }}>
+          <button
+            className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-zinc-800 hover:bg-zinc-100"
+            onClick={() => {
+              const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
+              if (th) startInlineRename(th);
+            }}
+          >
             <Pencil className="h-4 w-4 text-zinc-600" />
             <span>{t?.renameThread || "タイトル変更"}</span>
           </button>
-          <button className="mt-0.5 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50" onClick={() => {
-            const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
-            if (th) {
-              setDeleteTargetThread(th);
-              setOpenThreadMenuId(null);
-            }
-          }}>
+          <button
+            className="mt-0.5 flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm text-red-600 hover:bg-red-50"
+            onClick={() => {
+              const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
+              if (th) {
+                setDeleteTargetThread(th);
+                setOpenThreadMenuId(null);
+              }
+            }}
+          >
             <Trash2 className="h-4 w-4" />
             <span>{t?.delete || "削除"}</span>
           </button>

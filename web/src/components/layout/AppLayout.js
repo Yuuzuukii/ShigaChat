@@ -13,7 +13,7 @@ import { Toaster } from "../ui/toaster";
 
 export default function AppLayout() {
   const { user, token, logout, redirectToLogin } = useAuth({ requireAuth: true });
-  const { language, t, changeLanguage } = useLanguage();
+  const { language, t } = useLanguage();
   const userId = user?.id;
   const onUnauthorized = redirectToLogin;
 
@@ -61,12 +61,7 @@ export default function AppLayout() {
       />
 
       {/* Header */}
-      <Header
-        isDrawerOpen={isDrawerOpen}
-        onToggleDrawer={() => setIsDrawerOpen((v) => !v)}
-        language={language}
-        onLanguageChange={changeLanguage}
-      />
+      <Header isDrawerOpen={isDrawerOpen} onToggleDrawer={() => setIsDrawerOpen((v) => !v)} />
 
       {/* Page content */}
       <main
@@ -79,9 +74,7 @@ export default function AppLayout() {
           scrollBehavior: "smooth",
         }}
       >
-        <Outlet
-          context={{ language, t, changeLanguage, threadHook, isDrawerOpen, scrollContainerRef }}
-        />
+        <Outlet context={{ language, t, threadHook, isDrawerOpen, scrollContainerRef }} />
       </main>
 
       <Toaster isDrawerOpen={isDrawerOpen} />

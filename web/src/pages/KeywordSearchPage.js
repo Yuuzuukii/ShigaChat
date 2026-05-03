@@ -262,7 +262,7 @@ export default function KeywordSearchPage() {
                           </div>
                           {question?.title === "official" && (
                             <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 flex-shrink-0">
-                              {t.official}
+                              {t.official || "Official"}
                             </span>
                           )}
                         </div>

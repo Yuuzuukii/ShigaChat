@@ -5,9 +5,8 @@ import React from "react";
 import { Link } from "react-router-dom";
 import { PanelLeft, PanelLeftClose } from "lucide-react";
 import { Button } from "../ui/button";
-import LanguageSelector from "./LanguageSelector";
 
-export default function Header({ isDrawerOpen, onToggleDrawer, language, onLanguageChange }) {
+export default function Header({ isDrawerOpen, onToggleDrawer }) {
   return (
     <div
       className="fixed top-0 left-0 right-0 z-40 border-b border-blue-100 bg-white/70 px-5 py-3 backdrop-blur"
@@ -76,11 +75,6 @@ export default function Header({ isDrawerOpen, onToggleDrawer, language, onLangu
                 />
               </a>
             </div>
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <div className="hidden sm:flex">
-            <LanguageSelector value={language} onChange={onLanguageChange} />
           </div>
         </div>
       </div>
