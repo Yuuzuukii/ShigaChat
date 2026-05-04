@@ -195,7 +195,6 @@ jobs:
             --exclude='nginx/log/' \
             --exclude='backup/' \
             --exclude='Question/' \
-            --exclude='apps/web/' \
             -e "ssh" \
             ./ target:${{ env.DEPLOY_PATH }}/
 
