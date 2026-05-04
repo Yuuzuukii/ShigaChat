@@ -1,114 +1,142 @@
 # ShigaChat
 
-ShigaChat は、公益財団法人滋賀県国際協会の生活相談 Q&A を参照しながら、多言語で相談支援を行う Web アプリケーションです。React フロントエンド、FastAPI API、LangGraph ベースの回答生成エージェント、PostgreSQL / pgvector を組み合わせた構成になっています。
+ShigaChat は、滋賀県国際協会の生活相談 Q&A を参照しながら、多言語で相談支援を行う Web アプリケーションです。
+
+現在の構成は、React フロントエンド、FastAPI のメイン API、LangGraph ベースの回答生成サービス、PostgreSQL + pgvector、DB 運用用の one-off maintenance コンテナです。
 
 参照元 Q&A:
+
 https://www.s-i-a.or.jp/qa
 
-## 主な機能
+## 現在の主な機能
 
-- JWT 認証によるログイン / 新規登録
-- 9言語対応の UI と回答表示
+- ログイン / 新規登録
+- JWT による API 認証
+- ユーザーの使用言語変更
 - スレッド型チャット
-- SSE による回答のストリーミング表示
-- 初回質問を元にしたスレッドタイトル自動生成
+- SSE による回答ストリーミング
+- 参照 Q&A を使った RAG 回答
 - 回答に使った参照 Q&A の表示
-- 直近回答に対する翻訳 / 要約 / わかりやすく書き換え
-- キーワード検索
-- 13カテゴリのカテゴリ閲覧
-- 個人通知 / 全体通知 / 閲覧履歴
-- PostgreSQL のバックアップ / 復元
-- 参照 Q&A の再スクレイプと再投入
+- カテゴリ一覧 / カテゴリ別 Q&A 表示
+- 類似 Q&A 検索
+- SIA Q&A のクロールと DB 再投入
+- PostgreSQL の dump / restore
 
-## 対応言語
+対応言語:
 
 日本語、English、Tiếng Việt、中文、한국어、Português、Español、Tagalog、Bahasa Indonesia
 
 ## アーキテクチャ
 
 ```text
-React (apps/web/)
-  ├─ ログイン / 新規登録
-  ├─ チャット / スレッド管理
-  ├─ キーワード検索 / カテゴリ検索
-  └─ 通知 UI
+apps/web
+  React
+  Radix UI
+  lucide-react
+  flag-icons
+  nginx.conf
         │
-        ├─ 開発時: http://localhost:3000 -> FastAPI
-        └─ 配信時: nginx -> /api/ を FastAPI にプロキシ
-
-FastAPI (apps/service/)
-  ├─ /user
-  ├─ /question
-  ├─ /action
-  ├─ /keyword
-  ├─ /category
-  ├─ /notification
-  └─ /history
+        │ /api/
+        ▼
+apps/service
+  FastAPI
+  DDD / layered architecture
+  認証、ユーザー、スレッド、カテゴリ、検索 API
         │
-        └─ Agent API (apps/agent/)
-             ├─ /chat/stream
-             └─ /chat/simple
-
+        │ AGENT_API_BASE_URL=http://agent:8001
+        ▼
+apps/agent
+  FastAPI
+  LangGraph
+  OpenAI
+  RAG / 回答生成
+        │
+        ▼
 PostgreSQL + pgvector
-  ├─ 参照 Q&A / 翻訳 / 通知
-  ├─ threads
-  └─ thread_qa
+  users
+  threads
+  thread_qa
+  question / answer / translation
+  qa_embedding
 ```
-
-## サービス構成
-
-| サービス | 役割 | デフォルトポート |
-|---|---|---:|
-| `uvicorn` | FastAPI 本体。認証、スレッド、通知、カテゴリ、検索 API を提供 | `8000` |
-| `agent` | LangGraph ベースの回答生成サービス | `8001` |
-| `postgres` | アプリ DB。`pgvector/pg16` を使用 | `5432` |
-| `nginx` | 静的フロント配信と `/api/` のリバースプロキシ | `80` |
-| `maintenance` | DB運用・参照 Q&A 再投入用の一時実行コンテナ | profiles: `tools` |
-
-## 主要な API グループ
-
-| Prefix | 用途 |
-|---|---|
-| `/user` | ユーザー登録、ログイン、現在ユーザー取得、使用言語変更 |
-| `/question` | 回答生成、ストリーミング、スレッド一覧、メッセージ履歴、Q&A 取得 |
-| `/action` | 翻訳、要約、簡略化の適用 |
-| `/keyword` | 設定言語でのキーワード検索 |
-| `/category` | カテゴリ名取得、カテゴリ別 Q&A 取得、質問からカテゴリ逆引き |
-| `/notification` | 個人通知 / 全体通知の取得と既読化 |
-| `/history` | 閲覧履歴 / 投稿履歴 |
-
-フロントのチャット画面では、通常の回答生成に `/question/get_answer_stream` を使います。FastAPI は内部で `agent` の `/chat/stream` を呼び出し、返ってきたトークン列をそのまま SSE でフロントに流しつつ、最終結果を `thread_qa` に保存します。
 
 ## ディレクトリ構成
 
 ```text
 .
 ├── apps/
-│   ├── agent/   # 回答生成エージェント (FastAPI + LangGraph)
-│   ├── service/ # メイン API (FastAPI)
-│   └── web/     # React フロントエンド / nginx設定 / 配信用build
-├── backup/     # バックアップ出力先
-└── scripts/    # DB運用 / 再投入スクリプト
+│   ├── service/      # メイン API。FastAPI + layered architecture
+│   ├── agent/        # 回答生成サービス。FastAPI + LangGraph
+│   └── web/          # React frontend。nginx 設定と build もここに置く
+├── scripts/          # DB dump / restore / scrape / maintenance
+├── backup/           # dump 出力先
+├── docker-compose.yml
+├── db.md             # 将来の DB 再設計メモ
+└── DDD.md            # backend refactoring 計画メモ
 ```
+
+## サービス構成
+
+| Service | 役割 | Port |
+|---|---|---:|
+| `uvicorn` | `apps/service`。メイン FastAPI | `8000` |
+| `agent` | `apps/agent`。LangGraph 回答生成 API | `8001` |
+| `postgres` | PostgreSQL + pgvector | `5432` |
+| `nginx` | `apps/web/build` の配信と `/api/` proxy | `80` |
+| `maintenance` | DB 運用 / scrape 用 one-off container | profile: `tools` |
+
+## API
+
+### `apps/service`
+
+| Prefix | Endpoint | 用途 |
+|---|---|---|
+| `/user` | `POST /register` | ユーザー登録 |
+| `/user` | `POST /token` | ログイン |
+| `/user` | `GET /current_user` | 現在ユーザー取得 |
+| `/user` | `POST /change_language` | 使用言語変更 |
+| `/question` | `POST /create_thread` | スレッド作成 |
+| `/question` | `GET /get_user_threads` | スレッド一覧 |
+| `/question` | `GET /get_thread_messages/{thread_id}` | メッセージ履歴 |
+| `/question` | `DELETE /delete_thread/{thread_id}` | スレッド削除 |
+| `/question` | `POST /get_answer` | 通常回答 |
+| `/question` | `POST /get_answer_stream` | SSE 回答 |
+| `/category` | `GET /categories` | カテゴリ一覧 |
+| `/category` | `GET /category_translation/{category_id}` | カテゴリ名取得 |
+| `/category` | `GET /category/{category_id}` | カテゴリ別 Q&A |
+| `/category` | `GET /get_category_by_question` | 質問からカテゴリ逆引き |
+| `/retrieval` | `POST /search` | 類似 Q&A 検索 |
+
+### `apps/agent`
+
+| Endpoint | 用途 |
+|---|---|
+| `GET /health` | agent healthcheck |
+| `POST /chat/stream` | LangGraph の進捗と回答 token を SSE で返す |
+| `POST /chat/simple` | JSON で回答と参照 Q&A を返す |
 
 ## 環境変数
 
-### ルート `.env`
+### `.env`
 
-`.env.example` をコピーして作成します。
+リポジトリルートに作成します。
+
+```bash
+cp .env.example .env
+```
+
+主な項目:
 
 ```env
-# Required
-OPENAI_API_KEY=your_openai_api_key
-SECRET_KEY=your_secret_key
+OPENAI_API_KEY=
+SECRET_KEY=
 
 PG_HOST=postgres
 PG_PORT=5432
 PG_DATABASE=shigachat
 PG_USER=postgres
-PG_PASSWORD=your_password
+PG_PASSWORD=
 
-# Optional
 NGINX_PORT=80
 ANSWER_MODEL=gpt-5.4-nano
 QUERY_REWRITE_MODEL=gpt-5.4-nano
@@ -116,11 +144,26 @@ REF_SELECTION_MODEL=gpt-5.4-nano
 EMBEDDING_MODEL=text-embedding-3-small
 ```
 
-補足:
+### `.env.maintenance`
 
-- `uvicorn` から `agent` へは `AGENT_API_BASE_URL=http://agent:8001` が `docker-compose.yml` で渡されます
+DB 運用・クロール再投入用です。通常 API の DB user とは分ける想定です。
 
-### `apps/web/` のビルド用 env
+```bash
+cp .env.maintenance.example .env.maintenance
+```
+
+```env
+PG_HOST=postgres
+PG_PORT=5432
+PG_DATABASE=shigachat
+PG_USER=maintenance_user
+PG_PASSWORD=
+OPENAI_API_KEY=
+```
+
+### `apps/web`
+
+開発用:
 
 ```env
 # apps/web/.env.local
@@ -129,6 +172,8 @@ REACT_APP_BASE_PATH=/
 PUBLIC_URL=/
 ```
 
+配信用:
+
 ```env
 # apps/web/.env.deploy
 REACT_APP_API_URL=https://your-host.example/shigachat/api
@@ -136,134 +181,135 @@ REACT_APP_BASE_PATH=/shigachat
 PUBLIC_URL=/shigachat
 ```
 
-必要に応じて `REACT_APP_MAINTENANCE_MODE=true` を追加すると、全画面をメンテナンス画面に切り替えられます。
+## ローカル開発
 
-## ローカル開発手順
-
-ローカルでは、`web` の開発サーバーを使う構成が最も扱いやすいです。`nginx` は React をビルドしないため、日常開発では必須ではありません。
-
-### 1. 環境変数を作成
+### 1. DB / API / Agent を起動
 
 ```bash
-cp .env.example .env
+docker compose up -d postgres agent uvicorn
 ```
 
-### 2. PostgreSQL を起動
+アクセス先:
+
+- Service API: `http://localhost:8000`
+- Service API Docs: `http://localhost:8000/docs`
+- Agent healthcheck: `http://localhost:8001/health`
+
+### 2. フロントを開発モードで起動
 
 ```bash
-docker compose up -d postgres
-```
-
-### 3. 初期データを投入
-
-`restore_postgres.sh` は既存テーブルとデータを置き換えるため、破壊的です。
-
-```bash
-./scripts/restore_postgres.sh --confirm
-```
-
-別のダンプを使う場合:
-
-```bash
-./scripts/restore_postgres.sh --confirm /path/to/backup.sql
-```
-
-### 4. API / Agent を起動
-
-```bash
-docker compose up -d agent uvicorn
-```
-
-### 5. フロントを開発モードで起動
-
-```bash
-cd web
+cd apps/web
 npm install
 npm start
 ```
 
 アクセス先:
 
-- フロントエンド: `http://localhost:3000`
-- FastAPI Docs: `http://localhost:8000/docs`
-- Agent healthcheck: `http://localhost:8001/health`
+```text
+http://localhost:3000
+```
 
-## 配信用フロントビルド
+## 配信用ビルド
 
-`nginx` サービスは `apps/web/build` に置かれた静的ファイルをそのまま配信します。React のビルドは `apps/web/` で行います。
-
-### ルート配下向けの静的 build 更新
+`nginx` は `apps/web/build` を配信します。React の build も `apps/web` で作成します。
 
 ```bash
 cd apps/web
 npm install
 npm run build
+cd ../..
+docker compose up -d --build nginx
 ```
 
-この手順は `apps/web/build` の中身を更新するためのものです。ローカル開発中の動作確認は、基本的に `npm start` を使ってください。
-
-### `/shigachat` 配下での配信用ビルド
-
-`apps/web/.env.deploy` の `REACT_APP_API_URL` を配信先に合わせて調整したうえで実行します。
+`/shigachat` 配下に配信する場合:
 
 ```bash
 cd apps/web
-npm install
 npm run build:deploy
-```
-
-その後、必要なサービスをビルドして起動します。
-
-```bash
 cd ../..
-docker compose up -d --build
+docker compose up -d --build nginx
 ```
 
-注意:
+`apps/web/nginx.conf` は `/api/` を `uvicorn:8000` に proxy します。
 
-- `apps/web/nginx.conf` は `/api/` を `uvicorn:8000` にプロキシします
-- `nginx` 設定は、外側のリバースプロキシが `/shigachat` を剥がして転送する構成を想定しています
+## Python 依存管理
 
-## 運用スクリプト
+Python backend は `uv` に統一しています。
 
-### PostgreSQL ダンプ
+### service
 
 ```bash
-./scripts/dump_postgres.sh
-./scripts/dump_postgres.sh /path/to/backup.sql
+cd apps/service
+uv sync
+uv run python -c "from main import app; print(app.title)"
 ```
 
-### PostgreSQL リストア
+### agent
 
 ```bash
-./scripts/restore_postgres.sh
-./scripts/restore_postgres.sh --confirm /path/to/backup.sql
+cd apps/agent
+uv sync
+uv run python -c "from main import app; print(len(app.routes))"
 ```
 
-### 参照 Q&A の再スクレイプと再投入
+Docker build でも `uv.lock` を使います。
+
+## Frontend 依存方針
+
+`apps/web` は以下に寄せています。
+
+- React
+- Radix UI
+- lucide-react
+- flag-icons
+- Tailwind CSS
+
+`framer-motion` と `sonner` は使っていません。Toast は Radix Toast ベースの実装です。
+
+確認コマンド:
+
+```bash
+cd apps/web
+npm run lint
+npm run build
+CI=true npm test -- --watchAll=false
+```
+
+## DB 運用 / スクレイプ
+
+通常の API コンテナには運用スクリプトを入れません。DB dump / restore / scrape は `maintenance` profile の one-off container で実行します。
+
+詳細は [scripts/README.md](scripts/README.md) を参照してください。
+
+### ヘルプ
+
+```bash
+./scripts/maintenance.sh
+```
+
+### DB dump
+
+```bash
+./scripts/maintenance.sh dump /app/backup/manual.sql
+```
+
+### DB restore
+
+既存データを置き換える破壊的操作です。
+
+```bash
+./scripts/maintenance.sh restore --confirm /app/backup/manual.sql
+```
+
+### SIA Q&A scrape + DB 再投入
 
 ```bash
 ./scripts/maintenance.sh scrape
-```
-
-オプション例:
-
-```bash
-./scripts/maintenance.sh scrape --skip-backup
 ./scripts/maintenance.sh scrape --skip-vector
+./scripts/maintenance.sh scrape --skip-backup
 ```
 
-`scrape_inject.py` は、SIA の 9言語ページをクロールし、Q&A と翻訳データを再投入し、必要に応じて `qa_embedding` も更新します。
-
-## 主要な実装ポイント
-
-- 回答生成は `apps/service/controllers/conversation/chat_controller.py` から `agent` へ委譲されます
-- チャット履歴は `threads` と `thread_qa` に保存されます
-- 回答後アクションを復活させる場合は `apps/service` 側にUseCase/Controllerを追加し、同じスレッド履歴に `type=action` として保存します
-- フロントのカテゴリ一覧は `apps/web/src/config/categories.js` の静的定義を使い、カテゴリ詳細データは API から取得します
-- 参照 Q&A はチャットメッセージ内で展開表示され、カテゴリ詳細画面に遷移できます
-
-## 動作確認コマンド
+## 動作確認
 
 ```bash
 docker compose ps
@@ -272,9 +318,31 @@ docker compose logs agent --tail 120
 docker compose logs postgres --tail 120
 ```
 
-フロントの静的解析:
+フロント:
 
 ```bash
-cd web
+cd apps/web
 npm run lint
+npm run build
 ```
+
+service:
+
+```bash
+cd apps/service
+uv run python -c "from main import app; print(app.title, len(app.routes))"
+```
+
+agent:
+
+```bash
+cd apps/agent
+uv run python -c "from main import app; print(len(app.routes))"
+```
+
+## 補足
+
+- `apps/service` は DB、認証、会話履歴、カテゴリ、検索 API を担当します。
+- `apps/agent` は回答生成に特化した内部サービスです。
+- `apps/web/nginx.conf` は web 側に置いています。独立した `nginx/` ディレクトリは使っていません。
+- 将来 DB を作り直す場合の案は `db.md`、バックエンド DDD 移行の計画は `DDD.md` に残しています。

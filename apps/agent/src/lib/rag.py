@@ -1,9 +1,9 @@
 import os
 from dotenv import load_dotenv
 from openai import OpenAI
-from src.lib.config import DB_CONFIG
-from src.lib.language import LANGUAGE_MAP, resolve_language
-from src.schema.outputs import RefQA, RefQAItem
+from lib.config import DB_CONFIG
+from lib.language import LANGUAGE_MAP, resolve_language
+from schema.outputs import RefQA, RefQAItem
 
 load_dotenv()
 

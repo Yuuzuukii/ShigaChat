@@ -1,4 +1,4 @@
-from src.schema.dto import State
+from schema.dto import State
 
 def _route_by_ref_presence(state: State, no_ref_target: str, has_ref_target: str):
     if not state.ref_qa.ref_qa:

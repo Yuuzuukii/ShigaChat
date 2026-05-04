@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import TypedDict
-from src.schema.outputs import RefQA
+from schema.outputs import RefQA
 
 # グラフ実行時の引数みたいなもの
 class Context(TypedDict):

@@ -8,9 +8,9 @@ from fastapi.responses import StreamingResponse
 
 from agent.graph import graph
 from agent.simple_graph import simple_graph
-from src.schema.dto import State
-from src.schema.outputs import RefQA, SimpleAnswer
-from src.lib.llm import astream_llm, call_llm, call_llm_structured
+from schema.dto import State
+from schema.outputs import RefQA, SimpleAnswer
+from lib.llm import astream_llm, call_llm, call_llm_structured
 
 load_dotenv()
 

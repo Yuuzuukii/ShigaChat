@@ -4,12 +4,12 @@ import os
 from dotenv import load_dotenv
 from langgraph.graph import StateGraph, START, END
 from langgraph.runtime import Runtime
-from src.schema.dto import State, Context
-from src.schema.outputs import RefQA, RefSelection
-from src.lib.llm import call_llm, call_llm_structured
-from src.lib.language import detect_language, resolve_language
-from src.lib.rag import vector_search
-from src.lib.prompts import (
+from schema.dto import State, Context
+from schema.outputs import RefQA, RefSelection
+from lib.llm import call_llm, call_llm_structured
+from lib.language import detect_language, resolve_language
+from lib.rag import vector_search
+from lib.prompts import (
     ANSWER_WITHOUT_REF,
     ANSWER_WITH_REF,
     QUERY_REWRITE,

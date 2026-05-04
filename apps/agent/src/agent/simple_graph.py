@@ -8,9 +8,9 @@ from agent.graph import (
     vector_search_node,
 )
 from agent.routing import route_after_vector_search_simple
-from src.lib.language import resolve_language
-from src.lib.prompts import SIMPLE_ANSWER, get_prompt_template
-from src.schema.dto import Context, State
+from lib.language import resolve_language
+from lib.prompts import SIMPLE_ANSWER, get_prompt_template
+from schema.dto import Context, State
 
 
 async def build_simple_answer_prompt_node(state: State, runtime) -> dict:

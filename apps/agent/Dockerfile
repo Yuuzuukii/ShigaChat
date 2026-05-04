@@ -8,7 +8,7 @@ ENV UV_PROJECT_ENVIRONMENT=/usr/local
 
 RUN pip install --no-cache-dir uv
 
-COPY pyproject.toml uv.lock ./
+COPY pyproject.toml uv.lock README.md ./
 COPY src ./src
 COPY main.py ./
 
