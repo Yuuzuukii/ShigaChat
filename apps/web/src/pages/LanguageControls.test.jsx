@@ -1,10 +1,10 @@
 import "@testing-library/jest-dom";
 import React from "react";
 import { render, screen } from "@testing-library/react";
-import LoginPage from "./LoginPage";
-import RegisterPage from "./RegisterPage";
-import MaintenancePage from "./MaintenancePage";
-import Header from "../components/layout/Header";
+import LoginPage from "./login/LoginPage";
+import RegisterPage from "./register/RegisterPage";
+import MaintenancePage from "./maintenance/MaintenancePage";
+import Header from "../features/layout/Header";
 import { UserContext } from "../contexts/UserContext";
 
 const mockNavigate = jest.fn();
@@ -27,24 +27,15 @@ jest.mock(
   { virtual: true }
 );
 
-jest.mock("../components/layout/LanguageSelector", () => () => (
-  <div data-testid="language-selector" />
-));
-
-jest.mock("../hooks/useLanguage", () => ({
-  useLanguage: () => ({
-    t: {
-      maintenanceTitle: "ただいまメンテナンス中です",
-      maintenanceMessage: "ご不便をおかけして申し訳ございません。しばらくお待ちください。",
-    },
-  }),
-}));
-
 function renderWithUser(ui) {
   const value = {
     user: null,
     token: null,
     isLoading: false,
+    t: {
+      maintenanceTitle: "ただいまメンテナンス中です",
+      maintenanceMessage: "ご不便をおかけして申し訳ございません。しばらくお待ちください。",
+    },
     setToken: jest.fn(),
     setUser: jest.fn(),
     fetchUser: jest.fn(),
@@ -79,7 +70,7 @@ describe("language selector removal", () => {
   });
 
   test("maintenance page shows no language selector", () => {
-    render(<MaintenancePage />);
+    renderWithUser(<MaintenancePage />);
 
     expect(screen.getByText("ただいまメンテナンス中です")).toBeInTheDocument();
     expect(screen.queryByTestId("language-selector")).not.toBeInTheDocument();

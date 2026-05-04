@@ -1,4 +1,4 @@
-/* intentionally empty; toaster styling lives in components/ui/toaster.jsx */
+/* intentionally empty; toaster styling lives in features/layout/Toaster.jsx */
 
 /* Make h-full work across the app */
 html, body, #root {
