@@ -34,15 +34,15 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: apps/web
         run: npm ci
 
       # .env.local を作成（develop 用の環境変数）
       - name: Create .env.local
-        working-directory: web
+        working-directory: apps/web
         run: |
           cat > .env.local << 'EOF'
           REACT_APP_API_URL=http://localhost:8000
@@ -51,14 +51,14 @@ jobs:
 
       # ① フロントエンドを先にビルド（nginx/build/ が必要なため）
       - name: Build (dev)
-        working-directory: web
+        working-directory: apps/web
         run: npm run build
 
       # ② ビルド成果物を nginx/build/ にコピー
       - name: Copy build to nginx/build
         run: |
           mkdir -p nginx/build
-          cp -r web/build/. nginx/build/
+          cp -r apps/web/build/. nginx/build/
 
       # バックエンド用 .env を作成（Docker Compose 用）
       - name: Create .env (backend)

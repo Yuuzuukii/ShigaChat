@@ -66,18 +66,18 @@ jobs:
         with:
           node-version: 20
           cache: npm
-          cache-dependency-path: web/package-lock.json
+          cache-dependency-path: apps/web/package-lock.json
 
       - name: Clean frontend build cache
-        working-directory: web
+        working-directory: apps/web
         run: rm -rf build node_modules/.cache
 
       - name: Install dependencies
-        working-directory: web
+        working-directory: apps/web
         run: npm ci
 
       - name: Create .env.deploy
-        working-directory: web
+        working-directory: apps/web
         run: |
           cat > .env.deploy << 'EOF'
           REACT_APP_API_URL=https://si-lab.org/shigachat/api
@@ -86,14 +86,14 @@ jobs:
           EOF
 
       - name: Build
-        working-directory: web
+        working-directory: apps/web
         run: npm run build:deploy
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: frontend-build
-          path: web/build/
+          path: apps/web/build/
           retention-days: 1
 
   # ---------------------------------------------------------------
@@ -195,7 +195,7 @@ jobs:
             --exclude='nginx/log/' \
             --exclude='backup/' \
             --exclude='Question/' \
-            --exclude='web/' \
+            --exclude='apps/web/' \
             -e "ssh" \
             ./ target:${{ env.DEPLOY_PATH }}/
 
