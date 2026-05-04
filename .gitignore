@@ -4,6 +4,8 @@
 
 # 環境変数ファイル
 .env*
+!.env.example
+!.env.maintenance.example
 
 # Python
 __pycache__/
@@ -13,20 +15,17 @@ __pycache__/
 .python-version
 env/
 
-# nginx（設定ファイルは追跡する）
-nginx/log/
-nginx/build
-
 # Node
 **/node_modules
+
+# web (React) production build
+apps/web/build/
 
 # runtime / generated
 *.db
 *.log
 app/app.log
 !app/ShigaChat.db
-
-
 
 # Python virtualenv / tooling in nested projects
 .venv/

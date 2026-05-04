@@ -1,0 +1,25 @@
+[project]
+name = "shigachat-service"
+version = "0.0.1"
+description = "ShigaChat main FastAPI service."
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "python-multipart==0.0.20",
+    "pydantic==2.10.4",
+    "uvicorn==0.34.0",
+    "passlib==1.7.4",
+    "bcrypt==4.2.1",
+    "python-jose==3.3.0",
+    "python-dotenv==1.0.0",
+    "psycopg[binary]",
+    "httpx==0.28.1",
+    "openai==1.98.0",
+]
+
+[build-system]
+requires = ["setuptools>=73.0.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.uv]
+package = false

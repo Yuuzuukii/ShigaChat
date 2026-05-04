@@ -1,0 +1,26 @@
+FROM python:3.9
+
+WORKDIR /app
+
+# pg_dump に必要な postgresql-client をインストール
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    postgresql-client \
+    && rm -rf /var/lib/apt/lists/*
+
+# DB maintenance and crawl/import dependencies only.
+RUN pip install --no-cache-dir \
+    psycopg[binary] \
+    pgvector \
+    beautifulsoup4 \
+    python-dotenv \
+    requests \
+    openai \
+    numpy
+
+# Copy maintenance scripts.
+COPY . .
+
+# バックアップ出力先ディレクトリを作成
+RUN mkdir -p /app/backup
+
+CMD ["bash"]

@@ -38,5 +38,6 @@
     "titleBar.activeForeground": "#ffffff", // タイトルバーの文字色
     "activityBar.background": "#1d4ed8", // アクティビティバーの背景色
     "activityBar.foreground": "#ffffff" // アクティビティバーの文字色
-  }
+  },
+  "liveServer.settings.port": 5501
 }

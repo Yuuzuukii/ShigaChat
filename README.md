@@ -27,7 +27,7 @@ https://www.s-i-a.or.jp/qa
 ## アーキテクチャ
 
 ```text
-React (web/)
+React (apps/web/)
   ├─ ログイン / 新規登録
   ├─ チャット / スレッド管理
   ├─ キーワード検索 / カテゴリ検索
@@ -36,7 +36,7 @@ React (web/)
         ├─ 開発時: http://localhost:3000 -> FastAPI
         └─ 配信時: nginx -> /api/ を FastAPI にプロキシ
 
-FastAPI (app/)
+FastAPI (apps/service/)
   ├─ /user
   ├─ /question
   ├─ /action
@@ -45,7 +45,7 @@ FastAPI (app/)
   ├─ /notification
   └─ /history
         │
-        └─ Agent API (agent/)
+        └─ Agent API (apps/agent/)
              ├─ /chat/stream
              └─ /chat/simple
 
@@ -63,7 +63,7 @@ PostgreSQL + pgvector
 | `agent` | LangGraph ベースの回答生成サービス | `8001` |
 | `postgres` | アプリ DB。`pgvector/pg16` を使用 | `5432` |
 | `nginx` | 静的フロント配信と `/api/` のリバースプロキシ | `80` |
-| `scraper` | 参照 Q&A の再スクレイプ用ツールコンテナ | profiles: `tools` |
+| `maintenance` | DB運用・参照 Q&A 再投入用の一時実行コンテナ | profiles: `tools` |
 
 ## 主要な API グループ
 
@@ -83,12 +83,12 @@ PostgreSQL + pgvector
 
 ```text
 .
-├── agent/      # 回答生成エージェント (FastAPI + LangGraph)
-├── app/        # メイン API (FastAPI)
+├── apps/
+│   ├── agent/   # 回答生成エージェント (FastAPI + LangGraph)
+│   ├── service/ # メイン API (FastAPI)
+│   └── web/     # React フロントエンド / nginx設定 / 配信用build
 ├── backup/     # バックアップ出力先
-├── nginx/      # nginx.conf と配信用 build
-├── scripts/    # DB運用 / 再投入スクリプト
-└── web/        # React フロントエンドのソース
+└── scripts/    # DB運用 / 再投入スクリプト
 ```
 
 ## 環境変数
@@ -120,17 +120,17 @@ EMBEDDING_MODEL=text-embedding-3-small
 
 - `uvicorn` から `agent` へは `AGENT_API_BASE_URL=http://agent:8001` が `docker-compose.yml` で渡されます
 
-### `web/` のビルド用 env
+### `apps/web/` のビルド用 env
 
 ```env
-# web/.env.local
+# apps/web/.env.local
 REACT_APP_API_URL=http://localhost:8000
 REACT_APP_BASE_PATH=/
 PUBLIC_URL=/
 ```
 
 ```env
-# web/.env.deploy
+# apps/web/.env.deploy
 REACT_APP_API_URL=https://your-host.example/shigachat/api
 REACT_APP_BASE_PATH=/shigachat
 PUBLIC_URL=/shigachat
@@ -190,40 +190,38 @@ npm start
 
 ## 配信用フロントビルド
 
-`nginx` サービスは `nginx/build` に置かれた静的ファイルをそのまま配信します。React のビルドは `web/` で別途行い、成果物を `nginx/build` に反映してください。
+`nginx` サービスは `apps/web/build` に置かれた静的ファイルをそのまま配信します。React のビルドは `apps/web/` で行います。
 
 ### ルート配下向けの静的 build 更新
 
 ```bash
-cd web
+cd apps/web
 npm install
 npm run build
-cp -R build/. ../nginx/build/
 ```
 
-この手順は `nginx/build` の中身を更新するためのものです。ローカル開発中の動作確認は、基本的に `npm start` を使ってください。
+この手順は `apps/web/build` の中身を更新するためのものです。ローカル開発中の動作確認は、基本的に `npm start` を使ってください。
 
 ### `/shigachat` 配下での配信用ビルド
 
-`web/.env.deploy` の `REACT_APP_API_URL` を配信先に合わせて調整したうえで実行します。
+`apps/web/.env.deploy` の `REACT_APP_API_URL` を配信先に合わせて調整したうえで実行します。
 
 ```bash
-cd web
+cd apps/web
 npm install
 npm run build:deploy
-cp -R build/. ../nginx/build/
 ```
 
 その後、必要なサービスをビルドして起動します。
 
 ```bash
-cd ..
+cd ../..
 docker compose up -d --build
 ```
 
 注意:
 
-- `nginx/nginx.conf` は `/api/` を `uvicorn:8000` にプロキシします
+- `apps/web/nginx.conf` は `/api/` を `uvicorn:8000` にプロキシします
 - `nginx` 設定は、外側のリバースプロキシが `/shigachat` を剥がして転送する構成を想定しています
 
 ## 運用スクリプト
@@ -245,24 +243,24 @@ docker compose up -d --build
 ### 参照 Q&A の再スクレイプと再投入
 
 ```bash
-docker compose run --rm --profile tools scraper
+./scripts/maintenance.sh scrape
 ```
 
 オプション例:
 
 ```bash
-docker compose run --rm --profile tools scraper python3 scrape_inject.py --skip-backup
-docker compose run --rm --profile tools scraper python3 scrape_inject.py --skip-vector
+./scripts/maintenance.sh scrape --skip-backup
+./scripts/maintenance.sh scrape --skip-vector
 ```
 
 `scrape_inject.py` は、SIA の 9言語ページをクロールし、Q&A と翻訳データを再投入し、必要に応じて `qa_embedding` も更新します。
 
 ## 主要な実装ポイント
 
-- 回答生成は `app/api/routers/question.py` から `agent` へ委譲されます
+- 回答生成は `apps/service/controllers/conversation/chat_controller.py` から `agent` へ委譲されます
 - チャット履歴は `threads` と `thread_qa` に保存されます
-- 回答後アクションは `app/api/routers/action.py` が別モデルで処理し、同じスレッド履歴に `type=action` として保存します
-- フロントのカテゴリ一覧は `web/src/config/categories.js` の静的定義を使い、カテゴリ詳細データは API から取得します
+- 回答後アクションを復活させる場合は `apps/service` 側にUseCase/Controllerを追加し、同じスレッド履歴に `type=action` として保存します
+- フロントのカテゴリ一覧は `apps/web/src/config/categories.js` の静的定義を使い、カテゴリ詳細データは API から取得します
 - 参照 Q&A はチャットメッセージ内で展開表示され、カテゴリ詳細画面に遷移できます
 
 ## 動作確認コマンド

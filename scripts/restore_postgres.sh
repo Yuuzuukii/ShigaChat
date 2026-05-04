@@ -14,9 +14,11 @@
 set -e
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-CONTAINER_NAME="shigachat-postgres"
-PG_USER="postgres"
-PG_DATABASE="shigachat"
+CONTAINER_NAME="${POSTGRES_CONTAINER_NAME:-shigachat-postgres}"
+PG_HOST="${PG_HOST:-}"
+PG_PORT="${PG_PORT:-5432}"
+PG_USER="${PG_USER:-postgres}"
+PG_DATABASE="${PG_DATABASE:-shigachat}"
 
 # Parse arguments
 SKIP_CONFIRM=0
@@ -51,6 +53,7 @@ fi
 
 echo "=== ShigaChat PostgreSQL Restore ==="
 echo "Container:  ${CONTAINER_NAME}"
+echo "Host:       ${PG_HOST:-docker-exec:${CONTAINER_NAME}}"
 echo "Database:   ${PG_DATABASE}"
 echo "Dump file:  ${DUMP_FILE}"
 echo ""
@@ -77,10 +80,17 @@ echo ""
 
 # Restore the dump
 # The dump file includes DROP statements, so existing schema will be replaced
-docker exec -i "${CONTAINER_NAME}" \
-    psql -U "${PG_USER}" -d "${PG_DATABASE}" \
-    < "${DUMP_FILE}" \
-    2>&1 | grep -v "^DROP" | grep -v "^CREATE" | grep -v "^ALTER" | grep -v "^COPY" | head -20
+if [ -n "${PG_HOST}" ]; then
+    export PGPASSWORD="${PG_PASSWORD:-}"
+    psql -h "${PG_HOST}" -p "${PG_PORT}" -U "${PG_USER}" -d "${PG_DATABASE}" \
+        < "${DUMP_FILE}" \
+        2>&1 | grep -v "^DROP" | grep -v "^CREATE" | grep -v "^ALTER" | grep -v "^COPY" | head -20
+else
+    docker exec -i "${CONTAINER_NAME}" \
+        psql -U "${PG_USER}" -d "${PG_DATABASE}" \
+        < "${DUMP_FILE}" \
+        2>&1 | grep -v "^DROP" | grep -v "^CREATE" | grep -v "^ALTER" | grep -v "^COPY" | head -20
+fi
 
 echo ""
 echo "Restore completed."
@@ -88,13 +98,22 @@ echo ""
 
 # Show table row counts for verification
 echo "--- Row counts after restore ---"
-docker exec "${CONTAINER_NAME}" \
-    psql -U "${PG_USER}" -d "${PG_DATABASE}" -c "
+if [ -n "${PG_HOST}" ]; then
+    psql -h "${PG_HOST}" -p "${PG_PORT}" -U "${PG_USER}" -d "${PG_DATABASE}" -c "
 SELECT schemaname || '.' || relname AS table_name,
        n_live_tup AS row_count
 FROM pg_stat_user_tables
 ORDER BY schemaname, relname;
 "
+else
+    docker exec "${CONTAINER_NAME}" \
+        psql -U "${PG_USER}" -d "${PG_DATABASE}" -c "
+SELECT schemaname || '.' || relname AS table_name,
+       n_live_tup AS row_count
+FROM pg_stat_user_tables
+ORDER BY schemaname, relname;
+"
+fi
 
 echo ""
 echo "Restore verification complete."
