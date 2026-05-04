@@ -51,7 +51,11 @@ export default function ChatInput({
           <div className="p-4">
             {/* Action bar */}
             <div className="mb-3">
-              <ChatActionBar t={t} actionLoading={actionLoading} onApplyAction={onApplyAction} />
+              <ChatActionBar
+                t={t}
+                actionLoading={actionLoading}
+                onApplyAction={onApplyAction}
+              />
             </div>
 
             {/* Error messages */}
@@ -67,30 +71,37 @@ export default function ChatInput({
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={t?.placeholder || "ここに質問を入力してください..."}
-                className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-4 py-2 text-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 min-h-[2.5rem] h-10 leading-5"
+                placeholder={
+                  t?.placeholder || "ここに質問を入力してください..."
+                }
+                className="flex-1 resize-none rounded-xl border border-zinc-300 bg-white px-3 md:px-4 py-2 text-xs md:text-sm transition-all focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/20 min-h-[2.5rem] h-10 leading-5"
                 rows="1"
               />
               <button
                 type="button"
                 onClick={handleSend}
                 disabled={loading}
-                className="flex w-20 items-center justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-4 py-2 text-sm font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50"
+                className="flex items-center gap-1 whitespace-nowrap justify-center rounded-lg bg-gradient-to-r from-blue-600 to-blue-700 px-3 md:px-4 py-2 text-xs md:text-sm font-medium text-white transition-all hover:from-blue-700 hover:to-blue-800 disabled:opacity-50"
               >
                 {loading ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
                   <>
                     <Send className="h-3 w-3" />
-                    <span className="hidden sm:inline">{t?.askButton || "送信"}</span>
+                    <span className="hidden sm:inline">
+                      {t?.askButton || "送信"}
+                    </span>
                   </>
                 )}
               </button>
             </div>
             <div className="flex justify-between">
-              <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
               <div className="mt-2 text-xs text-zinc-500">
-                ※ 本サービスへの質問による個人情報の漏洩に関しては、一切の責任を負いかねます
+                ⌘/Ctrl + Enter で送信
+              </div>
+              <div className="mt-2 text-xs text-zinc-500">
+                ※
+                本サービスへの質問による個人情報の漏洩に関しては、一切の責任を負いかねます
               </div>
             </div>
           </div>
