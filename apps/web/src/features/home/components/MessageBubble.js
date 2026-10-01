@@ -120,7 +120,7 @@ function AssistantBubble({ m, t, navigate }) {
 }
 
 function RagSection({ ragQa, t, navigate }) {
-  const [isReferenceOpen, setIsReferenceOpen] = React.useState(false);
+  const [isReferenceOpen, setIsReferenceOpen] = React.useState(true);
 
   return (
     <details

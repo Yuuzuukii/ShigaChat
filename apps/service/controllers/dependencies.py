@@ -7,6 +7,7 @@ from infrastructure.agent.agent_client import AgentClient
 from infrastructure.auth.jwt_service import JwtService
 from infrastructure.auth.password_hasher import PasswordHasher
 from infrastructure.llm.embedding_client import OpenAIEmbeddingClient
+from infrastructure.llm.text_transformer import OpenAITextTransformer
 from infrastructure.llm.title_generator import ThreadTitleGenerator
 from repositories.conversation.chat_turn_repository import PostgresChatTurnRepository
 from repositories.conversation.thread_repository import PostgresThreadRepository
@@ -56,6 +57,10 @@ def agent_client() -> AgentClient:
 
 def title_generator() -> ThreadTitleGenerator:
     return ThreadTitleGenerator()
+
+
+def text_transformer() -> OpenAITextTransformer:
+    return OpenAITextTransformer()
 
 
 def embedding_client() -> OpenAIEmbeddingClient:

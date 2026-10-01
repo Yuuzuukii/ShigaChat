@@ -19,6 +19,7 @@ _LANGUAGE_ALIASES = {
     "zh-cn": "zh",
     "zh-tw": "zh",
     "fil": "tl",
+    "ms": "id",
 }
 
 _PREFIX_ALIASES = {
@@ -33,6 +34,10 @@ _PREFIX_ALIASES = {
     "fil": "tl",
     "id": "id",
 }
+
+
+# 対応言語に絞って判定する（短い文でインドネシア語が英語等に誤判定されるのを防ぐ）
+langid.set_languages([*LANGUAGE_MAP.keys(), "ms"])
 
 
 def normalize_language_code(code: str) -> str:

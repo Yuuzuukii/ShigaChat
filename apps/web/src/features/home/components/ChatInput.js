@@ -37,7 +37,7 @@ export default function ChatInput({
   );
 
   const handleKeyDown = (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
       e.preventDefault();
       onSend();
       if (textareaRef.current) textareaRef.current.style.height = "40px";
@@ -98,7 +98,7 @@ export default function ChatInput({
               </Button>
             </div>
             <div className="flex justify-between">
-              <div className="mt-2 text-xs text-zinc-500">⌘/Ctrl + Enter で送信</div>
+              <div className="mt-2 text-xs text-zinc-500">Enter で送信 / Shift + Enter で改行</div>
               <div className="mt-2 text-xs text-zinc-500">
                 ※ 本サービスへの質問による個人情報の漏洩に関しては、一切の責任を負いかねます
               </div>
