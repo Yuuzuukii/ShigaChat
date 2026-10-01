@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from controllers.conversation import chat_controller
+from controllers.conversation import action_controller, chat_controller
 from controllers.identity import user_controller
 from controllers.knowledge import category_controller
 from controllers.retrieval import retrieval_controller
@@ -18,6 +18,7 @@ app.add_middleware(
 
 app.include_router(user_controller.router, prefix="/user")
 app.include_router(chat_controller.router, prefix="/question")
+app.include_router(action_controller.router, prefix="/action")
 app.include_router(category_controller.router, prefix="/category")
 app.include_router(retrieval_controller.router, prefix="/retrieval")
 

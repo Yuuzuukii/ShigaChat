@@ -68,7 +68,7 @@ async def vector_search_node(state: State, runtime: Runtime[Context]) -> dict:
     language = resolve_language(state.language)
     retrieval_query = state.retrieval_query or runtime.context["question"]
 
-    ref_qa = vector_search(retrieval_query, language, 5)
+    ref_qa = vector_search(retrieval_query, language, 8)
 
     return {"ref_qa": ref_qa}
 

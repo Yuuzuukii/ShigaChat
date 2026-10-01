@@ -262,8 +262,9 @@ export default function HomePage() {
       content: text,
       time: new Date().toISOString(),
     };
+    const typingId = `typing-${crypto.randomUUID()}`;
     const typingMsg = {
-      id: "typing",
+      id: typingId,
       role: "assistant",
       content: "",
       typing: true,
@@ -329,7 +330,7 @@ export default function HomePage() {
       const updateTypingMessage = (updater) => {
         setMessages((prev) =>
           prev.map((message) =>
-            message.id === "typing"
+            message.id === typingId
               ? { ...message, ...updater(message) }
               : message
           )
@@ -444,7 +445,7 @@ export default function HomePage() {
         await loadThreads();
       } catch {}
     } catch (e) {
-      setMessages((prev) => prev.filter((m) => m.id !== "typing"));
+      setMessages((prev) => prev.filter((m) => m.id !== typingId));
       const normalizedMessage = normalizeRequestError(e, t);
       setErrorMessageKey("");
       setErrorMessage(normalizedMessage);
