@@ -59,28 +59,28 @@ export function Toaster({ isDrawerOpen: _isDrawerOpen = false }) {
               if (!open) removeToast(toast.id);
             }}
             className={cn(
-              "grid w-[min(22rem,calc(100vw-1rem))] grid-cols-[auto_1fr_auto] items-start gap-3 rounded-md border p-3 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:fade-out-80",
+              "pointer-events-auto grid shrink-0 w-[min(22rem,calc(100vw-1rem))] grid-cols-[auto_1fr_auto] items-start gap-3 rounded-md border p-3 shadow-lg data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:fade-out-80",
               style.root
             )}
           >
             <Icon className={cn("mt-0.5 h-4 w-4", style.iconClass)} />
             <div className="min-w-0">
-              <ToastPrimitive.Title className="text-sm font-semibold leading-5">
+              <ToastPrimitive.Title data-toast-title className="text-sm font-semibold leading-5">
                 {toast.title}
               </ToastPrimitive.Title>
               {toast.description && (
-                <ToastPrimitive.Description className="mt-1 text-xs leading-5 opacity-80">
+                <ToastPrimitive.Description data-toast-description className="mt-1 text-xs leading-5 opacity-80">
                   {toast.description}
                 </ToastPrimitive.Description>
               )}
             </div>
-            <ToastPrimitive.Close className="rounded p-1 opacity-70 transition-opacity hover:opacity-100">
+            <ToastPrimitive.Close data-toast-close aria-label="Close notification" className="rounded p-1 opacity-70 transition-opacity hover:opacity-100">
               <X className="h-4 w-4" />
             </ToastPrimitive.Close>
           </ToastPrimitive.Root>
         );
       })}
-      <ToastPrimitive.Viewport className="fixed bottom-2 right-2 z-[300] flex max-h-screen flex-col gap-2 outline-none" />
+      <ToastPrimitive.Viewport className="responsive-toasts pointer-events-none fixed bottom-2 right-2 z-[300] flex max-h-screen flex-col gap-2 outline-none" />
     </ToastPrimitive.Provider>
   );
 }

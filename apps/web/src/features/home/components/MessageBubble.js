@@ -64,7 +64,7 @@ function UserBubble({ m, t }) {
   const isAction = m.type === "action";
   return (
     <div
-      className={`max-w-[80%] rounded-2xl border p-4 shadow-sm ${isAction ? "bg-blue-300 bg-gradient-to-br from-blue-100 to-zinc-100/60 text-blue-900 shadow-blue-100" : "border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900 shadow-blue-100"}`}
+      className={`min-w-0 max-w-[92%] rounded-2xl border p-3 shadow-sm lg:max-w-[80%] lg:p-4 ${isAction ? "bg-blue-300 bg-gradient-to-br from-blue-100 to-zinc-100/60 text-blue-900 shadow-blue-100" : "border-blue-200 bg-gradient-to-br from-blue-50 to-blue-100/50 text-blue-900 shadow-blue-100"}`}
     >
       <div
         className={`mb-2 flex items-center gap-1.5 ${isAction ? "text-blue-600" : "text-zinc-500"}`}
@@ -78,25 +78,25 @@ function UserBubble({ m, t }) {
           {isAction ? t?.actionLabel || "アクション" : t?.you || "あなた"}
         </span>
       </div>
-      <div className="text-sm leading-relaxed">{m.content}</div>
+      <div className="text-sm leading-relaxed [overflow-wrap:anywhere] max-lg:whitespace-pre-wrap">{m.content}</div>
     </div>
   );
 }
 
 function AssistantBubble({ m, t, navigate }) {
   return (
-    <div className="w-full">
+    <div className="min-w-0 w-full">
       <div className="mb-3 flex items-center gap-2">
         <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-blue-700">
           <Lightbulb className="h-4 w-4 text-white" />
         </div>
         <span className="text-sm font-medium text-zinc-700">{t?.assistant || "アシスタント"}</span>
       </div>
-      <div className="prose prose-sm max-w-none text-zinc-800 leading-relaxed">
+      <div className="prose prose-sm min-w-0 max-w-none text-zinc-800 leading-relaxed [overflow-wrap:anywhere]">
         {m.typing ? (
           <div className="w-full max-w-md">
-            <div className="flex items-center gap-2">
-              <div className="flex gap-1">
+            <div role="status" className="flex items-center gap-2">
+              <div aria-hidden="true" className="flex shrink-0 gap-1">
                 <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.3s]" />
                 <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600 [animation-delay:-0.15s]" />
                 <div className="h-2 w-2 animate-bounce rounded-full bg-blue-600" />
@@ -128,16 +128,16 @@ function RagSection({ ragQa, t, navigate }) {
       open={isReferenceOpen}
       onToggle={(e) => setIsReferenceOpen(e.currentTarget.open)}
     >
-      <summary className="cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none">
-        <div className="flex items-center gap-2">
-          <FileText className="h-4 w-4 text-zinc-500" />
-          <span>
+      <summary className="min-h-11 cursor-pointer py-2 text-sm text-zinc-600 hover:text-zinc-800 transition-colors list-none lg:min-h-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <FileText className="h-4 w-4 shrink-0 text-zinc-500" />
+          <span className="min-w-0 [overflow-wrap:anywhere]">
             {t?.similarQuestions || "参考となる関連質問"} ({ragQa?.length || 0}件)
           </span>
           {isReferenceOpen ? (
-            <ChevronRight className="h-3 w-3 text-zinc-400" />
+            <ChevronRight className="h-3 w-3 shrink-0 text-zinc-400" />
           ) : (
-            <ChevronDown className="h-3 w-3 text-zinc-400" />
+            <ChevronDown className="h-3 w-3 shrink-0 text-zinc-400" />
           )}
         </div>
       </summary>
@@ -145,18 +145,18 @@ function RagSection({ ragQa, t, navigate }) {
         <div className="divide-y divide-zinc-200">
           {ragQa.map((q, idx) => (
             <details key={idx} className="group" open={false}>
-              <summary className="cursor-pointer px-4 py-3 hover:bg-zinc-50 transition-colors list-none">
+              <summary className="min-h-11 cursor-pointer px-3 py-3 hover:bg-zinc-50 lg:px-4 transition-colors list-none">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-start justify-between gap-3">
-                      <div className="flex-1 text-sm font-medium text-zinc-800 line-clamp-2">
+                      <div className="min-w-0 flex-1 text-sm font-medium text-zinc-800 line-clamp-2 [overflow-wrap:anywhere]">
                         <RichText content={q.question} />
                       </div>
                       {q.category_id && q.question_id && (
                         <button
                           type="button"
                           aria-label="該当カテゴリを開く"
-                          className="inline-flex flex-shrink-0 items-center justify-center p-1 text-zinc-500 transition-colors hover:text-blue-700"
+                          className="-my-2.5 inline-flex min-h-11 min-w-11 flex-shrink-0 items-center justify-center p-1 text-zinc-500 transition-colors hover:text-blue-700 lg:my-0 lg:min-h-0 lg:min-w-0"
                           onClick={(e) => {
                             e.preventDefault();
                             e.stopPropagation();
@@ -179,7 +179,7 @@ function RagSection({ ragQa, t, navigate }) {
                 </div>
               </summary>
               <div className="px-4 pb-4">
-                <div className="text-sm text-zinc-700 leading-relaxed">
+                <div className="text-sm text-zinc-700 leading-relaxed [overflow-wrap:anywhere]">
                   <RichText content={q.answer} />
                 </div>
               </div>

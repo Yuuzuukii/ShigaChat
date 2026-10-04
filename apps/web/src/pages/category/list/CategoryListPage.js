@@ -5,45 +5,14 @@
  * - 質問管理画面の旧カテゴリグリッドを踏襲
  * - Admin 関連を除外
  */
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { categoryList, categoryColors } from "../../../config/categories";
 import { fetchCategoryTranslation } from "../api";
 import { toast } from "../../../features/common/toast";
-import {
-  IdCard,
-  HeartHandshake,
-  Stethoscope,
-  PiggyBank,
-  Briefcase,
-  GraduationCap,
-  Heart,
-  Baby,
-  Home,
-  Receipt,
-  HelpingHand,
-  Siren,
-  CloudLightning,
-  Tag,
-  Layers,
-} from "lucide-react";
-
-const categoryIcons = {
-  "category-zairyu": IdCard,
-  "category-seikatsu": HeartHandshake,
-  "category-iryo": Stethoscope,
-  "category-nenkin": PiggyBank,
-  "category-roudou": Briefcase,
-  "category-kyouiku": GraduationCap,
-  "category-kekkon": Heart,
-  "category-shussan": Baby,
-  "category-jutaku": Home,
-  "category-zeikin": Receipt,
-  "category-fukushi": HelpingHand,
-  "category-jiken": Siren,
-  "category-saigai": CloudLightning,
-  "category-sonota": Tag,
-};
+import { Layers } from "lucide-react";
+import { getCategoryIcon } from "../../../features/category/categoryPresentation";
+import "../../../features/category/Responsive.css";
 
 function getTextColorForBg(hex) {
   if (!hex || typeof hex !== "string" || !hex.startsWith("#")) return "#1f2937";
@@ -61,44 +30,39 @@ export default function CategoryListPage() {
   const { language, t } = useOutletContext();
   const navigate = useNavigate();
   const [hoveredCategoryId, setHoveredCategoryId] = useState(null);
-  const hasCheckedCategoryApiRef = useRef(false);
 
   // バックエンド停止時にカテゴリ取得失敗トーストを表示するための疎通チェック
   useEffect(() => {
-    if (hasCheckedCategoryApiRef.current) return;
-    hasCheckedCategoryApiRef.current = true;
-
-    let cancelled = false;
+    const controller = new AbortController();
     const sampleCategoryId = categoryList?.[0]?.id;
     if (!sampleCategoryId) return;
 
     async function verifyCategoryApi() {
       try {
-        const resp = await fetchCategoryTranslation(sampleCategoryId);
+        const resp = await fetchCategoryTranslation(sampleCategoryId, { signal: controller.signal });
         if (!resp.ok) throw new Error("category_api_unavailable");
       } catch (error) {
+        if (controller.signal.aborted) return;
         console.error("カテゴリ一覧API疎通エラー:", error);
-        if (!cancelled) {
-          toast.error(t?.categoryError || "カテゴリの取得に失敗しました", {
-            duration: 4000,
-          });
-        }
+        toast.error(t?.categoryError || "カテゴリの取得に失敗しました", {
+          duration: 4000,
+        });
       }
     }
 
     verifyCategoryApi();
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, [t]);
 
   return (
-    <div className="min-h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
+    <div className="category-list-page min-h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50">
       <div className="flex justify-center">
         <div className="relative z-10 mx-auto w-full max-w-6xl px-4 py-6 text-slate-800 md:py-8">
           <div className="w-full">
             <div className="mb-10 text-center">
-              <div className="mb-4 flex items-center justify-center gap-3">
+              <div className="category-page-title mb-4 flex items-center justify-center gap-3">
                 <Layers className="h-8 w-8 text-blue-800" />
                 <h1 className="text-3xl font-bold text-blue-800">{t.categorySearch}</h1>
               </div>
@@ -117,7 +81,7 @@ export default function CategoryListPage() {
                 const isHover = hoveredCategoryId === cat.id;
                 const bg = isHover ? palette.hover : palette.base;
                 const color = getTextColorForBg(bg);
-                const Icon = categoryIcons[cat.className] || Tag;
+                const Icon = getCategoryIcon(cat);
 
                 return (
                   <button
@@ -130,7 +94,7 @@ export default function CategoryListPage() {
                     onMouseLeave={() => setHoveredCategoryId(null)}
                     onFocus={() => setHoveredCategoryId(cat.id)}
                     onBlur={() => setHoveredCategoryId(null)}
-                    className="group relative min-h-[136px] overflow-hidden rounded-lg border-0 p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                    className="category-tile group relative min-h-[136px] overflow-hidden rounded-lg border-0 p-4 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
                     style={{ backgroundColor: bg, color }}
                   >
                     <div className="flex h-full w-full flex-col items-center justify-center gap-3 text-center">

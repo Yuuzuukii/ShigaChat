@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom";
-import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import React, { act } from "react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import CategoryDetailPage from "./CategoryDetailPage";
 import { fetchCategoryTranslation, fetchCategoryQuestions, addHistory } from "../api";
@@ -15,6 +15,7 @@ const mockUseSearchParams = jest.fn(() => [new URLSearchParams(), mockSetSearchP
 jest.mock(
   "react-router-dom",
   () => ({
+    Link: ({ to, children, ...props }) => <a href={to} {...props}>{children}</a>,
     useNavigate: () => mockNavigate,
     useOutletContext: () => mockUseOutletContext(),
     useParams: () => mockUseParams(),
@@ -114,21 +115,23 @@ describe("CategoryDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "在留" })).toBeInTheDocument();
     expect(await screen.findByText("日本語の質問")).toBeInTheDocument();
-    expect(fetchCategoryQuestions).toHaveBeenCalledWith("1", "ja");
+    expect(fetchCategoryQuestions).toHaveBeenCalledWith("1", "ja", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(screen.getByTestId("qa-language-tabs")).toBeInTheDocument();
     expect(screen.getByRole("tablist", { name: "言語" })).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "日本語" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "English" })).toBeInTheDocument();
 
-    await userEvent.click(screen.getByText("日本語の質問"));
+    fireEvent.click(screen.getByText("日本語の質問"));
 
     expect(await screen.findByText("日本語の回答")).toBeInTheDocument();
     expect(addHistory).toHaveBeenCalledWith(1);
 
-    await userEvent.click(screen.getByRole("tab", { name: "English" }));
+    // user-event v13 needs act for React 18 interaction updates.
+    // eslint-disable-next-line testing-library/no-unnecessary-act
+    await act(async () => { userEvent.click(screen.getByRole("tab", { name: "English" })); });
 
     await waitFor(() => {
-      expect(fetchCategoryQuestions).toHaveBeenLastCalledWith("1", "en");
+      expect(fetchCategoryQuestions).toHaveBeenLastCalledWith("1", "en", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     });
     expect(mockSetSearchParams).toHaveBeenCalledWith(expect.any(URLSearchParams));
     const lastSetSearchParamsCall =
@@ -164,7 +167,32 @@ describe("CategoryDetailPage", () => {
     renderCategoryDetailPage({ search: "lang=en" });
 
     expect(await screen.findByText("English question")).toBeInTheDocument();
-    expect(fetchCategoryQuestions).toHaveBeenCalledWith("1", "en");
+    expect(fetchCategoryQuestions).toHaveBeenCalledWith("1", "en", expect.objectContaining({ signal: expect.any(AbortSignal) }));
     expect(screen.getByRole("tab", { name: "English" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  test("opens and closes answers with the keyboard and exposes the expanded state", async () => {
+    fetchCategoryTranslation.mockResolvedValue(mockResponse({ カテゴリ名: "在留" }));
+    fetchCategoryQuestions.mockResolvedValue(mockResponse({
+      questions: [{ question_id: 3, 質問: "キーボードで開く質問", 回答: "回答の本文" }],
+    }));
+
+    renderCategoryDetailPage();
+    const trigger = await screen.findByRole("button", { name: "キーボードで開く質問" });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByRole("button", { name: "カテゴリ一覧に戻る" }));
+    expect(mockNavigate).toHaveBeenCalledWith("/category");
+
+    trigger.focus();
+    // user-event v13 needs act for React 18 keyboard updates.
+    // eslint-disable-next-line testing-library/no-unnecessary-act
+    await act(async () => { userEvent.keyboard("{Enter}"); });
+    expect(trigger).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("回答の本文")).toBeVisible();
+
+    // eslint-disable-next-line testing-library/no-unnecessary-act
+    await act(async () => { userEvent.keyboard(" "); });
+    expect(trigger).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("回答の本文")).not.toBeInTheDocument();
   });
 });

@@ -21,11 +21,11 @@ export default function ChatMessages({
   ));
 
   return (
-    <div className="flex-1 overflow-y-auto p-4" ref={messagesContainerRef}>
-      <div className="mx-auto w-full max-w-4xl h-full">
+    <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 max-lg:p-0" ref={messagesContainerRef} aria-busy={messagesLoading}>
+      <div className="mx-auto h-full min-w-0 w-full max-w-4xl max-lg:px-3 max-lg:pb-3 max-lg:pt-16">
         {/* Loading spinner */}
         {messagesLoading && currentThreadId && (
-          <div className="flex h-full items-center justify-center">
+          <div role="status" className="flex h-full items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
               <p className="text-sm text-zinc-600">メッセージを読み込み中...</p>

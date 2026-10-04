@@ -68,3 +68,7 @@ This section has moved here: [https://facebook.github.io/create-react-app/docs/d
 ### `npm run build` fails to minify
 
 This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+
+## Responsive design
+
+画面幅ごとのレイアウト、モバイル入力、コンポーネントの責務、検証結果は [RESPONSIVE_DESIGN.md](RESPONSIVE_DESIGN.md) を参照してください。

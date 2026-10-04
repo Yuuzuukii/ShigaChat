@@ -1,0 +1,66 @@
+/* Keep the desktop presentation intact; adjust only space-constrained screens. */
+@media (max-width: 1023px) {
+  .category-page-title > svg {
+    flex-shrink: 0;
+  }
+
+  .category-page-title > h1,
+  .category-tile span,
+  .keyword-page-title,
+  .qa-question-text,
+  .qa-answer-text,
+  .keyword-search-term {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .qa-language-scroll {
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    border-radius: 1.4rem 1.4rem 0 0;
+  }
+
+  .qa-language-list {
+    min-width: 27rem;
+  }
+
+  .qa-language-list [role="tab"] {
+    min-height: 44px;
+  }
+
+  .category-back-button {
+    left: 50% !important;
+    bottom: calc(1.5rem + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 2rem);
+  }
+
+  .category-back-button > button {
+    max-width: 100%;
+    justify-content: center;
+  }
+
+  .category-back-button svg,
+  .qa-question-date > svg {
+    flex-shrink: 0;
+  }
+}
+
+@media (max-width: 639px) {
+  .qa-answer-panel,
+  .qa-question-card {
+    padding: 1rem;
+  }
+
+  .qa-question-heading {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .qa-question-heading > div {
+    flex-basis: 100%;
+  }
+
+  .keyword-search-input {
+    font-size: 1rem;
+  }
+}

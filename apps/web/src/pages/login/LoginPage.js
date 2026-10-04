@@ -123,7 +123,7 @@ export default function LoginPage() {
   return (
     <AuthLayout>
       <div className="w-full max-w-2xl">
-        <Card className="group relative w-full overflow-hidden border border-blue-100/70 bg-white/70 shadow-xl shadow-blue-100/40 backdrop-blur-xl">
+        <Card className="group relative w-full overflow-hidden shadow-xl shadow-blue-100/40 backdrop-blur-xl">
           <div className="pointer-events-none absolute -left-24 top-0 h-64 w-40 -skew-x-12 bg-gradient-to-b from-white/60 to-transparent opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
 
           <CardHeader className="pb-4 relative">
@@ -138,7 +138,7 @@ export default function LoginPage() {
           </CardHeader>
 
           <CardContent className="pb-6 pt-2">
-            <form onSubmit={(e) => e.preventDefault()} className="space-y-5">
+            <form onSubmit={(e) => e.preventDefault()} aria-label={t.login} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="nickname" className="text-blue-900">
                   {t.nickname}
@@ -149,6 +149,8 @@ export default function LoginPage() {
                   value={nickname}
                   onChange={(e) => setNickname(e.target.value)}
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   className="h-11 rounded-xl border-blue-200 bg-white/90 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
                 />
                 {nicknameErrorKey && (
@@ -173,13 +175,15 @@ export default function LoginPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="current-password"
-                    className="h-11 rounded-xl border-blue-200 bg-white/90 pr-10 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
+                    className="auth-password-input h-11 rounded-xl border-blue-200 bg-white/90 pr-10 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1.5 h-8 w-8 text-blue-700"
+                    className="auth-password-toggle absolute right-1.5 top-1.5 h-8 w-8 text-blue-700"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                     onClick={() => setShowPassword((v) => !v)}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -208,7 +212,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={handleLogin}
                 disabled={loading}
-                className="group h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg ring-1 ring-blue-300 transition-all hover:-translate-y-px hover:shadow-blue-200 active:translate-y-0"
+                className="group h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg ring-1 ring-blue-300 hover:-translate-y-px hover:shadow-blue-200 active:translate-y-0"
               >
                 {loading ? (
                   <>
@@ -226,7 +230,7 @@ export default function LoginPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 w-full rounded-xl border-blue-200/80 bg-white/80 text-blue-700 hover:bg-blue-50"
+                className="h-11 w-full rounded-xl bg-white/80 text-blue-700 hover:bg-blue-50"
                 onClick={() => handleNavigate("/register")}
               >
                 {t.signUp}

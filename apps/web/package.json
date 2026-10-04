@@ -28,8 +28,8 @@
     "build:deploy": "env-cmd -f .env.deploy react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "lint": "eslint src/",
-    "lint:fix": "eslint src/ --fix"
+    "lint": "eslint --ext .js,.jsx src/",
+    "lint:fix": "eslint --ext .js,.jsx src/ --fix"
   },
   "browserslist": {
     "production": [

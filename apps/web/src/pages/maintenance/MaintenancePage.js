@@ -8,12 +8,13 @@
 import React, { useContext } from "react";
 import { UserContext } from "../../contexts/UserContext";
 import { Wrench } from "lucide-react";
+import "../../features/layout/AuthResponsive.css";
 
 export default function MaintenancePage() {
   const { t } = useContext(UserContext);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50 px-4">
+    <div className="auth-status-page min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50 px-4">
       <div className="text-center max-w-md">
         {/* D01: メンテナンスアイコン */}
         <div className="flex justify-center mb-6">

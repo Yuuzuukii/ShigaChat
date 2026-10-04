@@ -6,23 +6,24 @@ import { Link } from "react-router-dom";
 import { PanelLeft, PanelLeftClose } from "lucide-react";
 import { Button } from "../../components/ui/button";
 
-export default function Header({ isDrawerOpen, onToggleDrawer }) {
+export default function Header({ isDrawerOpen, onToggleDrawer, isMobile = false, t }) {
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-40 border-b border-blue-100 bg-white/70 px-5 py-3 backdrop-blur"
+      className="app-header fixed top-0 left-0 right-0 z-40 border-b border-blue-100 bg-white/70 px-5 py-3 backdrop-blur"
       style={{
-        marginLeft: isDrawerOpen ? "18rem" : "3.5rem",
         transition: "margin-left 300ms ease",
       }}
     >
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="app-header-row flex items-center gap-4">
           <Button
             variant="ghost"
             size="icon"
             onClick={onToggleDrawer}
-            aria-label={isDrawerOpen ? "Collapse sidebar" : "Expand sidebar"}
-            className="transition-all duration-200 hover:bg-blue-100 hover:shadow-md hover:scale-110"
+            aria-label={isMobile ? t?.menu || "Menu" : isDrawerOpen ? "Collapse sidebar" : "Expand sidebar"}
+            aria-expanded={isDrawerOpen}
+            aria-controls="app-sidebar"
+            className="app-header-toggle transition-all duration-200 hover:bg-blue-100 hover:shadow-md hover:scale-110"
           >
             {isDrawerOpen ? (
               <PanelLeftClose className="h-5 w-5 transition-all duration-200 hover:text-blue-700" />
@@ -30,14 +31,14 @@ export default function Header({ isDrawerOpen, onToggleDrawer }) {
               <PanelLeft className="h-5 w-5 transition-all duration-200 hover:text-blue-700" />
             )}
           </Button>
-          <div className="flex items-center gap-5">
+          <div className="app-header-brand flex items-center gap-5">
             <Link
               to="/home"
               aria-label="Go to home"
               className="group inline-flex items-center transition-transform duration-150 hover:-translate-y-0.5 active:translate-y-px focus-visible:outline-none"
             >
               <span
-                className="text-2xl font-bold transition-all duration-150 group-hover:text-blue-700 group-hover:drop-shadow-[0_2px_2px_rgba(0,86,179,0.28)] group-active:drop-shadow-none"
+                className="app-header-logo text-2xl font-bold transition-all duration-150 group-hover:text-blue-700 group-hover:drop-shadow-[0_2px_2px_rgba(0,86,179,0.28)] group-active:drop-shadow-none"
                 style={{
                   color: "#0056b3",
                   fontWeight: 700,
@@ -48,7 +49,7 @@ export default function Header({ isDrawerOpen, onToggleDrawer }) {
                 ShigaChat
               </span>
             </Link>
-            <div className="flex items-center gap-2">
+            <div className="app-header-partners flex items-center gap-2">
               <a
                 href="https://www.s-i-a.or.jp"
                 target="_blank"
