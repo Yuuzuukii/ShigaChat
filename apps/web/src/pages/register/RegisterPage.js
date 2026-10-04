@@ -129,15 +129,15 @@ export default function RegisterPage() {
   return (
     <AuthLayout>
       <div className="w-full max-w-2xl">
-        <Card className="group relative w-full overflow-hidden border border-blue-100/70 bg-white/80 shadow-xl shadow-blue-100/40 backdrop-blur-xl">
+        <Card className="group relative w-full overflow-hidden shadow-xl shadow-blue-100/40 backdrop-blur-xl">
           <div className="pointer-events-none absolute -left-24 top-0 h-64 w-40 -skew-x-12 bg-gradient-to-b from-white/60 to-transparent opacity-0 transition-opacity duration-700 group-hover:opacity-100" />
 
-          <CardHeader className="pb-4 relative">
+          <CardHeader className="auth-register-header pb-4 relative">
             <div className="absolute left-4 top-4">
               <Button
                 variant="ghost"
                 size="sm"
-                className="text-blue-700"
+                className="auth-back-button text-blue-700"
                 onClick={() => handleNavigate("/login")}
               >
                 <ArrowLeft className="mr-1 h-4 w-4" />
@@ -150,7 +150,7 @@ export default function RegisterPage() {
           </CardHeader>
 
           <CardContent className="pb-6 pt-2">
-            <form onSubmit={handleRegister} className="space-y-5">
+            <form onSubmit={handleRegister} aria-label={t.signUp} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="nickname" className="text-blue-900">
                   {t.nickname}
@@ -161,6 +161,8 @@ export default function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   autoComplete="username"
+                  autoCapitalize="none"
+                  autoCorrect="off"
                   className="h-11 rounded-xl border-blue-200 bg-white/90 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
                 />
                 {nameErrorKey && (
@@ -185,13 +187,15 @@ export default function RegisterPage() {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     autoComplete="new-password"
-                    className="h-11 rounded-xl border-blue-200 bg-white/90 pr-10 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
+                    className="auth-password-input h-11 rounded-xl border-blue-200 bg-white/90 pr-10 shadow-sm placeholder:text-zinc-400 focus-visible:ring-blue-400"
                   />
                   <Button
                     type="button"
                     variant="ghost"
                     size="icon"
-                    className="absolute right-1.5 top-1.5 h-8 w-8 text-blue-700"
+                    className="auth-password-toggle absolute right-1.5 top-1.5 h-8 w-8 text-blue-700"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                    aria-pressed={showPassword}
                     onClick={() => setShowPassword((v) => !v)}
                   >
                     {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
@@ -212,10 +216,15 @@ export default function RegisterPage() {
                   {t.spokenLanguage}
                 </Label>
                 <Select value={spokenLanguage} onValueChange={setSpokenLanguage}>
-                  <SelectTrigger className="h-11 w-full rounded-xl border-blue-200 bg-white/90 px-3 text-sm text-blue-900 shadow-sm">
+                  <SelectTrigger
+                    id="spokenLanguage"
+                    aria-invalid={Boolean(spokenLanguageErrorKey)}
+                    aria-describedby={spokenLanguageErrorKey ? "spokenLanguage-error" : undefined}
+                    className="h-11 w-full rounded-xl border-blue-200 bg-white/90 px-3 text-sm text-blue-900 shadow-sm"
+                  >
                     <SelectValue placeholder={t.notSelected} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="auth-language-options">
                     {spokenLanguageOptions.map((opt) => (
                       <SelectItem key={opt.value} value={opt.value}>
                         <span className="flex items-center gap-2">
@@ -230,6 +239,7 @@ export default function RegisterPage() {
                   <div
                     className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
                     role="alert"
+                    id="spokenLanguage-error"
                   >
                     {t[spokenLanguageErrorKey]}
                   </div>
@@ -256,7 +266,7 @@ export default function RegisterPage() {
               <Button
                 type="submit"
                 disabled={loading}
-                className="group h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg ring-1 ring-blue-300 transition-all hover:-translate-y-px hover:shadow-blue-200 active:translate-y-0"
+                className="group h-11 w-full rounded-xl bg-gradient-to-r from-blue-600 to-cyan-500 text-white shadow-lg ring-1 ring-blue-300 hover:-translate-y-px hover:shadow-blue-200 active:translate-y-0"
               >
                 {loading ? (
                   <>
@@ -274,7 +284,7 @@ export default function RegisterPage() {
               <Button
                 type="button"
                 variant="outline"
-                className="h-11 w-full rounded-xl border-blue-200/80 bg-white/80 text-blue-700 hover:bg-blue-50"
+                className="h-11 w-full rounded-xl bg-white/80 text-blue-700 hover:bg-blue-50"
                 onClick={() => handleNavigate("/login")}
               >
                 <ArrowLeft className="mr-2 h-4 w-4" />

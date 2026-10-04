@@ -18,10 +18,14 @@ import {
 } from "lucide-react";
 import { Sidebar as SidebarUI, SidebarHeader, SidebarContent } from "../../components/ui/sidebar";
 import Tooltip from "../../components/common/Tooltip";
+import { useModalSurface } from "../common/useModalSurface";
 import ConfirmDialog from "../../components/common/ConfirmDialog";
 
 export default function AppSidebar({
   isOpen,
+  isMobile = false,
+  onClose,
+  backgroundRef,
   user,
   threads,
   activeThreadId,
@@ -33,6 +37,11 @@ export default function AppSidebar({
   onLogout,
 }) {
   const navigate = useNavigate();
+  const sidebarRef = useRef(null);
+  const accountButtonRef = useRef(null);
+  const threadTriggerRef = useRef(null);
+  const threadMenuRef = useRef(null);
+  useModalSurface(isMobile && isOpen, sidebarRef, onClose, backgroundRef, threadMenuRef);
 
   // Thread actions menu
   const [openThreadMenuId, setOpenThreadMenuId] = useState(null);
@@ -100,6 +109,28 @@ export default function AppSidebar({
     setOpenThreadMenuId(null);
   };
 
+  useEffect(() => {
+    if (!isOpen) {
+      setOpenThreadMenuId(null);
+      setShowUserMenu(false);
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!openThreadMenuId && !showUserMenu) return;
+    const closeMenus = (event) => {
+      if (event.key !== "Escape" || deleteTargetThread || (!sidebarRef.current?.contains(event.target) && !threadMenuRef.current?.contains(event.target))) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      if (openThreadMenuId) threadTriggerRef.current?.focus();
+      else accountButtonRef.current?.focus();
+      setOpenThreadMenuId(null);
+      setShowUserMenu(false);
+    };
+    document.addEventListener("keydown", closeMenus, true);
+    return () => document.removeEventListener("keydown", closeMenus, true);
+  }, [openThreadMenuId, showUserMenu, deleteTargetThread]);
+
   const navItems = [
     { to: "/home", icon: Home, label: t?.home || "ホーム", tooltip: t?.tooltipHome },
     {
@@ -113,20 +144,32 @@ export default function AppSidebar({
   return (
     <>
       <SidebarUI
+        ref={sidebarRef}
+        id="app-sidebar"
+        role={isMobile ? "dialog" : undefined}
+        aria-modal={isMobile && isOpen ? true : undefined}
+        aria-label={t?.menu || "Menu"}
+        tabIndex={-1}
+        hidden={isMobile && !isOpen}
         open={true}
-        className="fixed top-0 left-0 z-50 h-screen [&_*]:border-0"
+        className="responsive-sidebar fixed top-0 left-0 z-50 h-screen [&_*]:border-0"
         style={{ width: isOpen ? "18rem" : "3.5rem", transition: "width 300ms ease" }}
       >
         <div className="flex h-full flex-col">
-          <SidebarHeader className="py-8 border-0">
+          <SidebarHeader className="responsive-sidebar-header py-8 border-0">
             <div className={`flex items-center ${isOpen ? "gap-2 px-2" : "justify-center"}`}>
               {isOpen && (
                 <div className="text-sm font-semibold text-blue-800">{t?.menu || "Menu"}</div>
               )}
             </div>
+            {isMobile && (
+              <button type="button" onClick={onClose} aria-label={t?.close || "Close"} className="inline-flex h-11 w-11 items-center justify-center rounded-md text-blue-700 hover:bg-blue-50">
+                <XIcon className="h-5 w-5" aria-hidden="true" />
+              </button>
+            )}
           </SidebarHeader>
 
-          <SidebarContent className="flex-1 pt-2 border-0">
+          <SidebarContent className="responsive-sidebar-content flex-1 pt-2 border-0">
             {/* ナビゲーション */}
             <nav className="mb-6 space-y-1">
               {navItems.map(({ to, icon: Icon, label, tooltip }) => (
@@ -134,6 +177,8 @@ export default function AppSidebar({
                   <div className={isOpen ? "" : "flex justify-center items-center"}>
                     <Link
                       to={to}
+                      onClick={isMobile ? onClose : undefined}
+                      aria-label={label}
                       className={`flex items-center rounded text-sm text-zinc-900 transition-all duration-200 hover:bg-blue-50 hover:shadow-sm hover:scale-[1.02] ${isOpen ? "gap-3 px-3 py-2" : "justify-center px-1 py-3"}`}
                     >
                       <Icon className={`text-blue-600 ${isOpen ? "h-6 w-6" : "h-5 w-5"}`} />
@@ -172,7 +217,7 @@ export default function AppSidebar({
                         >
                           {!isEditing ? (
                             <button
-                              className="flex-1 whitespace-normal break-words text-left leading-snug"
+                              className="min-w-0 flex-1 whitespace-normal break-words text-left leading-snug"
                               onClick={() => onSelectThread(th.id)}
                               title={th.title}
                             >
@@ -182,11 +227,13 @@ export default function AppSidebar({
                             <div className="flex w-full items-center gap-2">
                               <input
                                 ref={editInputRef}
-                                className="flex-1 rounded border border-blue-200 bg-white px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                aria-label={t?.renameThread || "Rename"}
+                                className="min-w-0 flex-1 rounded border border-blue-200 bg-white px-2 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-300"
                                 value={editingTitle}
                                 onChange={(e) => setEditingTitle(e.target.value)}
                                 onClick={(e) => e.stopPropagation()}
                                 onKeyDown={(e) => {
+                                  if (e.nativeEvent.isComposing || e.keyCode === 229) return;
                                   if (e.key === "Enter") {
                                     e.preventDefault();
                                     commitInlineRename();
@@ -199,6 +246,7 @@ export default function AppSidebar({
                                 onBlur={commitInlineRename}
                               />
                               <button
+                                aria-label={t?.renameThread || "Save"}
                                 className="text-green-600"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -208,6 +256,7 @@ export default function AppSidebar({
                                 <Check className="h-4 w-4" />
                               </button>
                               <button
+                                aria-label={t?.cancel || "Cancel"}
                                 className="text-zinc-500"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -220,14 +269,18 @@ export default function AppSidebar({
                           )}
                           {!isEditing && (
                             <button
-                              className={`ml-2 transition-opacity duration-150 ${isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
+                              aria-label={`${t?.menu || "Menu"}: ${th.title}`}
+                              aria-expanded={isMenuOpen}
+                              className={`thread-options ml-2 transition-opacity duration-150 ${isMobile || isMenuOpen || isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}
                               onClick={(e) => {
                                 e.preventDefault();
                                 e.stopPropagation();
+                                threadTriggerRef.current = e.currentTarget;
+                                setShowUserMenu(false);
                                 const rect = e.currentTarget.getBoundingClientRect();
                                 setThreadMenuPos({
-                                  left: Math.round(rect.right + 8),
-                                  top: Math.round(rect.top + rect.height / 2),
+                                  left: isMobile ? Math.max(8, Math.min(rect.left, window.innerWidth - 184)) : Math.round(rect.right + 8),
+                                  top: isMobile ? Math.max(64, Math.min(rect.top + rect.height / 2, (window.visualViewport?.height || window.innerHeight) - 64)) : Math.round(rect.top + rect.height / 2),
                                 });
                                 setOpenThreadMenuId(String(th.id));
                               }}
@@ -250,10 +303,13 @@ export default function AppSidebar({
           </SidebarContent>
 
           {/* ユーザーメニュー */}
-          <div className="p-3" ref={userMenuRef}>
+          <div className="responsive-sidebar-account p-3" ref={userMenuRef}>
             <button
+              ref={accountButtonRef}
               type="button"
-              onClick={() => setShowUserMenu((v) => !v)}
+              aria-label={`${user?.nickname || t?.guest}: ${t?.menu || "Menu"}`}
+              aria-expanded={showUserMenu}
+              onClick={() => { setOpenThreadMenuId(null); setShowUserMenu((v) => !v); }}
               className={`relative flex w-full items-center rounded px-1 py-1 transition-all hover:bg-blue-50 ${!isOpen ? "justify-center" : ""}`}
             >
               <div
@@ -277,7 +333,7 @@ export default function AppSidebar({
             </button>
             {showUserMenu && (
               <div
-                className={`absolute ${isOpen ? "left-full ml-2" : "left-full ml-2"} bottom-3 z-[60] w-40 rounded-md border border-zinc-200 bg-white p-2 shadow-lg`}
+                className={`responsive-user-menu absolute ${isOpen ? "left-full ml-2" : "left-full ml-2"} bottom-3 z-[60] w-40 rounded-md border border-zinc-200 bg-white p-2 shadow-lg`}
               >
                 <button
                   className="flex w-full items-center gap-2 rounded px-2 py-2 text-sm text-zinc-800 hover:bg-zinc-100"
@@ -296,10 +352,12 @@ export default function AppSidebar({
         </div>
       </SidebarUI>
 
+
       {/* Thread actions menu portal */}
       {openThreadMenuId && (
         <div
-          className="fixed z-[200] w-44 -translate-y-1/2 rounded-md border border-zinc-200 bg-white p-1.5 shadow-lg"
+          ref={threadMenuRef}
+          className="responsive-thread-menu fixed z-[200] w-44 -translate-y-1/2 rounded-md border border-zinc-200 bg-white p-1.5 shadow-lg"
           style={{ left: threadMenuPos.left, top: threadMenuPos.top }}
           onClick={(e) => e.stopPropagation()}
         >
@@ -318,6 +376,7 @@ export default function AppSidebar({
             onClick={() => {
               const th = threads.find((t) => String(t.id) === String(openThreadMenuId));
               if (th) {
+                threadTriggerRef.current?.focus();
                 setDeleteTargetThread(th);
                 setOpenThreadMenuId(null);
               }
@@ -328,6 +387,7 @@ export default function AppSidebar({
           </button>
         </div>
       )}
+
 
       <ConfirmDialog
         open={!!deleteTargetThread}

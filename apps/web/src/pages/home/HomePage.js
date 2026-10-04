@@ -192,7 +192,7 @@ export default function HomePage() {
   const [actionMessage, setActionMessage] = useState("");
   const [suppressThreadSwitchAnimation, setSuppressThreadSwitchAnimation] = useState(false);
 
-  const [similarity, setSimilarity] = useState(() => {
+  const [similarity] = useState(() => {
     const v = localStorage.getItem("rag_similarity_threshold");
     const n = v != null ? parseFloat(v) : DEFAULT_SIMILARITY;
     return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
@@ -253,15 +253,6 @@ export default function HomePage() {
     navigate("/login");
   }, [navigate]);
 
-  const handleSimilarityChange = (e) => {
-    const n = parseFloat(e.target.value);
-    const clamped = Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : DEFAULT_SIMILARITY;
-    setSimilarity(clamped);
-    try {
-      localStorage.setItem("rag_similarity_threshold", String(clamped));
-    } catch {}
-  };
-
   useEffect(() => {
     if (input.trim()) {
       setErrorMessage("");
@@ -271,6 +262,7 @@ export default function HomePage() {
 
   // ─── Send message ───
   const sendMessage = async () => {
+    if (loading || actionLoading) return;
     if (!token) {
       setErrorMessageKey("errorLogin");
       setErrorMessage("");
@@ -517,6 +509,7 @@ export default function HomePage() {
 
   // ─── Action (translate / summarize / simplify) ───
   const applyAction = async (type, targetLangOverride = null) => {
+    if (loading || actionLoading) return;
     if (!token) {
       setErrorMessageKey("errorLogin");
       setErrorMessage("");
@@ -632,63 +625,42 @@ export default function HomePage() {
   };
 
   return (
-    <div className="h-full w-full bg-gradient-to-br from-blue-50 via-white to-cyan-50 overflow-hidden">
-      <div className="h-full flex justify-center">
-        <main className="h-full w-full flex">
-          <div className="flex-1 min-h-0 max-h-full backdrop-blur-sm relative">
-            {/* 新しいチャットボタン */}
-            <div className="absolute top-3 left-3 z-10">
-              <button
-                onClick={startNewChat}
-                className="flex items-center gap-2 px-3 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-150 hover:-translate-y-px hover:shadow-md active:translate-y-px active:shadow-none group text-sm font-medium"
-                title={t?.newChat || "新しいチャット"}
-              >
-                <Plus className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                <span>{t?.newChat || "新しいチャット"}</span>
-              </button>
-            </div>
-
-            {/* 絞り込み強度 */}
-            {/* <div className="absolute top-3 left-1/2 transform -translate-x-1/2 z-10">
-              <Card className="flex items-center gap-2 px-3 py-1.5 bg-white/90 backdrop-blur-sm border-zinc-200">
-                <span className="text-xs font-medium text-zinc-700 whitespace-nowrap">{t?.similarityLabel || "一致の厳しさ"}</span>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-zinc-500">{t?.similarityLow || "弱い"}</span>
-                  <input className="h-1.5 w-20 cursor-pointer appearance-none rounded-full bg-gradient-to-r from-blue-100 to-blue-200 accent-blue-600" type="range" min="0" max="1" step="0.05" value={similarity} onChange={handleSimilarityChange} />
-                  <span className="text-xs text-zinc-500">{t?.similarityHigh || "強い"}</span>
-                </div>
-                <span className="rounded-md bg-blue-100 px-1.5 py-0.5 text-xs font-mono text-blue-700">{similarity.toFixed(2)}</span>
-              </Card>
-            </div> */}
-
-            <div className="h-full flex flex-col">
-              <ChatMessages
-                messages={messages}
-                messagesLoading={messagesLoading}
-                currentThreadId={currentThreadId}
-                suppressEntranceAnimation={suppressThreadSwitchAnimation}
-                t={t}
-                navigate={navigate}
-                messagesContainerRef={messagesContainerRef}
-                messagesEndRef={messagesEndRef}
-              />
-              <ChatInput
-                input={input}
-                setInput={setInput}
-                loading={loading}
-                actionLoading={actionLoading}
-                errorMessage={errorMessageKey ? t?.[errorMessageKey] || errorMessage : errorMessage}
-                actionMessage={actionMessage}
-                t={t}
-                onSend={sendMessage}
-                onApplyAction={applyAction}
-                similarity={similarity}
-                onSimilarityChange={handleSimilarityChange}
-              />
-            </div>
-          </div>
-        </main>
+    <section className="h-full min-h-0 w-full overflow-hidden bg-gradient-to-br from-blue-50 via-white to-cyan-50 max-lg:[container-type:size]" aria-label={t?.home || "ホーム"}>
+      <div className="relative flex h-full min-h-0 w-full flex-col backdrop-blur-sm">
+        <div className="absolute left-3 top-3 z-10 max-w-[calc(100%-1.5rem)] [@container(max-height:250px)]:hidden">
+          <button
+            type="button"
+            onClick={startNewChat}
+            disabled={loading || actionLoading}
+            title={t?.newChat || "新しいチャット"}
+            className="group flex min-h-11 max-w-full items-center gap-2 rounded-full bg-blue-600 px-3 py-2 text-sm font-medium text-white transition-all duration-150 hover:-translate-y-px hover:bg-blue-700 hover:shadow-md active:translate-y-px active:shadow-none disabled:opacity-50 lg:min-h-0"
+          >
+            <Plus aria-hidden="true" className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" />
+            <span className="min-w-0 [overflow-wrap:anywhere]">{t?.newChat || "新しいチャット"}</span>
+          </button>
+        </div>
+        <ChatMessages
+          messages={messages}
+          messagesLoading={messagesLoading}
+          currentThreadId={currentThreadId}
+          suppressEntranceAnimation={suppressThreadSwitchAnimation}
+          t={t}
+          navigate={navigate}
+          messagesContainerRef={messagesContainerRef}
+          messagesEndRef={messagesEndRef}
+        />
+        <ChatInput
+          input={input}
+          setInput={setInput}
+          loading={loading}
+          actionLoading={actionLoading}
+          errorMessage={errorMessageKey ? t?.[errorMessageKey] || errorMessage : errorMessage}
+          actionMessage={actionMessage}
+          t={t}
+          onSend={sendMessage}
+          onApplyAction={applyAction}
+        />
       </div>
-    </div>
+    </section>
   );
 }

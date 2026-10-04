@@ -7,7 +7,7 @@ import React from "react";
  * XSS回避: 文字列分割で<a>を生成（dangerouslySetInnerHTML 不使用）
  */
 export default function CategoryAnswerText({ content }) {
-  const text = content || "";
+  const text = String(content ?? "");
 
   // Helper: render plain text with support for <strong>..</strong>,
   // <span class="highlighted">..</span>, line breaks (\n), and <br/> as actual line breaks.

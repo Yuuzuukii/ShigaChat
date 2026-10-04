@@ -9,6 +9,7 @@ import React, { useContext } from "react";
 import { Link } from "react-router-dom";
 import { UserContext } from "../../contexts/UserContext";
 import { FileQuestion } from "lucide-react";
+import "../../features/layout/AuthResponsive.css";
 
 export default function NotFoundPage() {
   const { user, t } = useContext(UserContext);
@@ -17,7 +18,7 @@ export default function NotFoundPage() {
   const linkTo = isLoggedIn ? "/home" : "/login";
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50 px-4">
+    <div className="auth-status-page min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-cyan-50 px-4">
       <div className="text-center max-w-md">
         {/* D01: エラーコード */}
         <div className="flex justify-center mb-6">

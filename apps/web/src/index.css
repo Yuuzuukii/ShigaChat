@@ -25,3 +25,67 @@ input[type="password"]::-ms-reveal,
 input[type="password"]::-ms-clear {
   display: none !important;
 }
+
+
+/* Responsive geometry only: original colors, typography and decoration remain in components. */
+:root {
+  --viewport-height: 100vh;
+  --app-header-height: 4.5rem;
+}
+@supports (height: 100dvh) {
+  :root { --viewport-height: 100dvh; }
+}
+.app-shell {
+  height: var(--app-height, var(--viewport-height));
+  min-height: 0;
+}
+.app-content { height: 100%; min-width: 0; }
+.app-main {
+  min-width: 0;
+  padding-top: var(--app-header-height);
+  transition: margin-left 300ms ease;
+}
+.app-main--chat { overflow: hidden; }
+.app-header, .app-main { margin-left: 3.5rem; }
+.app-shell[data-sidebar-expanded="true"] .app-header,
+.app-shell[data-sidebar-expanded="true"] .app-main { margin-left: 18rem; }
+.app-drawer-backdrop { position: fixed; inset: 0; z-index: 45; background: rgb(0 0 0 / .4); }
+.responsive-sidebar[hidden] { display: none; }
+.skip-link { position: fixed; top: .5rem; left: .5rem; z-index: 100; transform: translateY(-150%); padding: .75rem; background: white; color: #0056b3; }
+.skip-link:focus { transform: translateY(0); }
+
+@media (max-width: 1023px) {
+  :root { --app-header-height: calc(4rem + env(safe-area-inset-top, 0px)); }
+  .app-header, .app-main,
+  .app-shell[data-sidebar-expanded="true"] .app-header,
+  .app-shell[data-sidebar-expanded="true"] .app-main { margin-left: 0; }
+  .app-main { overscroll-behavior-y: contain; }
+  .app-header { min-height: var(--app-header-height); padding: calc(.5rem + env(safe-area-inset-top, 0px)) max(.75rem, env(safe-area-inset-right, 0px)) .5rem max(.75rem, env(safe-area-inset-left, 0px)); }
+  .app-header-row { width: 100%; justify-content: space-between; gap: .5rem; }
+  .app-header-brand { min-width: 0; flex: 1; justify-content: space-between; gap: .5rem; }
+  .app-header-toggle { width: 44px; height: 44px; flex-shrink: 0; }
+  .app-header-logo { font-size: clamp(1.1rem, 5vw, 1.5rem); white-space: nowrap; }
+  .app-header-partners { gap: .375rem; flex-shrink: 0; }
+  .app-header-partners a { display: flex; align-items: center; min-height: 44px; }
+  .app-header-partners img { max-width: 42px; max-height: 32px; width: auto; height: auto; }
+  .responsive-sidebar { width: min(18rem, calc(100vw - 3rem)) !important; height: var(--app-height, var(--viewport-height)); padding-top: env(safe-area-inset-top, 0px); }
+  .responsive-sidebar-header { padding-top: 1rem; padding-bottom: 1rem; flex-shrink: 0; }
+  .responsive-sidebar-content { min-height: 0; height: auto; overscroll-behavior: contain; }
+  .responsive-sidebar-account { position: relative; flex-shrink: 0; padding-bottom: max(.75rem, env(safe-area-inset-bottom, 0px)); }
+  .responsive-sidebar button, .responsive-sidebar nav a { min-height: 44px; }
+  .responsive-sidebar .thread-options { min-width: 44px; opacity: 1; }
+  .responsive-sidebar input { min-width: 0; font-size: 16px; }
+  .responsive-user-menu { left: .75rem; right: .75rem; bottom: calc(100% - .25rem); width: auto; margin-left: 0; }
+  .responsive-thread-menu { max-width: calc(100vw - 1rem); }
+  .responsive-thread-menu button { min-height: 44px; }
+  .responsive-dialog { padding: max(1rem, env(safe-area-inset-top, 0px)) max(1rem, env(safe-area-inset-right, 0px)) max(1rem, env(safe-area-inset-bottom, 0px)) max(1rem, env(safe-area-inset-left, 0px)); }
+  .responsive-dialog > div { max-height: 100%; overflow-y: auto; }
+  .responsive-dialog button { min-height: 44px; height: auto; white-space: normal; }
+  .responsive-toasts { top: max(.5rem, env(safe-area-inset-top, 0px)); bottom: auto; max-height: calc(var(--app-height, var(--viewport-height)) * .35); overflow-y: auto; }
+  .responsive-toasts [data-toast-title], .responsive-toasts [data-toast-description] { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+  .responsive-toasts [data-toast-close] { min-width: 44px; min-height: 44px; }
+  input, textarea, select { font-size: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

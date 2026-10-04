@@ -8,7 +8,7 @@ export const TabsList = React.forwardRef(({ className = "", ...props }, ref) => 
   <TabsPrimitive.List
     ref={ref}
     className={joinClassNames(
-      "grid w-full overflow-hidden rounded-t-[1.4rem] border border-b-0 border-blue-100 bg-zinc-100",
+      "qa-language-list grid w-full overflow-hidden rounded-t-[1.4rem] border border-b-0 border-blue-100 bg-zinc-100",
       className
     )}
     {...props}

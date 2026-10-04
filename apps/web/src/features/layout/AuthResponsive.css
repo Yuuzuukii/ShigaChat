@@ -1,0 +1,58 @@
+/* Keep the original desktop design. Adjust only viewport and touch constraints. */
+@media (max-width: 1023px) {
+  .auth-shell,
+  .auth-shell-content,
+  .auth-status-page {
+    min-height: 100dvh;
+  }
+
+  .auth-shell-content,
+  .auth-status-page {
+    padding-top: max(1.5rem, env(safe-area-inset-top));
+    padding-bottom: max(1.5rem, env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+    padding-right: max(1rem, env(safe-area-inset-right));
+  }
+
+  .auth-shell-content > *,
+  .auth-status-page > * {
+    min-width: 0;
+  }
+
+  .auth-shell input,
+  .auth-shell [role="combobox"] {
+    font-size: 16px;
+  }
+
+  .auth-shell .auth-password-input {
+    padding-right: 3rem;
+  }
+
+  .auth-shell .auth-password-toggle {
+    top: 0;
+    right: 0;
+    width: 44px;
+    height: 44px;
+  }
+
+  .auth-shell .auth-back-button,
+  .auth-language-options [role="option"] {
+    min-height: 44px;
+  }
+
+  .auth-language-options {
+    max-height: var(--radix-select-content-available-height);
+  }
+
+  .auth-status-page h1,
+  .auth-status-page p {
+    overflow-wrap: anywhere;
+  }
+}
+
+@media (max-width: 359px) {
+  /* Keep the back action at the upper left without overlapping the title. */
+  .auth-shell .auth-register-header {
+    padding-top: 4.5rem;
+  }
+}
