@@ -1,0 +1,236 @@
+{
+  "judge_model": "gpt-5.4-mini",
+  "overall": {
+    "count": 101,
+    "judge_pass_rate": 0.911,
+    "judge_score_mean": 4.62,
+    "hallucination_rate": 0.05,
+    "keywords_ok_rate": 0.891,
+    "ref_hit_rate": 0.917,
+    "spurious_ref_rate": 0
+  },
+  "by_kind": {
+    "single": {
+      "count": 56,
+      "judge_pass_rate": 0.929,
+      "judge_score_mean": 4.66,
+      "hallucination_rate": 0.054,
+      "keywords_ok_rate": 0.911,
+      "ref_hit_rate": 0.961,
+      "spurious_ref_rate": 0
+    },
+    "conversation": {
+      "count": 45,
+      "judge_pass_rate": 0.889,
+      "judge_score_mean": 4.58,
+      "hallucination_rate": 0.044,
+      "keywords_ok_rate": 0.867,
+      "ref_hit_rate": 0.867,
+      "spurious_ref_rate": null
+    }
+  },
+  "by_turn": {
+    "turn1": {
+      "count": 71,
+      "judge_pass_rate": 0.944,
+      "judge_score_mean": 4.72,
+      "hallucination_rate": 0.042,
+      "keywords_ok_rate": 0.93,
+      "ref_hit_rate": 0.97,
+      "spurious_ref_rate": 0
+    },
+    "turn2": {
+      "count": 15,
+      "judge_pass_rate": 0.867,
+      "judge_score_mean": 4.47,
+      "hallucination_rate": 0.067,
+      "keywords_ok_rate": 0.8,
+      "ref_hit_rate": 0.8,
+      "spurious_ref_rate": null
+    },
+    "turn3": {
+      "count": 15,
+      "judge_pass_rate": 0.8,
+      "judge_score_mean": 4.33,
+      "hallucination_rate": 0.067,
+      "keywords_ok_rate": 0.8,
+      "ref_hit_rate": 0.8,
+      "spurious_ref_rate": null
+    }
+  },
+  "by_category": {
+    "住宅": {
+      "count": 5,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 4.6,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 0.8,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "年金・保険": {
+      "count": 17,
+      "judge_pass_rate": 0.941,
+      "judge_score_mean": 4.71,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 0.882,
+      "ref_hit_rate": 0.941,
+      "spurious_ref_rate": null
+    },
+    "在留・住民手続": {
+      "count": 9,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 4.89,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "出産・育児": {
+      "count": 11,
+      "judge_pass_rate": 0.818,
+      "judge_score_mean": 4.18,
+      "hallucination_rate": 0.182,
+      "keywords_ok_rate": 0.818,
+      "ref_hit_rate": 0.818,
+      "spurious_ref_rate": null
+    },
+    "労働": {
+      "count": 14,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 4.93,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 0.929,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "医療": {
+      "count": 4,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 4.75,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "教育": {
+      "count": 8,
+      "judge_pass_rate": 0.875,
+      "judge_score_mean": 4.63,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": 0.875,
+      "spurious_ref_rate": null
+    },
+    "税金": {
+      "count": 7,
+      "judge_pass_rate": 0.714,
+      "judge_score_mean": 4.43,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 0.571,
+      "ref_hit_rate": 0.714,
+      "spurious_ref_rate": null
+    },
+    "結婚・離婚": {
+      "count": 6,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 5,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "事件・事故": {
+      "count": 5,
+      "judge_pass_rate": 0.8,
+      "judge_score_mean": 4.2,
+      "hallucination_rate": 0.2,
+      "keywords_ok_rate": 0.8,
+      "ref_hit_rate": 0.8,
+      "spurious_ref_rate": null
+    },
+    "生活": {
+      "count": 4,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 5,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": 1,
+      "spurious_ref_rate": null
+    },
+    "災害": {
+      "count": 6,
+      "judge_pass_rate": 1,
+      "judge_score_mean": 4.83,
+      "hallucination_rate": 0,
+      "keywords_ok_rate": 0.833,
+      "ref_hit_rate": 0.833,
+      "spurious_ref_rate": null
+    },
+    "(該当なし)": {
+      "count": 5,
+      "judge_pass_rate": 0.6,
+      "judge_score_mean": 3.6,
+      "hallucination_rate": 0.4,
+      "keywords_ok_rate": 1,
+      "ref_hit_rate": null,
+      "spurious_ref_rate": 0
+    }
+  },
+  "failed": [
+    {
+      "case": "E09-1",
+      "question": "児童手当はいつまでもらえますか？",
+      "score": 1,
+      "reason": "根拠QAにない一般知識で回答し、問い合わせ先も答えず、制度条件をずらしている。"
+    },
+    {
+      "case": "E28-1",
+      "question": "確定申告はいつまでにすればいいですか？",
+      "score": 3,
+      "reason": "期限は答えたが2026年の日付とe-Tax、該当者条件が抜けている"
+    },
+    {
+      "case": "N02-1",
+      "question": "ソーラーパネルを家に付けたいのですが、補助金はありますか？",
+      "score": 4,
+      "reason": "断定は慎重だが、滋賀県内で市町補助があると具体化し、根拠QAなしの事実を述べている。"
+    },
+    {
+      "case": "N05-1",
+      "question": "おすすめのラーメン屋を教えてください",
+      "score": 2,
+      "reason": "範囲外とせず一般知識で回答し、根拠なしの店系統を断定しているため。"
+    },
+    {
+      "case": "C03-3",
+      "question": "子どもが生まれたあとにもらえる手当はありますか？",
+      "score": 1,
+      "reason": "児童手当への言及がなく質問に未対応。さらに出産育児一時金や出産手当金など、今回の根拠QA外の具体制度を断定している。"
+    },
+    {
+      "case": "C10-2",
+      "question": "日本語が上手ではないので、外国語で相談できますか？",
+      "score": 2,
+      "reason": "外国語相談先の案内が根拠QAとずれ、110番等の追加もあり。法テラス多言語ダイヤル未記載を答えた。"
+    },
+    {
+      "case": "C11-3",
+      "question": "保護者は学校でどんなことをしますか？",
+      "score": 2,
+      "reason": "給食や費用の話で、質問の主旨であるPTA・保護者会への言及がない。参照QAと一部一致するが答えがずれている。"
+    },
+    {
+      "case": "C14-3",
+      "question": "確定申告はいつまでですか？",
+      "score": 3,
+      "reason": "期間は概ね正しいが、2026年の具体日付まで答えておらず要点不足。"
+    },
+    {
+      "case": "C15-2",
+      "question": "ところで、日本語を勉強できる学校はありますか？",
+      "score": 1,
+      "reason": "日本語学校一覧を答えず、参照情報にない不確認の旨と一般的な案内のみで質問に答えていない。"
+    }
+  ]
+}

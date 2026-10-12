@@ -25,9 +25,21 @@ module.exports = defineConfig({
     { name: "setup", testMatch: /auth\.setup\.js/ },
     {
       name: "chat",
-      testMatch: /.*\.spec\.js/,
+      testMatch: /chat\.spec\.js/,
       dependencies: ["setup"],
       use: { storageState: path.join(__dirname, ".auth/user.json") },
+    },
+    {
+      // 回答の妥当性（LLM 採点）
+      name: "quality",
+      testMatch: /quality\.spec\.js/,
+      dependencies: ["setup"],
+      use: { storageState: path.join(__dirname, ".auth/user.json") },
+    },
+    {
+      // 複数アカウントの同時アクセス。ログインはテスト内で行うので setup は不要
+      name: "load",
+      testMatch: /load\.spec\.js/,
     },
   ],
 });

@@ -19,12 +19,56 @@ function parseSse(body) {
   return events;
 }
 
+function appendJsonl(name, entry) {
+  fs.appendFileSync(path.join(runDir(), name), `${JSON.stringify(entry)}\n`);
+}
+
 function record(entry) {
-  fs.appendFileSync(path.join(runDir(), "results.jsonl"), `${JSON.stringify(entry)}\n`);
+  appendJsonl("results.jsonl", entry);
+}
+
+// ブラウザ側で fetch を包み、SSE の各イベントがいつ届いたか（fetch 開始からの ms）を記録する。
+// 画面の挙動には触れず、レスポンスを clone して読むだけ。
+function installSseTimer() {
+  if (window.__sseInstalled) return; // openNewChat を重ねて呼んでも二重に包まない
+  window.__sseInstalled = true;
+  const originalFetch = window.fetch;
+  window.__sse = [];
+  window.fetch = async (...args) => {
+    const startedAt = performance.now();
+    const response = await originalFetch(...args);
+    const url = typeof args[0] === "string" ? args[0] : args[0]?.url;
+    if (url && url.includes("/question/get_answer_stream") && response.body) {
+      const run = { events: [], done: false };
+      window.__sse.push(run);
+      const reader = response.clone().body.getReader();
+      const decoder = new TextDecoder();
+      (async () => {
+        let buffer = "";
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
+            let index;
+            while ((index = buffer.indexOf("\n\n")) >= 0) {
+              const raw = buffer.slice(0, index);
+              buffer = buffer.slice(index + 2);
+              const name = raw.match(/^event: (.*)$/m)?.[1];
+              if (name) run.events.push({ name, ms: Math.round(performance.now() - startedAt) });
+            }
+          }
+        } catch {}
+        run.done = true;
+      })();
+    }
+    return response;
+  };
 }
 
 /** 新しいチャットを開く（tid なしの /home は新規スレッドになる） */
 async function openNewChat(page) {
+  await page.addInitScript(installSseTimer);
   await page.goto("/home");
   await expect(page.locator("#chat-question")).toBeVisible();
 }
@@ -33,7 +77,7 @@ async function openNewChat(page) {
  * UI から 1 問送信し、回答が画面に出るまで待って結果を記録する。
  * 回答本文と参照 Q&A は、画面が受け取った SSE レスポンスから取り出す。
  */
-async function ask(page, question, meta) {
+async function ask(page, question, meta, options = {}) {
   const input = page.locator("#chat-question");
   const sendButton = page.locator('form button[type="submit"]');
   const entry = {
@@ -45,11 +89,14 @@ async function ask(page, question, meta) {
     references: [],
     error: "",
     thread_id: null,
+    timeline: [],
   };
 
   const startedAt = Date.now();
   try {
     await input.fill(question);
+    // 複数ユーザーで同時に送信したいとき、全員が入力を終えるまでここで待たせる
+    if (options.beforeSend) await options.beforeSend();
     const responsePromise = page.waitForResponse((res) => res.url().includes(STREAM_PATH), {
       timeout: 120 * 1000,
     });
@@ -70,6 +117,12 @@ async function ask(page, question, meta) {
     entry.references = end.data.ref_qa || [];
     entry.thread_id = end.data.thread_id ?? null;
 
+    // 各イベントの到達時刻（ms）。fetch フックが入っていない場合は空のまま
+    await page
+      .waitForFunction(() => window.__sse?.at(-1)?.done, null, { timeout: 5000 })
+      .catch(() => {});
+    entry.timeline = await page.evaluate(() => window.__sse?.at(-1)?.events ?? []);
+
     // 画面側も生成完了の状態に戻り、エラー表示が出ていないこと
     await expect(sendButton).not.toHaveAttribute("aria-label", GENERATING_LABEL);
     await expect(page.locator('main [role="alert"], form ~ [role="alert"]')).toHaveCount(0);
@@ -87,4 +140,4 @@ async function ask(page, question, meta) {
   return entry;
 }
 
-module.exports = { openNewChat, ask };
+module.exports = { openNewChat, ask, appendJsonl };
