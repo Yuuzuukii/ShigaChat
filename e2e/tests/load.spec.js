@@ -11,6 +11,7 @@ const { stagesFromTimeline, summarize, toMarkdown, createBarrier } = require("..
 //   E2E_LOAD_LEVELS  同時接続数を昇順で。既定 "1,5,10"（1 が基準値）
 //   E2E_LOAD_ROUNDS  各レベルで何回、全員同時に送るか。既定 1
 //   E2E_LABEL        結果に付けるラベル（修正前後の比較用）
+//   E2E_LOAD_CASE    全員に同じ質問（評価ケースのID。例 E24）を送る。回答の長さの違いを除いて比べたいとき
 
 const API_URL = process.env.E2E_API_URL || "http://localhost:8000";
 const BASE_URL = process.env.E2E_BASE_URL || "http://localhost:3000";
@@ -18,6 +19,7 @@ const PREFIX = process.env.E2E_LOAD_USER_PREFIX || "e2e-load";
 const LEVELS = (process.env.E2E_LOAD_LEVELS || "1,5,10").split(",").map(Number).filter(Boolean);
 const ROUNDS = Number(process.env.E2E_LOAD_ROUNDS || 1);
 const LABEL = process.env.E2E_LABEL || "";
+const FIXED_CASE = process.env.E2E_LOAD_CASE || "";
 const MAX_USERS = Math.max(...LEVELS);
 
 const accountName = (index) => `${PREFIX}-${String(index + 1).padStart(2, "0")}`;
@@ -54,8 +56,8 @@ test("複数ユーザーの同時質問 @load", async ({ browser, request }) => 
     users.push(...batch);
   }
 
-  const questions = loadEvalCases().filter((c) => c.expectRefs);
-  expect(questions.length, "評価ケースがありません").toBeGreaterThan(0);
+  const questions = loadEvalCases().filter((c) => c.expectRefs && (!FIXED_CASE || c.id === FIXED_CASE));
+  expect(questions.length, `評価ケースがありません (E2E_LOAD_CASE=${FIXED_CASE})`).toBeGreaterThan(0);
 
   const rows = [];
   let cursor = 0;
