@@ -18,8 +18,10 @@
     "lucide-react": "^0.544.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-markdown": "^9.1.0",
     "react-router-dom": "^7.14.2",
     "react-scripts": "^5.0.1",
+    "remark-gfm": "^4.0.1",
     "web-vitals": "^2.1.4"
   },
   "scripts": {
@@ -49,5 +51,16 @@
     "eslint-plugin-unused-imports": "^4.4.1",
     "postcss": "^8.5.13",
     "tailwindcss": "^3.4.17"
+  },
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(react-markdown|remark-.*|micromark.*|mdast-.*|unist-.*|unified|bail|devlop|trough|vfile.*|hast-.*|property-information|space-separated-tokens|comma-separated-tokens|decode-named-character-reference|character-entities.*|ccount|escape-string-regexp|markdown-table|zwitch|longest-streak|trim-lines|html-url-attributes|is-plain-obj|estree-.*)/)"
+    ],
+    "moduleNameMapper": {
+      "^unist-util-visit-parents/do-not-use-color$": "<rootDir>/node_modules/unist-util-visit-parents/lib/color.js",
+      "^#minpath$": "<rootDir>/node_modules/vfile/lib/minpath.browser.js",
+      "^#minproc$": "<rootDir>/node_modules/vfile/lib/minproc.browser.js",
+      "^#minurl$": "<rootDir>/node_modules/vfile/lib/minurl.browser.js"
+    }
   }
 }
