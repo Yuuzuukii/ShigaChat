@@ -13,6 +13,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import RichText from "../../../components/common/RichText";
+import MarkdownText from "../../../components/common/MarkdownText";
 
 function formatDateTime(val) {
   if (!val) return null;
@@ -92,7 +93,7 @@ function AssistantBubble({ m, t, navigate }) {
         </div>
         <span className="text-sm font-medium text-zinc-700">{t?.assistant || "アシスタント"}</span>
       </div>
-      <div className="prose prose-sm min-w-0 max-w-none text-zinc-800 leading-relaxed [overflow-wrap:anywhere]">
+      <div className="min-w-0 max-w-none text-zinc-800 leading-relaxed [overflow-wrap:anywhere]">
         {m.typing ? (
           <div className="w-full max-w-md">
             <div role="status" className="flex items-center gap-2">
@@ -107,7 +108,7 @@ function AssistantBubble({ m, t, navigate }) {
             </div>
           </div>
         ) : (
-          <RichText content={m.content} />
+          <MarkdownText content={m.content} />
         )}
       </div>
 
