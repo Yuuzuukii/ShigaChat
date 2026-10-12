@@ -1,0 +1,180 @@
+{
+  "label": "after-async",
+  "levels": [
+    1,
+    5,
+    10,
+    20
+  ],
+  "rounds": 3,
+  "summary": [
+    {
+      "level": 1,
+      "requests": 3,
+      "errors": 0,
+      "stats": {
+        "thread_ready_ms": {
+          "p50": 28,
+          "p95": 28,
+          "max": 28
+        },
+        "agent_started_ms": {
+          "p50": 32,
+          "p95": 89,
+          "max": 89
+        },
+        "search_step_ms": {
+          "p50": 139,
+          "p95": 460,
+          "max": 460
+        },
+        "vector_search_done_ms": {
+          "p50": 171,
+          "p95": 553,
+          "max": 553
+        },
+        "answer_start_ms": {
+          "p50": 1436,
+          "p95": 1771,
+          "max": 1771
+        },
+        "first_token_ms": {
+          "p50": 2311,
+          "p95": 2324,
+          "max": 2324
+        },
+        "total_ms": {
+          "p50": 2771,
+          "p95": 3072,
+          "max": 3072
+        }
+      }
+    },
+    {
+      "level": 5,
+      "requests": 15,
+      "errors": 0,
+      "stats": {
+        "thread_ready_ms": {
+          "p50": 61,
+          "p95": 65,
+          "max": 65
+        },
+        "agent_started_ms": {
+          "p50": 61,
+          "p95": 65,
+          "max": 65
+        },
+        "search_step_ms": {
+          "p50": 169,
+          "p95": 380,
+          "max": 380
+        },
+        "vector_search_done_ms": {
+          "p50": 229,
+          "p95": 443,
+          "max": 443
+        },
+        "answer_start_ms": {
+          "p50": 1674,
+          "p95": 2066,
+          "max": 2066
+        },
+        "first_token_ms": {
+          "p50": 2246,
+          "p95": 2710,
+          "max": 2710
+        },
+        "total_ms": {
+          "p50": 3275,
+          "p95": 4566,
+          "max": 4566
+        }
+      }
+    },
+    {
+      "level": 10,
+      "requests": 30,
+      "errors": 0,
+      "stats": {
+        "thread_ready_ms": {
+          "p50": 59,
+          "p95": 64,
+          "max": 85
+        },
+        "agent_started_ms": {
+          "p50": 59,
+          "p95": 99,
+          "max": 102
+        },
+        "search_step_ms": {
+          "p50": 194,
+          "p95": 297,
+          "max": 298
+        },
+        "vector_search_done_ms": {
+          "p50": 257,
+          "p95": 356,
+          "max": 405
+        },
+        "answer_start_ms": {
+          "p50": 1828,
+          "p95": 2566,
+          "max": 3242
+        },
+        "first_token_ms": {
+          "p50": 2416,
+          "p95": 3124,
+          "max": 3807
+        },
+        "total_ms": {
+          "p50": 3797,
+          "p95": 4347,
+          "max": 4746
+        }
+      }
+    },
+    {
+      "level": 20,
+      "requests": 60,
+      "errors": 0,
+      "stats": {
+        "thread_ready_ms": {
+          "p50": 59,
+          "p95": 82,
+          "max": 92
+        },
+        "agent_started_ms": {
+          "p50": 64,
+          "p95": 131,
+          "max": 159
+        },
+        "search_step_ms": {
+          "p50": 253,
+          "p95": 359,
+          "max": 494
+        },
+        "vector_search_done_ms": {
+          "p50": 344,
+          "p95": 478,
+          "max": 590
+        },
+        "answer_start_ms": {
+          "p50": 2643,
+          "p95": 3188,
+          "max": 3273
+        },
+        "first_token_ms": {
+          "p50": 3296,
+          "p95": 3932,
+          "max": 4060
+        },
+        "total_ms": {
+          "p50": 5808,
+          "p95": 7181,
+          "max": 7462
+        }
+      }
+    }
+  ]
+}
