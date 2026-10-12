@@ -12,29 +12,53 @@ const linkClass =
   "text-blue-600 underline-offset-2 hover:text-blue-800 hover:underline transition-colors";
 
 const components = {
-  h1: (p) => <h1 className="mb-3 mt-6 text-xl font-bold text-zinc-900 first:mt-0" {...strip(p)} />,
-  h2: (p) => (
+  h1: ({ children, ...p }) => (
+    <h1 className="mb-3 mt-6 text-xl font-bold text-zinc-900 first:mt-0" {...strip(p)}>
+      {children}
+    </h1>
+  ),
+  h2: ({ children, ...p }) => (
     <h2
       className="mb-3 mt-6 border-b border-zinc-200 pb-1 text-lg font-bold text-zinc-900 first:mt-0"
       {...strip(p)}
-    />
+    >
+      {children}
+    </h2>
   ),
-  h3: (p) => <h3 className="mb-2 mt-5 text-base font-bold text-zinc-900 first:mt-0" {...strip(p)} />,
-  h4: (p) => <h4 className="mb-2 mt-4 text-sm font-bold text-zinc-900 first:mt-0" {...strip(p)} />,
-  h5: (p) => <h5 className="mb-2 mt-4 text-sm font-semibold text-zinc-900 first:mt-0" {...strip(p)} />,
-  h6: (p) => <h6 className="mb-2 mt-4 text-sm font-semibold text-zinc-700 first:mt-0" {...strip(p)} />,
+  h3: ({ children, ...p }) => (
+    <h3 className="mb-2 mt-5 text-base font-bold text-zinc-900 first:mt-0" {...strip(p)}>
+      {children}
+    </h3>
+  ),
+  h4: ({ children, ...p }) => (
+    <h4 className="mb-2 mt-4 text-sm font-bold text-zinc-900 first:mt-0" {...strip(p)}>
+      {children}
+    </h4>
+  ),
+  h5: ({ children, ...p }) => (
+    <h5 className="mb-2 mt-4 text-sm font-semibold text-zinc-900 first:mt-0" {...strip(p)}>
+      {children}
+    </h5>
+  ),
+  h6: ({ children, ...p }) => (
+    <h6 className="mb-2 mt-4 text-sm font-semibold text-zinc-700 first:mt-0" {...strip(p)}>
+      {children}
+    </h6>
+  ),
   p: (p) => <p className="my-3 whitespace-pre-line first:mt-0 last:mb-0" {...strip(p)} />,
   strong: (p) => <strong className="font-bold text-zinc-900" {...strip(p)} />,
   em: (p) => <em className="italic" {...strip(p)} />,
   del: (p) => <del className="text-zinc-500" {...strip(p)} />,
-  a: ({ node: _node, ...rest }) => (
+  a: ({ node: _node, children, ...rest }) => (
     <a
       {...rest}
       target="_blank"
       rel="noopener noreferrer"
       onClick={(e) => e.stopPropagation()}
       className={linkClass}
-    />
+    >
+      {children}
+    </a>
   ),
   ul: (p) => <ul className="my-3 list-disc space-y-1 pl-6 marker:text-zinc-400" {...strip(p)} />,
   ol: (p) => <ol className="my-3 list-decimal space-y-1 pl-6 marker:text-zinc-500" {...strip(p)} />,
