@@ -10,6 +10,7 @@ body {
 
 /* Improve scroll behavior for anchor navigation */
 html {
+  font-size: 112.5%;
   scroll-behavior: smooth;
   scroll-padding-top: 100px;
 }

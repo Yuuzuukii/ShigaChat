@@ -5,7 +5,7 @@ import CategoryAnswerText from "./CategoryAnswerText";
 /** Shared behavior with the existing category and keyword result presentation. */
 export default function QuestionAnswerCard({
   questionId, question, answer, updatedAt, categoryName, isOfficial,
-  isExpanded, onToggle, variant = "category", t,
+  isExpanded, isHighlighted = false, onToggle, variant = "category", t,
 }) {
   const isSearchResult = variant === "search";
   const answerId = `answer-${questionId}`;
@@ -27,7 +27,9 @@ export default function QuestionAnswerCard({
       aria-controls={isExpanded ? answerId : undefined}
       onClick={() => onToggle(questionId)}
       onKeyDown={handleKeyDown}
-      className="qa-question-card min-h-[120px] cursor-pointer rounded-lg bg-zinc-50 p-6 transition-all duration-200 hover:bg-blue-50/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+      className={`qa-question-card min-h-[120px] cursor-pointer rounded-lg p-6 transition-all duration-500 hover:bg-blue-50/50 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${
+        isHighlighted ? "bg-blue-100 shadow-sm ring-2 ring-blue-300" : "bg-zinc-50"
+      }`}
     >
       <div className="qa-question-heading flex items-start justify-between gap-4">
         <div className="flex min-w-0 flex-1 items-start gap-3 text-lg font-semibold text-zinc-900">

@@ -11,6 +11,7 @@ import QuestionAnswerCard from "../../../features/category/QuestionAnswerCard";
 import { getCategoryIcon } from "../../../features/category/categoryPresentation";
 import "../../../features/category/Responsive.css";
 
+const HIGHLIGHT_DURATION_MS = 2500;
 const supportedQaLanguageCodes = new Set(languageOptions.map((option) => option.code));
 const getSupportedQaLanguage = (code) => supportedQaLanguageCodes.has(code) ? code : null;
 
@@ -47,8 +48,11 @@ export default function CategoryDetailPage() {
   const [visibleAnswerId, setVisibleAnswerId] = useState(null);
   const [qaLanguage, setQaLanguage] = useState(urlQaLanguage || language);
   const [mounted, setMounted] = useState(false);
+  const [highlightedId, setHighlightedId] = useState(null);
   const autoScrolledQuestionIdRef = useRef(null);
   const languageScrollRef = useRef(null);
+  const stickyTabsRef = useRef(null);
+  const answerPanelRef = useRef(null);
   const resetScopeRef = useRef({ categoryId, language });
 
   useEffect(() => {
@@ -86,12 +90,42 @@ export default function CategoryDetailPage() {
     const frameId = requestAnimationFrame(() => {
       if (!scrollQuestionIntoMain(questionId, scrollContainerRef)) return;
       autoScrolledQuestionIdRef.current = questionId;
+      setHighlightedId(Number(questionId));
       const nextSearchParams = new URLSearchParams(searchParams);
       nextSearchParams.delete("id");
       setSearchParams(nextSearchParams, { replace: true });
     });
     return () => cancelAnimationFrame(frameId);
   }, [questionId, questions, scrollContainerRef, searchParams, setSearchParams]);
+
+  // Clip the QA panel at the pinned language tabs so cards never show above or behind them.
+  const hasQuestions = questions !== null;
+  useEffect(() => {
+    const container = scrollContainerRef?.current;
+    const tabs = stickyTabsRef.current;
+    if (!container || !tabs) return;
+    const update = () => {
+      const panel = answerPanelRef.current;
+      if (!panel) return;
+      // Cut at the tabs' vertical middle: below their rounded corners, still hidden behind them.
+      const tabsRect = tabs.getBoundingClientRect();
+      const cut = tabsRect.top + tabsRect.height / 2 - panel.getBoundingClientRect().top;
+      panel.style.clipPath = cut > 0 ? `inset(${cut}px -100vmax -100vmax -100vmax)` : "";
+    };
+    update();
+    container.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      container.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, [scrollContainerRef, hasQuestions, qaLanguage]);
+
+  useEffect(() => {
+    if (highlightedId === null) return;
+    const timerId = setTimeout(() => setHighlightedId(null), HIGHLIGHT_DURATION_MS);
+    return () => clearTimeout(timerId);
+  }, [highlightedId]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -178,20 +212,23 @@ export default function CategoryDetailPage() {
 
             <Tabs value={qaLanguage} onValueChange={handleQaLanguageChange} className="mb-20 w-full">
               <div data-testid="qa-language-tabs" className="relative w-full">
-                <div ref={languageScrollRef} className="qa-language-scroll relative z-20">
+                <div ref={stickyTabsRef} className="qa-language-sticky sticky z-30">
+                <div ref={languageScrollRef} className="qa-language-scroll relative">
                   <TabsList aria-label={t.language || "Language"} className="grid-cols-9">
                     {languageOptions.map((option) => (
                       <TabsTrigger key={option.code} value={option.code} aria-label={option.label} title={option.label} className="group">
                         <FlagIcon
                           languageCode={option.code}
                           title={option.label}
-                          className="h-5 w-7 opacity-80 transition-all group-hover:opacity-100 group-data-[state=active]:scale-105 group-data-[state=active]:opacity-100 sm:h-6 sm:w-9"
+                          className="h-6 w-8 opacity-80 transition-all group-hover:opacity-100 group-data-[state=active]:scale-105 group-data-[state=active]:opacity-100 sm:h-7 sm:w-9"
                         />
                       </TabsTrigger>
                     ))}
                   </TabsList>
                 </div>
+                </div>
                 <TabsContent
+                  ref={answerPanelRef}
                   value={qaLanguage}
                   className="qa-answer-panel relative z-10 mt-0 rounded-b-[28px] border border-t-0 border-blue-100 bg-white px-5 pb-6 pt-6 shadow-[0_22px_50px_rgba(15,23,42,0.10)]"
                 >
@@ -206,6 +243,7 @@ export default function CategoryDetailPage() {
                             answer={question.回答}
                             updatedAt={question.time}
                             isOfficial={question.title === "official"}
+                            isHighlighted={highlightedId === Number(question.question_id)}
                             isExpanded={visibleAnswerId === question.question_id}
                             onToggle={toggleAnswer}
                             t={t}
