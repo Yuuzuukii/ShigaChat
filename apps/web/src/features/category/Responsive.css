@@ -1,3 +1,8 @@
+/* Pin the language tabs slightly below the header; the QA panel is clipped at the tabs by CategoryDetailPage. */
+.qa-language-sticky {
+  top: 0.75rem; /* gap below the header; main already reserves the header height as padding */
+}
+
 /* Keep the desktop presentation intact; adjust only space-constrained screens. */
 @media (max-width: 1023px) {
   .category-page-title > svg {

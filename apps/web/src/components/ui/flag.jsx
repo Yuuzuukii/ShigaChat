@@ -22,7 +22,7 @@ export function FlagIcon({ languageCode, className = "", title = "" }) {
       aria-hidden="true"
       title={title}
       className={cn(
-        "fi fis inline-block rounded-[0.2rem] shadow-sm ring-1 ring-black/10",
+        "fi inline-block rounded-[0.2rem]",
         `fi-${countryCode}`,
         className
       )}
